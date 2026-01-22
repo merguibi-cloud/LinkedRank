@@ -1,0 +1,14 @@
+{
+  "query": "SELECT linkedinUsername, COUNT(*) as count FROM linkedin_influencers GROUP BY linkedinUsername HAVING count > 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT linkedinUsername, COUNT(*) as count FROM linkedin_influencers GROUP BY linkedinUsername HAVING count > 1;",
+  "rows": [
+    {
+      "linkedinUsername": "NULL",
+      "count": "96"
+    }
+  ],
+  "messages": [],
+  "stdout": "linkedinUsername\tcount\nNULL\t96\n",
+  "stderr": "",
+  "execution_time_ms": 170
+}

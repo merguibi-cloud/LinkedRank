@@ -1,0 +1,8 @@
+{
+  "query": "SELECT * FROM linkedin_settings WHERE user_id = 1 LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT * FROM linkedin_settings WHERE user_id = 1 LIMIT 1;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'user_id' in 'where clause'"
+  ]
+}

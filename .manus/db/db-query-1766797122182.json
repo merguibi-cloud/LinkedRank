@@ -1,0 +1,26 @@
+{
+  "query": "SELECT id, agentId, type, title, status, priority FROM agent_tasks ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT id, agentId, type, title, status, priority FROM agent_tasks ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "2",
+      "agentId": "1",
+      "type": "generate_post",
+      "title": "Générer un post LinkedIn",
+      "status": "pending",
+      "priority": "medium"
+    },
+    {
+      "id": "1",
+      "agentId": "1",
+      "type": "generate_post",
+      "title": "Générer un post LinkedIn",
+      "status": "pending",
+      "priority": "medium"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tagentId\ttype\ttitle\tstatus\tpriority\n2\t1\tgenerate_post\tGénérer un post LinkedIn\tpending\tmedium\n1\t1\tgenerate_post\tGénérer un post LinkedIn\tpending\tmedium\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

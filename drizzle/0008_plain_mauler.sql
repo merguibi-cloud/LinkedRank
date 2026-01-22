@@ -1,0 +1,1 @@
+ALTER TABLE `agent_memory` MODIFY COLUMN `type` enum('user_preference','content_style','feedback','performance_insight','audience_insight','topic_expertise','best_practice','trend_analysis') NOT NULL;

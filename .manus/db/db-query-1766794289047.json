@@ -1,0 +1,913 @@
+{
+  "query": "SELECT id, name, linkedinUsername, country, followers FROM linkedin_influencers WHERE name IN (SELECT name FROM linkedin_influencers GROUP BY name HAVING COUNT(*) > 1) ORDER BY name, id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT id, name, linkedinUsername, country, followers FROM linkedin_influencers WHERE name IN (SELECT name FROM linkedin_influencers GROUP BY name HAVING COUNT(*) > 1) ORDER BY name, id;",
+  "rows": [
+    {
+      "id": "60007",
+      "name": "Adam Grant",
+      "linkedinUsername": "adammgrant",
+      "country": "USA",
+      "followers": "6800000"
+    },
+    {
+      "id": "90036",
+      "name": "Adam Grant",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "6800000"
+    },
+    {
+      "id": "60016",
+      "name": "Alex Hormozi",
+      "linkedinUsername": "alexhormozi",
+      "country": "USA",
+      "followers": "2800000"
+    },
+    {
+      "id": "90045",
+      "name": "Alex Hormozi",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "2800000"
+    },
+    {
+      "id": "60033",
+      "name": "Alex Xu",
+      "linkedinUsername": "aleaborwankar",
+      "country": "USA",
+      "followers": "950000"
+    },
+    {
+      "id": "90062",
+      "name": "Alex Xu",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "950000"
+    },
+    {
+      "id": "60026",
+      "name": "Andrew Huberman",
+      "linkedinUsername": "andrewhuberman",
+      "country": "USA",
+      "followers": "1500000"
+    },
+    {
+      "id": "90055",
+      "name": "Andrew Huberman",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "1500000"
+    },
+    {
+      "id": "60017",
+      "name": "Andrew Ng",
+      "linkedinUsername": "andrewyng",
+      "country": "USA",
+      "followers": "2800000"
+    },
+    {
+      "id": "90046",
+      "name": "Andrew Ng",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "2800000"
+    },
+    {
+      "id": "60048",
+      "name": "Aravind Srinivas",
+      "linkedinUsername": "aravindsrinivas",
+      "country": "USA",
+      "followers": "450000"
+    },
+    {
+      "id": "90077",
+      "name": "Aravind Srinivas",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "450000"
+    },
+    {
+      "id": "60003",
+      "name": "Arianna Huffington",
+      "linkedinUsername": "ariannahuffington",
+      "country": "USA",
+      "followers": "12000000"
+    },
+    {
+      "id": "60027",
+      "name": "Arianna Huffington",
+      "linkedinUsername": "araborwankar",
+      "country": "USA",
+      "followers": "1500000"
+    },
+    {
+      "id": "90032",
+      "name": "Arianna Huffington",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "12000000"
+    },
+    {
+      "id": "60065",
+      "name": "Badr Jafar",
+      "linkedinUsername": "badrjafar",
+      "country": "UAE",
+      "followers": "150000"
+    },
+    {
+      "id": "90015",
+      "name": "Badr Jafar",
+      "linkedinUsername": "NULL",
+      "country": "UAE",
+      "followers": "280000"
+    },
+    {
+      "id": "60010",
+      "name": "Barack Obama",
+      "linkedinUsername": "barackobama",
+      "country": "USA",
+      "followers": "4500000"
+    },
+    {
+      "id": "90039",
+      "name": "Barack Obama",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "4500000"
+    },
+    {
+      "id": "60055",
+      "name": "Benoit Dubos",
+      "linkedinUsername": "benoitdubos",
+      "country": "France",
+      "followers": "350000"
+    },
+    {
+      "id": "90084",
+      "name": "Benoit Dubos",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "350000"
+    },
+    {
+      "id": "60001",
+      "name": "Bill Gates",
+      "linkedinUsername": "williamhgates",
+      "country": "USA",
+      "followers": "36000000"
+    },
+    {
+      "id": "90030",
+      "name": "Bill Gates",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "36000000"
+    },
+    {
+      "id": "60009",
+      "name": "Brené Brown",
+      "linkedinUsername": "brenebrown",
+      "country": "USA",
+      "followers": "4500000"
+    },
+    {
+      "id": "90038",
+      "name": "Brené Brown",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "4500000"
+    },
+    {
+      "id": "60066",
+      "name": "Caroline Mignaux",
+      "linkedinUsername": "carolinemignaux",
+      "country": "France",
+      "followers": "150000"
+    },
+    {
+      "id": "90003",
+      "name": "Caroline Mignaux",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "320000"
+    },
+    {
+      "id": "60059",
+      "name": "Christopher Parola",
+      "linkedinUsername": "christopherparola",
+      "country": "France",
+      "followers": "250000"
+    },
+    {
+      "id": "90088",
+      "name": "Christopher Parola",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "250000"
+    },
+    {
+      "id": "60022",
+      "name": "Daniel Pink",
+      "linkedinUsername": "danielpink",
+      "country": "USA",
+      "followers": "1800000"
+    },
+    {
+      "id": "60029",
+      "name": "Daniel Pink",
+      "linkedinUsername": "danielhpink",
+      "country": "USA",
+      "followers": "1200000"
+    },
+    {
+      "id": "90051",
+      "name": "Daniel Pink",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "1800000"
+    },
+    {
+      "id": "60032",
+      "name": "Dharmesh Shah",
+      "linkedinUsername": "dharmesh",
+      "country": "USA",
+      "followers": "1100000"
+    },
+    {
+      "id": "90061",
+      "name": "Dharmesh Shah",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "1100000"
+    },
+    {
+      "id": "60053",
+      "name": "Dickie Bush",
+      "linkedinUsername": "dickiebush",
+      "country": "USA",
+      "followers": "380000"
+    },
+    {
+      "id": "90082",
+      "name": "Dickie Bush",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "380000"
+    },
+    {
+      "id": "60014",
+      "name": "Emmanuel Macron",
+      "linkedinUsername": "emmanuelmacron",
+      "country": "France",
+      "followers": "3500000"
+    },
+    {
+      "id": "90043",
+      "name": "Emmanuel Macron",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "3500000"
+    },
+    {
+      "id": "60041",
+      "name": "Ethan Mollick",
+      "linkedinUsername": "emollick",
+      "country": "USA",
+      "followers": "580000"
+    },
+    {
+      "id": "90070",
+      "name": "Ethan Mollick",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "580000"
+    },
+    {
+      "id": "60063",
+      "name": "Fadi Ghandour",
+      "linkedinUsername": "fadighandour",
+      "country": "UAE",
+      "followers": "180000"
+    },
+    {
+      "id": "90092",
+      "name": "Fadi Ghandour",
+      "linkedinUsername": "NULL",
+      "country": "UAE",
+      "followers": "180000"
+    },
+    {
+      "id": "60008",
+      "name": "Gary Vaynerchuk",
+      "linkedinUsername": "garyvaynerchuk",
+      "country": "USA",
+      "followers": "5200000"
+    },
+    {
+      "id": "90037",
+      "name": "Gary Vaynerchuk",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "5200000"
+    },
+    {
+      "id": "60021",
+      "name": "Grant Cardone",
+      "linkedinUsername": "gaborwankar",
+      "country": "USA",
+      "followers": "2100000"
+    },
+    {
+      "id": "90050",
+      "name": "Grant Cardone",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "2100000"
+    },
+    {
+      "id": "60046",
+      "name": "Guillaume Moubeche",
+      "linkedinUsername": "guillaumemoubeche",
+      "country": "France",
+      "followers": "450000"
+    },
+    {
+      "id": "90075",
+      "name": "Guillaume Moubeche",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "450000"
+    },
+    {
+      "id": "60030",
+      "name": "Guillaume Pley",
+      "linkedinUsername": "guillaumepley",
+      "country": "France",
+      "followers": "1200000"
+    },
+    {
+      "id": "90059",
+      "name": "Guillaume Pley",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "1200000"
+    },
+    {
+      "id": "60044",
+      "name": "Jasmin Alić",
+      "linkedinUsername": "jasmiinalic",
+      "country": "Germany",
+      "followers": "480000"
+    },
+    {
+      "id": "60045",
+      "name": "Jasmin Alić",
+      "linkedinUsername": "jasmin-alic",
+      "country": "Bosnia",
+      "followers": "480000"
+    },
+    {
+      "id": "90074",
+      "name": "Jasmin Alić",
+      "linkedinUsername": "NULL",
+      "country": "Bosnia",
+      "followers": "480000"
+    },
+    {
+      "id": "60039",
+      "name": "Jean-Marc Jancovici",
+      "linkedinUsername": "jmjancovici",
+      "country": "France",
+      "followers": "650000"
+    },
+    {
+      "id": "90068",
+      "name": "Jean-Marc Jancovici",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "650000"
+    },
+    {
+      "id": "60024",
+      "name": "Jensen Huang",
+      "linkedinUsername": "jenhsunhuang",
+      "country": "USA",
+      "followers": "1800000"
+    },
+    {
+      "id": "90053",
+      "name": "Jensen Huang",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "1800000"
+    },
+    {
+      "id": "60038",
+      "name": "Justin Welsh",
+      "linkedinUsername": "justinwelsh",
+      "country": "USA",
+      "followers": "750000"
+    },
+    {
+      "id": "90067",
+      "name": "Justin Welsh",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "750000"
+    },
+    {
+      "id": "60052",
+      "name": "Lara Acosta",
+      "linkedinUsername": "laraacosta",
+      "country": "UK",
+      "followers": "380000"
+    },
+    {
+      "id": "60054",
+      "name": "Lara Acosta",
+      "linkedinUsername": "iamlara",
+      "country": "UK",
+      "followers": "380000"
+    },
+    {
+      "id": "90081",
+      "name": "Lara Acosta",
+      "linkedinUsername": "NULL",
+      "country": "UK",
+      "followers": "380000"
+    },
+    {
+      "id": "60031",
+      "name": "Lewis Hamilton",
+      "linkedinUsername": "lewishamilton",
+      "country": "UK",
+      "followers": "1200000"
+    },
+    {
+      "id": "90060",
+      "name": "Lewis Hamilton",
+      "linkedinUsername": "NULL",
+      "country": "UK",
+      "followers": "1200000"
+    },
+    {
+      "id": "60035",
+      "name": "Lex Fridman",
+      "linkedinUsername": "lexfridman",
+      "country": "USA",
+      "followers": "850000"
+    },
+    {
+      "id": "90064",
+      "name": "Lex Fridman",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "850000"
+    },
+    {
+      "id": "60058",
+      "name": "Maud Alavès",
+      "linkedinUsername": "maudalaves",
+      "country": "France",
+      "followers": "280000"
+    },
+    {
+      "id": "90087",
+      "name": "Maud Alavès",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "280000"
+    },
+    {
+      "id": "60005",
+      "name": "Narendra Modi",
+      "linkedinUsername": "naaborwankar",
+      "country": "India",
+      "followers": "10000000"
+    },
+    {
+      "id": "90034",
+      "name": "Narendra Modi",
+      "linkedinUsername": "NULL",
+      "country": "India",
+      "followers": "10000000"
+    },
+    {
+      "id": "60050",
+      "name": "Naval Ravikant",
+      "linkedinUsername": "naval-ravikant",
+      "country": "USA",
+      "followers": "420000"
+    },
+    {
+      "id": "90079",
+      "name": "Naval Ravikant",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "420000"
+    },
+    {
+      "id": "60049",
+      "name": "Nicolas Cole",
+      "linkedinUsername": "nicolascole77",
+      "country": "USA",
+      "followers": "450000"
+    },
+    {
+      "id": "90078",
+      "name": "Nicolas Cole",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "450000"
+    },
+    {
+      "id": "60020",
+      "name": "Nikhil Kamath",
+      "linkedinUsername": "nikhilkamathcio",
+      "country": "India",
+      "followers": "2100000"
+    },
+    {
+      "id": "90049",
+      "name": "Nikhil Kamath",
+      "linkedinUsername": "NULL",
+      "country": "India",
+      "followers": "2100000"
+    },
+    {
+      "id": "60051",
+      "name": "Nina Ramen",
+      "linkedinUsername": "ninaramen",
+      "country": "France",
+      "followers": "380000"
+    },
+    {
+      "id": "90080",
+      "name": "Nina Ramen",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "380000"
+    },
+    {
+      "id": "60018",
+      "name": "Nithin Kamath",
+      "linkedinUsername": "nitaborwankar",
+      "country": "India",
+      "followers": "2500000"
+    },
+    {
+      "id": "90047",
+      "name": "Nithin Kamath",
+      "linkedinUsername": "NULL",
+      "country": "India",
+      "followers": "2500000"
+    },
+    {
+      "id": "60047",
+      "name": "Noah Kagan",
+      "linkedinUsername": "noahkagan",
+      "country": "USA",
+      "followers": "450000"
+    },
+    {
+      "id": "90076",
+      "name": "Noah Kagan",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "450000"
+    },
+    {
+      "id": "60057",
+      "name": "Oussama Ammar",
+      "linkedinUsername": "oussamaammar",
+      "country": "France",
+      "followers": "320000"
+    },
+    {
+      "id": "90086",
+      "name": "Oussama Ammar",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "320000"
+    },
+    {
+      "id": "60036",
+      "name": "Patrick Bet-David",
+      "linkedinUsername": "patrickbetdavid",
+      "country": "USA",
+      "followers": "850000"
+    },
+    {
+      "id": "90065",
+      "name": "Patrick Bet-David",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "850000"
+    },
+    {
+      "id": "60037",
+      "name": "Rafael Nadal",
+      "linkedinUsername": "rafaelnadal",
+      "country": "Spain",
+      "followers": "850000"
+    },
+    {
+      "id": "90066",
+      "name": "Rafael Nadal",
+      "linkedinUsername": "NULL",
+      "country": "Spain",
+      "followers": "850000"
+    },
+    {
+      "id": "60012",
+      "name": "Ray Dalio",
+      "linkedinUsername": "raydalio",
+      "country": "USA",
+      "followers": "3500000"
+    },
+    {
+      "id": "90023",
+      "name": "Ray Dalio",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "3800000"
+    },
+    {
+      "id": "60015",
+      "name": "Reid Hoffman",
+      "linkedinUsername": "raborwankar",
+      "country": "USA",
+      "followers": "3200000"
+    },
+    {
+      "id": "90044",
+      "name": "Reid Hoffman",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "3200000"
+    },
+    {
+      "id": "60002",
+      "name": "Richard Branson",
+      "linkedinUsername": "rbranson",
+      "country": "UK",
+      "followers": "19500000"
+    },
+    {
+      "id": "90031",
+      "name": "Richard Branson",
+      "linkedinUsername": "NULL",
+      "country": "UK",
+      "followers": "19500000"
+    },
+    {
+      "id": "60067",
+      "name": "Ronaldo Mouchawar",
+      "linkedinUsername": "ronaldomouchawar",
+      "country": "UAE",
+      "followers": "120000"
+    },
+    {
+      "id": "90096",
+      "name": "Ronaldo Mouchawar",
+      "linkedinUsername": "NULL",
+      "country": "UAE",
+      "followers": "120000"
+    },
+    {
+      "id": "60064",
+      "name": "Roxanne Varza",
+      "linkedinUsername": "roxannevarza",
+      "country": "France",
+      "followers": "180000"
+    },
+    {
+      "id": "90093",
+      "name": "Roxanne Varza",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "180000"
+    },
+    {
+      "id": "60062",
+      "name": "Ruben Taieb",
+      "linkedinUsername": "rubentaieb",
+      "country": "France",
+      "followers": "200000"
+    },
+    {
+      "id": "90091",
+      "name": "Ruben Taieb",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "200000"
+    },
+    {
+      "id": "60028",
+      "name": "Sahil Bloom",
+      "linkedinUsername": "sahilbloom",
+      "country": "USA",
+      "followers": "1200000"
+    },
+    {
+      "id": "90057",
+      "name": "Sahil Bloom",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "1200000"
+    },
+    {
+      "id": "60034",
+      "name": "Sam Altman",
+      "linkedinUsername": "samaltman",
+      "country": "USA",
+      "followers": "950000"
+    },
+    {
+      "id": "90063",
+      "name": "Sam Altman",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "950000"
+    },
+    {
+      "id": "60023",
+      "name": "Sara Blakely",
+      "linkedinUsername": "sarablakely",
+      "country": "USA",
+      "followers": "1800000"
+    },
+    {
+      "id": "90052",
+      "name": "Sara Blakely",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "1800000"
+    },
+    {
+      "id": "60004",
+      "name": "Satya Nadella",
+      "linkedinUsername": "sataborwankar",
+      "country": "USA",
+      "followers": "11000000"
+    },
+    {
+      "id": "90033",
+      "name": "Satya Nadella",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "11000000"
+    },
+    {
+      "id": "60060",
+      "name": "Shubham Sharma",
+      "linkedinUsername": "shubhamsharma",
+      "country": "France",
+      "followers": "240000"
+    },
+    {
+      "id": "90089",
+      "name": "Shubham Sharma",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "240000"
+    },
+    {
+      "id": "60006",
+      "name": "Simon Sinek",
+      "linkedinUsername": "simonsinek",
+      "country": "USA",
+      "followers": "7500000"
+    },
+    {
+      "id": "90035",
+      "name": "Simon Sinek",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "7500000"
+    },
+    {
+      "id": "60019",
+      "name": "Steven Bartlett",
+      "linkedinUsername": "stevenbartlett",
+      "country": "UK",
+      "followers": "2100000"
+    },
+    {
+      "id": "90011",
+      "name": "Steven Bartlett",
+      "linkedinUsername": "NULL",
+      "country": "UK",
+      "followers": "2100000"
+    },
+    {
+      "id": "60011",
+      "name": "Sundar Pichai",
+      "linkedinUsername": "sundarpichai",
+      "country": "USA",
+      "followers": "4200000"
+    },
+    {
+      "id": "90019",
+      "name": "Sundar Pichai",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "8500000"
+    },
+    {
+      "id": "60056",
+      "name": "Thibault Louis",
+      "linkedinUsername": "thibaultlouis",
+      "country": "France",
+      "followers": "320000"
+    },
+    {
+      "id": "90085",
+      "name": "Thibault Louis",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "320000"
+    },
+    {
+      "id": "60040",
+      "name": "Tim Denning",
+      "linkedinUsername": "timdenning1",
+      "country": "Australia",
+      "followers": "650000"
+    },
+    {
+      "id": "60043",
+      "name": "Tim Denning",
+      "linkedinUsername": "timdenning",
+      "country": "Australia",
+      "followers": "520000"
+    },
+    {
+      "id": "90069",
+      "name": "Tim Denning",
+      "linkedinUsername": "NULL",
+      "country": "Australia",
+      "followers": "650000"
+    },
+    {
+      "id": "60013",
+      "name": "Tony Robbins",
+      "linkedinUsername": "officialtonyrobbins",
+      "country": "USA",
+      "followers": "3500000"
+    },
+    {
+      "id": "90042",
+      "name": "Tony Robbins",
+      "linkedinUsername": "NULL",
+      "country": "USA",
+      "followers": "3500000"
+    },
+    {
+      "id": "60025",
+      "name": "Ursula von der Leyen",
+      "linkedinUsername": "uraborwankar",
+      "country": "Germany",
+      "followers": "1800000"
+    },
+    {
+      "id": "90054",
+      "name": "Ursula von der Leyen",
+      "linkedinUsername": "NULL",
+      "country": "Germany",
+      "followers": "1800000"
+    },
+    {
+      "id": "60061",
+      "name": "Violette Dorange",
+      "linkedinUsername": "violettedorange",
+      "country": "France",
+      "followers": "220000"
+    },
+    {
+      "id": "90090",
+      "name": "Violette Dorange",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "220000"
+    },
+    {
+      "id": "60042",
+      "name": "Youssef Koutari",
+      "linkedinUsername": "youssefkoutari",
+      "country": "France",
+      "followers": "542000"
+    },
+    {
+      "id": "90071",
+      "name": "Youssef Koutari",
+      "linkedinUsername": "NULL",
+      "country": "France",
+      "followers": "542000"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tlinkedinUsername\tcountry\tfollowers\n60007\tAdam Grant\tadammgrant\tUSA\t6800000\n90036\tAdam Grant\tNULL\tUSA\t6800000\n60016\tAlex Hormozi\talexhormozi\tUSA\t2800000\n90045\tAlex Hormozi\tNULL\tUSA\t2800000\n60033\tAlex Xu\taleaborwankar\tUSA\t950000\n90062\tAlex Xu\tNULL\tUSA\t950000\n60026\tAndrew Huberman\tandrewhuberman\tUSA\t1500000\n90055\tAndrew Huberman\tNULL\tUSA\t1500000\n60017\tAndrew Ng\tandrewyng\tUSA\t2800000\n90046\tAndrew Ng\tNULL\tUSA\t2800000\n60048\tAravind Srinivas\taravindsrinivas\tUSA\t450000\n90077\tAravind Srinivas\tNULL\tUSA\t450000\n60003\tArianna Huffington\tariannahuffington\tUSA\t12000000\n60027\tArianna Huffington\taraborwankar\tUSA\t1500000\n90032\tArianna Huffington\tNULL\tUSA\t12000000\n60065\tBadr Jafar\tbadrjafar\tUAE\t150000\n90015\tBadr Jafar\tNULL\tUAE\t280000\n60010\tBarack Obama\tbarackobama\tUSA\t4500000\n90039\tBarack Obama\tNULL\tUSA\t4500000\n60055\tBenoit Dubos\tbenoitdubos\tFrance\t350000\n90084\tBenoit Dubos\tNULL\tFrance\t350000\n60001\tBill Gates\twilliamhgates\tUSA\t36000000\n90030\tBill Gates\tNULL\tUSA\t36000000\n60009\tBrené Brown\tbrenebrown\tUSA\t4500000\n90038\tBrené Brown\tNULL\tUSA\t4500000\n60066\tCaroline Mignaux\tcarolinemignaux\tFrance\t150000\n90003\tCaroline Mignaux\tNULL\tFrance\t320000\n60059\tChristopher Parola\tchristopherparola\tFrance\t250000\n90088\tChristopher Parola\tNULL\tFrance\t250000\n60022\tDaniel Pink\tdanielpink\tUSA\t1800000\n60029\tDaniel Pink\tdanielhpink\tUSA\t1200000\n90051\tDaniel Pink\tNULL\tUSA\t1800000\n60032\tDharmesh Shah\tdharmesh\tUSA\t1100000\n90061\tDharmesh Shah\tNULL\tUSA\t1100000\n60053\tDickie Bush\tdickiebush\tUSA\t380000\n90082\tDickie Bush\tNULL\tUSA\t380000\n60014\tEmmanuel Macron\temmanuelmacron\tFrance\t3500000\n90043\tEmmanuel Macron\tNULL\tFrance\t3500000\n60041\tEthan Mollick\temollick\tUSA\t580000\n90070\tEthan Mollick\tNULL\tUSA\t580000\n60063\tFadi Ghandour\tfadighandour\tUAE\t180000\n90092\tFadi Ghandour\tNULL\tUAE\t180000\n60008\tGary Vaynerchuk\tgaryvaynerchuk\tUSA\t5200000\n90037\tGary Vaynerchuk\tNULL\tUSA\t5200000\n60021\tGrant Cardone\tgaborwankar\tUSA\t2100000\n90050\tGrant Cardone\tNULL\tUSA\t2100000\n60046\tGuillaume Moubeche\tguillaumemoubeche\tFrance\t450000\n90075\tGuillaume Moubeche\tNULL\tFrance\t450000\n60030\tGuillaume Pley\tguillaumepley\tFrance\t1200000\n90059\tGuillaume Pley\tNULL\tFrance\t1200000\n60044\tJasmin Alić\tjasmiinalic\tGermany\t480000\n60045\tJasmin Alić\tjasmin-alic\tBosnia\t480000\n90074\tJasmin Alić\tNULL\tBosnia\t480000\n60039\tJean-Marc Jancovici\tjmjancovici\tFrance\t650000\n90068\tJean-Marc Jancovici\tNULL\tFrance\t650000\n60024\tJensen Huang\tjenhsunhuang\tUSA\t1800000\n90053\tJensen Huang\tNULL\tUSA\t1800000\n60038\tJustin Welsh\tjustinwelsh\tUSA\t750000\n90067\tJustin Welsh\tNULL\tUSA\t750000\n60052\tLara Acosta\tlaraacosta\tUK\t380000\n60054\tLara Acosta\tiamlara\tUK\t380000\n90081\tLara Acosta\tNULL\tUK\t380000\n60031\tLewis Hamilton\tlewishamilton\tUK\t1200000\n90060\tLewis Hamilton\tNULL\tUK\t1200000\n60035\tLex Fridman\tlexfridman\tUSA\t850000\n90064\tLex Fridman\tNULL\tUSA\t850000\n60058\tMaud Alavès\tmaudalaves\tFrance\t280000\n90087\tMaud Alavès\tNULL\tFrance\t280000\n60005\tNarendra Modi\tnaaborwankar\tIndia\t10000000\n90034\tNarendra Modi\tNULL\tIndia\t10000000\n60050\tNaval Ravikant\tnaval-ravikant\tUSA\t420000\n90079\tNaval Ravikant\tNULL\tUSA\t420000\n60049\tNicolas Cole\tnicolascole77\tUSA\t450000\n90078\tNicolas Cole\tNULL\tUSA\t450000\n60020\tNikhil Kamath\tnikhilkamathcio\tIndia\t2100000\n90049\tNikhil Kamath\tNULL\tIndia\t2100000\n60051\tNina Ramen\tninaramen\tFrance\t380000\n90080\tNina Ramen\tNULL\tFrance\t380000\n60018\tNithin Kamath\tnitaborwankar\tIndia\t2500000\n90047\tNithin Kamath\tNULL\tIndia\t2500000\n60047\tNoah Kagan\tnoahkagan\tUSA\t450000\n90076\tNoah Kagan\tNULL\tUSA\t450000\n60057\tOussama Ammar\toussamaammar\tFrance\t320000\n90086\tOussama Ammar\tNULL\tFrance\t320000\n60036\tPatrick Bet-David\tpatrickbetdavid\tUSA\t850000\n90065\tPatrick Bet-David\tNULL\tUSA\t850000\n60037\tRafael Nadal\trafaelnadal\tSpain\t850000\n90066\tRafael Nadal\tNULL\tSpain\t850000\n60012\tRay Dalio\traydalio\tUSA\t3500000\n90023\tRay Dalio\tNULL\tUSA\t3800000\n60015\tReid Hoffman\traborwankar\tUSA\t3200000\n90044\tReid Hoffman\tNULL\tUSA\t3200000\n60002\tRichard Branson\trbranson\tUK\t19500000\n90031\tRichard Branson\tNULL\tUK\t19500000\n60067\tRonaldo Mouchawar\tronaldomouchawar\tUAE\t120000\n90096\tRonaldo Mouchawar\tNULL\tUAE\t120000\n60064\tRoxanne Varza\troxannevarza\tFrance\t180000\n90093\tRoxanne Varza\tNULL\tFrance\t180000\n60062\tRuben Taieb\trubentaieb\tFrance\t200000\n90091\tRuben Taieb\tNULL\tFrance\t200000\n60028\tSahil Bloom\tsahilbloom\tUSA\t1200000\n90057\tSahil Bloom\tNULL\tUSA\t1200000\n60034\tSam Altman\tsamaltman\tUSA\t950000\n90063\tSam Altman\tNULL\tUSA\t950000\n60023\tSara Blakely\tsarablakely\tUSA\t1800000\n90052\tSara Blakely\tNULL\tUSA\t1800000\n60004\tSatya Nadella\tsataborwankar\tUSA\t11000000\n90033\tSatya Nadella\tNULL\tUSA\t11000000\n60060\tShubham Sharma\tshubhamsharma\tFrance\t240000\n90089\tShubham Sharma\tNULL\tFrance\t240000\n60006\tSimon Sinek\tsimonsinek\tUSA\t7500000\n90035\tSimon Sinek\tNULL\tUSA\t7500000\n60019\tSteven Bartlett\tstevenbartlett\tUK\t2100000\n90011\tSteven Bartlett\tNULL\tUK\t2100000\n60011\tSundar Pichai\tsundarpichai\tUSA\t4200000\n90019\tSundar Pichai\tNULL\tUSA\t8500000\n60056\tThibault Louis\tthibaultlouis\tFrance\t320000\n90085\tThibault Louis\tNULL\tFrance\t320000\n60040\tTim Denning\ttimdenning1\tAustralia\t650000\n60043\tTim Denning\ttimdenning\tAustralia\t520000\n90069\tTim Denning\tNULL\tAustralia\t650000\n60013\tTony Robbins\tofficialtonyrobbins\tUSA\t3500000\n90042\tTony Robbins\tNULL\tUSA\t3500000\n60025\tUrsula von der Leyen\turaborwankar\tGermany\t1800000\n90054\tUrsula von der Leyen\tNULL\tGermany\t1800000\n60061\tViolette Dorange\tviolettedorange\tFrance\t220000\n90090\tViolette Dorange\tNULL\tFrance\t220000\n60042\tYoussef Koutari\tyoussefkoutari\tFrance\t542000\n90071\tYoussef Koutari\tNULL\tFrance\t542000\n",
+  "stderr": "",
+  "execution_time_ms": 54
+}

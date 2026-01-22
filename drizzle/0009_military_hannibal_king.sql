@@ -1,0 +1,1 @@
+ALTER TABLE `agent_tasks` MODIFY COLUMN `type` enum('generate_post','generate_carousel','generate_infographic','suggest_response','detect_trend','analyze_trends','analyze_performance','suggest_connection','schedule_post') NOT NULL;

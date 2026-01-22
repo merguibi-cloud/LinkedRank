@@ -1,0 +1,90 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1766263392055,
+      "tag": "0000_pretty_toad_men",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1766263499941,
+      "tag": "0001_whole_lifeguard",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1766265880146,
+      "tag": "0002_rapid_redwing",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1766365646193,
+      "tag": "0003_futuristic_miracleman",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1766368802180,
+      "tag": "0004_pretty_amazoness",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1766523755191,
+      "tag": "0005_outgoing_miek",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1766676668684,
+      "tag": "0006_unknown_greymalkin",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1766793116454,
+      "tag": "0007_careless_the_anarchist",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1766793702620,
+      "tag": "0008_plain_mauler",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1766793742766,
+      "tag": "0009_military_hannibal_king",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1766798153321,
+      "tag": "0010_new_mongu",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1766798705904,
+      "tag": "0011_mushy_maelstrom",
+      "breakpoints": true
+    }
+  ]
+}

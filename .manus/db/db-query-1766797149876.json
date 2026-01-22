@@ -1,0 +1,30 @@
+{
+  "query": "SELECT id, agentId, userId, type, title, status, priority, description FROM agent_tasks;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT id, agentId, userId, type, title, status, priority, description FROM agent_tasks;",
+  "rows": [
+    {
+      "id": "1",
+      "agentId": "1",
+      "userId": "1",
+      "type": "generate_post",
+      "title": "Générer un post LinkedIn",
+      "status": "pending",
+      "priority": "medium",
+      "description": "Créer un post engageant sur les dernières tendances de l'Intelligence Artificielle en 2025, avec un ton professionnel mais accessible. Inclure des statistiques récentes et terminer par une question pour engager la communauté."
+    },
+    {
+      "id": "2",
+      "agentId": "1",
+      "userId": "1",
+      "type": "generate_post",
+      "title": "Générer un post LinkedIn",
+      "status": "pending",
+      "priority": "medium",
+      "description": "Créer un post engageant sur les tendances IA en 2025"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tagentId\tuserId\ttype\ttitle\tstatus\tpriority\tdescription\n1\t1\t1\tgenerate_post\tGénérer un post LinkedIn\tpending\tmedium\tCréer un post engageant sur les dernières tendances de l'Intelligence Artificielle en 2025, avec un ton professionnel mais accessible. Inclure des statistiques récentes et terminer par une question pour engager la communauté.\n2\t1\t1\tgenerate_post\tGénérer un post LinkedIn\tpending\tmedium\tCréer un post engageant sur les tendances IA en 2025\n",
+  "stderr": "",
+  "execution_time_ms": 49
+}

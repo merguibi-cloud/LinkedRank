@@ -1,0 +1,90 @@
+{
+  "query": "SELECT name, COUNT(*) as count FROM linkedin_influencers GROUP BY name HAVING COUNT(*) > 1 ORDER BY count DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT name, COUNT(*) as count FROM linkedin_influencers GROUP BY name HAVING COUNT(*) > 1 ORDER BY count DESC LIMIT 20;",
+  "rows": [
+    {
+      "name": "Lara Acosta",
+      "count": "3"
+    },
+    {
+      "name": "Arianna Huffington",
+      "count": "3"
+    },
+    {
+      "name": "Daniel Pink",
+      "count": "3"
+    },
+    {
+      "name": "Tim Denning",
+      "count": "3"
+    },
+    {
+      "name": "Jasmin Alić",
+      "count": "3"
+    },
+    {
+      "name": "Oussama Ammar",
+      "count": "2"
+    },
+    {
+      "name": "Dharmesh Shah",
+      "count": "2"
+    },
+    {
+      "name": "Nicolas Cole",
+      "count": "2"
+    },
+    {
+      "name": "Dickie Bush",
+      "count": "2"
+    },
+    {
+      "name": "Andrew Huberman",
+      "count": "2"
+    },
+    {
+      "name": "Violette Dorange",
+      "count": "2"
+    },
+    {
+      "name": "Reid Hoffman",
+      "count": "2"
+    },
+    {
+      "name": "Justin Welsh",
+      "count": "2"
+    },
+    {
+      "name": "Adam Grant",
+      "count": "2"
+    },
+    {
+      "name": "Lex Fridman",
+      "count": "2"
+    },
+    {
+      "name": "Narendra Modi",
+      "count": "2"
+    },
+    {
+      "name": "Emmanuel Macron",
+      "count": "2"
+    },
+    {
+      "name": "Youssef Koutari",
+      "count": "2"
+    },
+    {
+      "name": "Ronaldo Mouchawar",
+      "count": "2"
+    },
+    {
+      "name": "Bill Gates",
+      "count": "2"
+    }
+  ],
+  "messages": [],
+  "stdout": "name\tcount\nLara Acosta\t3\nArianna Huffington\t3\nDaniel Pink\t3\nTim Denning\t3\nJasmin Alić\t3\nOussama Ammar\t2\nDharmesh Shah\t2\nNicolas Cole\t2\nDickie Bush\t2\nAndrew Huberman\t2\nViolette Dorange\t2\nReid Hoffman\t2\nJustin Welsh\t2\nAdam Grant\t2\nLex Fridman\t2\nNarendra Modi\t2\nEmmanuel Macron\t2\nYoussef Koutari\t2\nRonaldo Mouchawar\t2\nBill Gates\t2\n",
+  "stderr": "",
+  "execution_time_ms": 476
+}

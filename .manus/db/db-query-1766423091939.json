@@ -1,0 +1,60 @@
+{
+  "query": "SELECT name, followers, country FROM linkedin_influencers ORDER BY followers DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT name, followers, country FROM linkedin_influencers ORDER BY followers DESC LIMIT 10;",
+  "rows": [
+    {
+      "name": "Bill Gates",
+      "followers": "36000000",
+      "country": "USA"
+    },
+    {
+      "name": "Richard Branson",
+      "followers": "19500000",
+      "country": "UK"
+    },
+    {
+      "name": "Arianna Huffington",
+      "followers": "12000000",
+      "country": "USA"
+    },
+    {
+      "name": "Satya Nadella",
+      "followers": "11000000",
+      "country": "USA"
+    },
+    {
+      "name": "Narendra Modi",
+      "followers": "10000000",
+      "country": "India"
+    },
+    {
+      "name": "Simon Sinek",
+      "followers": "7500000",
+      "country": "USA"
+    },
+    {
+      "name": "Adam Grant",
+      "followers": "6800000",
+      "country": "USA"
+    },
+    {
+      "name": "Gary Vaynerchuk",
+      "followers": "5200000",
+      "country": "USA"
+    },
+    {
+      "name": "Barack Obama",
+      "followers": "4500000",
+      "country": "USA"
+    },
+    {
+      "name": "Brené Brown",
+      "followers": "4500000",
+      "country": "USA"
+    }
+  ],
+  "messages": [],
+  "stdout": "name\tfollowers\tcountry\nBill Gates\t36000000\tUSA\nRichard Branson\t19500000\tUK\nArianna Huffington\t12000000\tUSA\nSatya Nadella\t11000000\tUSA\nNarendra Modi\t10000000\tIndia\nSimon Sinek\t7500000\tUSA\nAdam Grant\t6800000\tUSA\nGary Vaynerchuk\t5200000\tUSA\nBarack Obama\t4500000\tUSA\nBrené Brown\t4500000\tUSA\n",
+  "stderr": "",
+  "execution_time_ms": 54
+}

@@ -1,0 +1,37 @@
+{
+  "query": "SELECT id, agentId, type, title, status, outputData, createdAt FROM agent_tasks ORDER BY createdAt DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT id, agentId, type, title, status, outputData, createdAt FROM agent_tasks ORDER BY createdAt DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "3",
+      "agentId": "1",
+      "type": "generate_post",
+      "title": "Générer un post LinkedIn",
+      "status": "awaiting_approval",
+      "outputData": "{\"generatedPost\":{\"title\":\"L'IA n'est pas une menace, c'est un levier.\",\"content\":\"85% des emplois de 2030 n'existent pas encore. Cette statistique, souvent citée, prend tout son sens face à l'accélération fulgurante de l'Intelligence Artificielle.\\n\\nL'IA ne va pas remplacer l'humain. Elle va remplacer l'humain qui refuse d'utiliser l'IA.\\n\\nNous assistons à une transformation radicale du marché du travail, non pas une destruction.\\n\\nSelon le Forum Économique Mondial, l'IA pourrait créer 97 millions de nouveaux rôles d'ici 2025, tout en automatisant environ 85 millions de tâches répétitives.\\n\\nLe véritable enjeu n'est plus la technologie elle-même, mais notre capacité à nous adapter et à développer des compétences complémentaires : pensée critique, créativité, intelligence émotionnelle.\\n\\nLes entreprises qui investissent massivement dans la formation de leurs équipes aux outils d'IA verront leur productivité augmenter de 40% en moyenne (selon une étude récente de McKinsey).\\n\\nC'est la preuve que l'avantage concurrentiel de demain réside dans la symbiose Homme-Machine.\\n\\nNe craignez pas l'outil. Maîtrisez-le.\\n\\nC'est l'ère de l'augmentation, pas du remplacement.\",\"hashtags\":[\"IntelligenceArtificielle\",\"FuturDuTravail\",\"TransformationDigitale\"],\"suggestedMedia\":\"Image professionnelle et inspirante montrant un humain travaillant en collaboration avec des données ou un graphique futuriste symbolisant la croissance et l'innovation.\",\"callToAction\":\"Dans votre secteur, quelle compétence humaine l'IA ne pourra-t-elle jamais remplacer ? Partagez votre analyse en commentaire.\"},\"metadata\":{\"theme\":\"Générer un post LinkedIn\",\"tone\":\"professional\",\"language\":\"FR\",\"generatedAt\":\"2025-12-27T01:04:17.307Z\"}}",
+      "createdAt": "2025-12-27 01:04:10"
+    },
+    {
+      "id": "2",
+      "agentId": "1",
+      "type": "generate_post",
+      "title": "Générer un post LinkedIn",
+      "status": "pending",
+      "outputData": "NULL",
+      "createdAt": "2025-12-27 00:58:23"
+    },
+    {
+      "id": "1",
+      "agentId": "1",
+      "type": "generate_post",
+      "title": "Générer un post LinkedIn",
+      "status": "pending",
+      "outputData": "NULL",
+      "createdAt": "2025-12-27 00:54:49"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tagentId\ttype\ttitle\tstatus\toutputData\tcreatedAt\n3\t1\tgenerate_post\tGénérer un post LinkedIn\tawaiting_approval\t{\"generatedPost\":{\"title\":\"L'IA n'est pas une menace, c'est un levier.\",\"content\":\"85% des emplois de 2030 n'existent pas encore. Cette statistique, souvent citée, prend tout son sens face à l'accélération fulgurante de l'Intelligence Artificielle.\\n\\nL'IA ne va pas remplacer l'humain. Elle va remplacer l'humain qui refuse d'utiliser l'IA.\\n\\nNous assistons à une transformation radicale du marché du travail, non pas une destruction.\\n\\nSelon le Forum Économique Mondial, l'IA pourrait créer 97 millions de nouveaux rôles d'ici 2025, tout en automatisant environ 85 millions de tâches répétitives.\\n\\nLe véritable enjeu n'est plus la technologie elle-même, mais notre capacité à nous adapter et à développer des compétences complémentaires : pensée critique, créativité, intelligence émotionnelle.\\n\\nLes entreprises qui investissent massivement dans la formation de leurs équipes aux outils d'IA verront leur productivité augmenter de 40% en moyenne (selon une étude récente de McKinsey).\\n\\nC'est la preuve que l'avantage concurrentiel de demain réside dans la symbiose Homme-Machine.\\n\\nNe craignez pas l'outil. Maîtrisez-le.\\n\\nC'est l'ère de l'augmentation, pas du remplacement.\",\"hashtags\":[\"IntelligenceArtificielle\",\"FuturDuTravail\",\"TransformationDigitale\"],\"suggestedMedia\":\"Image professionnelle et inspirante montrant un humain travaillant en collaboration avec des données ou un graphique futuriste symbolisant la croissance et l'innovation.\",\"callToAction\":\"Dans votre secteur, quelle compétence humaine l'IA ne pourra-t-elle jamais remplacer ? Partagez votre analyse en commentaire.\"},\"metadata\":{\"theme\":\"Générer un post LinkedIn\",\"tone\":\"professional\",\"language\":\"FR\",\"generatedAt\":\"2025-12-27T01:04:17.307Z\"}}\t2025-12-27 01:04:10\n2\t1\tgenerate_post\tGénérer un post LinkedIn\tpending\tNULL\t2025-12-27 00:58:23\n1\t1\tgenerate_post\tGénérer un post LinkedIn\tpending\tNULL\t2025-12-27 00:54:49\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

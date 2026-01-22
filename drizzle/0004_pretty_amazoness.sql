@@ -1,0 +1,1 @@
+ALTER TABLE `auto_publish_queue` ADD `imageUrl` text;

@@ -1,0 +1,33 @@
+{
+  "query": "SELECT * FROM agent_tasks LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT * FROM agent_tasks LIMIT 1;",
+  "rows": [
+    {
+      "id": "1",
+      "agentId": "1",
+      "userId": "1",
+      "type": "generate_post",
+      "title": "Générer un post LinkedIn",
+      "description": "Créer un post engageant sur les dernières tendances de l'Intelligence Artificielle en 2025, avec un ton professionnel mais accessible. Inclure des statistiques récentes et terminer par une question pour engager la communauté.",
+      "status": "pending",
+      "priority": "medium",
+      "scheduledFor": "NULL",
+      "startedAt": "NULL",
+      "completedAt": "NULL",
+      "inputData": "NULL",
+      "outputData": "NULL",
+      "requiresApproval": "1",
+      "approvedAt": "NULL",
+      "approvedBy": "NULL",
+      "rejectionReason": "NULL",
+      "errorMessage": "NULL",
+      "retryCount": "0",
+      "createdAt": "2025-12-27 00:54:49",
+      "updatedAt": "2025-12-27 00:54:49"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tagentId\tuserId\ttype\ttitle\tdescription\tstatus\tpriority\tscheduledFor\tstartedAt\tcompletedAt\tinputData\toutputData\trequiresApproval\tapprovedAt\tapprovedBy\trejectionReason\terrorMessage\tretryCount\tcreatedAt\tupdatedAt\n1\t1\t1\tgenerate_post\tGénérer un post LinkedIn\tCréer un post engageant sur les dernières tendances de l'Intelligence Artificielle en 2025, avec un ton professionnel mais accessible. Inclure des statistiques récentes et terminer par une question pour engager la communauté.\tpending\tmedium\tNULL\tNULL\tNULL\tNULL\tNULL\t1\tNULL\tNULL\tNULL\tNULL\t0\t2025-12-27 00:54:49\t2025-12-27 00:54:49\n",
+  "stderr": "",
+  "execution_time_ms": 54
+}

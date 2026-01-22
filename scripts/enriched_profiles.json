@@ -1,0 +1,359 @@
+{
+  "enriched_profiles": [
+    {
+      "linkedinUsername": "youssefkoutari",
+      "name": "Youssef Koutari",
+      "headline": "Founder & President Elite Society Group",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/D4E03AQF79zJcbi1QiA/profile-displayphoto-scale_100_100/B4EZkpsnbAKYAc-/0/1757341186254?e=1767830400&v=beta&t=WFjXOxPizD7qMCVCVwn1leDoUB7HHHj5Cjda0TgGbys",
+      "bannerImage": [
+        {
+          "width": 800,
+          "height": 200,
+          "url": "https://media.licdn.com/dms/image/v2/D4E16AQEwV48e-pJ8hQ/profile-displaybackgroundimage-shrink_200_800/B4EZl3MQG2HgAU-/0/1758641325291?e=1767830400&v=beta&t=QTjfoY4OSAVNjZlJOjgPByz_xAZhXQ3kjd_zYxl7lzE"
+        },
+        {
+          "width": 1400,
+          "height": 350,
+          "url": "https://media.licdn.com/dms/image/v2/D4E16AQEwV48e-pJ8hQ/profile-displaybackgroundimage-shrink_350_1400/B4EZl3MQG2HgAY-/0/1758641325291?e=1767830400&v=beta&t=liYPaCwq_hFwxkaIk87T5-rr_qUn614l23HSXFrVpDo"
+        }
+      ],
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": true,
+      "isVerified": true,
+      "country": "France",
+      "city": "",
+      "region": "France",
+      "company": "Elite Society Group",
+      "jobTitle": "President & Co Fondateur",
+      "original_username": "youssefkoutari",
+      "expected_name": "Youssef Koutari"
+    },
+    {
+      "linkedinUsername": "",
+      "name": "",
+      "headline": "",
+      "profilePicture": "",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "original_username": "guillaumemoubeche",
+      "expected_name": "Guillaume Moubeche"
+    },
+    {
+      "linkedinUsername": "",
+      "name": "",
+      "headline": "",
+      "profilePicture": "",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "original_username": "carolinereceveur",
+      "expected_name": "Caroline Receveur"
+    },
+    {
+      "linkedinUsername": "",
+      "name": "",
+      "headline": "",
+      "profilePicture": "",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "original_username": "tikitofficiel",
+      "expected_name": "Tibo InShape"
+    },
+    {
+      "linkedinUsername": "",
+      "name": "",
+      "headline": "",
+      "profilePicture": "",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "original_username": "ninjabrioche",
+      "expected_name": "Nina Ramen"
+    },
+    {
+      "linkedinUsername": "benoitdubos",
+      "name": "Benoît Dubos",
+      "headline": "On génère 2 à 5 RDV de vente qualifiés/jour pour ton Entreprise de Services B2B 👉 Scalezia.co/bienvenue | 700+ clients | 2 emails/semaine pour exploser tes objectifs (107K+ inscrits) 👉 bit.ly/Missive 🌱🌳",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/D4D03AQEoC1DbTOyABA/profile-displayphoto-shrink_200_200/B4DZd9Rcx0GYAY-/0/1750153416386?e=1767830400&v=beta&t=I1ipyl5_Xs9CzjIVfrYDFKz0gref6yNaZ4adOD33tSg",
+      "bannerImage": [
+        {
+          "width": 1400,
+          "height": 350,
+          "url": "https://media.licdn.com/dms/image/v2/D4D16AQF-GSvhbY8GvQ/profile-displaybackgroundimage-shrink_350_1400/B4DZd9RiXSGUAc-/0/1750153439130?e=1767830400&v=beta&t=j-6FitU8Zqpc_8UYzUtry2xHvEgRaw78SGIjL7dKqf0"
+        },
+        {
+          "width": 800,
+          "height": 200,
+          "url": "https://media.licdn.com/dms/image/v2/D4D16AQF-GSvhbY8GvQ/profile-displaybackgroundimage-shrink_200_800/B4DZd9RiXSGUAY-/0/1750153439130?e=1767830400&v=beta&t=nVclsjlba86KeSTTUZaLfJSuxIl52z1B1cdnthQMQTc"
+        }
+      ],
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": true,
+      "isVerified": true,
+      "country": "France",
+      "city": "Paris, Île-de-France",
+      "region": "Paris, Île-de-France, France",
+      "company": "Scalezia",
+      "jobTitle": "CEO & Co-fondateur",
+      "original_username": "benoitdubos",
+      "expected_name": "Benoit Dubos"
+    },
+    {
+      "linkedinUsername": "",
+      "name": "",
+      "headline": "",
+      "profilePicture": "",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "original_username": "justinewelsh",
+      "expected_name": "Justin Welsh"
+    },
+    {
+      "linkedinUsername": "",
+      "name": "",
+      "headline": "",
+      "profilePicture": "",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "original_username": "garaborisov",
+      "expected_name": "Gara Borisov"
+    },
+    {
+      "linkedinUsername": "richardbranson",
+      "name": "Richard Branson",
+      "headline": "Technical Director / CTO | IoT & AI Innovator | Building Connected Systems for Sport, Fitness & Experiential Technology",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/D4E03AQGPhk5-kyzcBQ/profile-displayphoto-scale_100_100/B4EZrT.W.2GYAc-/0/1764492931722?e=1767830400&v=beta&t=6cjt6DYpS_zbsXA8BAwZCfRXp4gZ4DafKiFosJyXbt8",
+      "bannerImage": [
+        {
+          "width": 800,
+          "height": 200,
+          "url": "https://media.licdn.com/dms/image/v2/C4E16AQGseeBWFfsf-A/profile-displaybackgroundimage-shrink_200_800/profile-displaybackgroundimage-shrink_200_800/0/1517690218774?e=1767830400&v=beta&t=seFDZurOC2Y0R0DhZxO-5aK5I1X4lp_1HaXIhv-3brc"
+        },
+        {
+          "width": 1000,
+          "height": 250,
+          "url": "https://media.licdn.com/dms/image/v2/C4E16AQGseeBWFfsf-A/profile-displaybackgroundimage-shrink_350_1400/profile-displaybackgroundimage-shrink_350_1400/0/1517690218919?e=1767830400&v=beta&t=ZXnTtur4UProyaOpskKrZGjvmezVpkzA7ZNmNAgB7Hc"
+        }
+      ],
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": true,
+      "country": "United Kingdom",
+      "city": "Royal Tunbridge Wells, England",
+      "region": "Royal Tunbridge Wells, England, United Kingdom",
+      "company": "Action Cam Limited",
+      "jobTitle": "Technical Director / CTO",
+      "original_username": "richardbranson",
+      "expected_name": "Richard Branson"
+    },
+    {
+      "linkedinUsername": "",
+      "name": "",
+      "headline": "",
+      "profilePicture": "",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "original_username": "satlouis",
+      "expected_name": "Simon Sinek"
+    },
+    {
+      "linkedinUsername": "",
+      "name": "",
+      "headline": "",
+      "profilePicture": "",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "original_username": "garyvee",
+      "expected_name": "Gary Vaynerchuk"
+    },
+    {
+      "linkedinUsername": "",
+      "name": "",
+      "headline": "",
+      "profilePicture": "",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "original_username": "gaborgeorge",
+      "expected_name": "Gabor George"
+    },
+    {
+      "linkedinUsername": "alexhormozi",
+      "name": "Alex Hormozi",
+      "headline": "Founder Acquisition.com, Co-Founder Skool.com.\n\nGet your free scaling roadmap👇",
+      "profilePicture": "",
+      "bannerImage": [
+        {
+          "width": 800,
+          "height": 199,
+          "url": "https://media.licdn.com/dms/image/v2/D5616AQFMWPVsnlX3bw/profile-displaybackgroundimage-shrink_200_800/B56ZjkHwvyH8AU-/0/1756173898387?e=1767830400&v=beta&t=APzGqGb8o4KmKHuUMl8gE_2ZlY8DgBqrVrgo_W92cSA"
+        },
+        {
+          "width": 1400,
+          "height": 349,
+          "url": "https://media.licdn.com/dms/image/v2/D5616AQFMWPVsnlX3bw/profile-displaybackgroundimage-shrink_350_1400/B56ZjkHwvyH8AY-/0/1756173898387?e=1767830400&v=beta&t=yhf7aOj-mJEoit5eMxrbUA2hEsw97i6pm10JI5DWv7E"
+        }
+      ],
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": true,
+      "isVerified": true,
+      "country": "United States",
+      "city": "Las Vegas, Nevada",
+      "region": "Las Vegas, Nevada, United States",
+      "company": "Acquisition.com",
+      "jobTitle": "Managing Partner",
+      "original_username": "alexhormozi",
+      "expected_name": "Alex Hormozi"
+    },
+    {
+      "linkedinUsername": "noahkagan",
+      "name": "Noah Kagan",
+      "headline": "Chief Sumo at AppSumo.com | Helping entrepreneurs get started at noahkagan.com",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/C4E03AQGko_Uj52FBLQ/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1516230504268?e=1767830400&v=beta&t=x3eJlR6klCwhVLBGK8oienJfpnIKHIKdu5fIsWHa6e0",
+      "bannerImage": [
+        {
+          "width": 800,
+          "height": 200,
+          "url": "https://media.licdn.com/dms/image/v2/D4D16AQE-JnriiMBJVw/profile-displaybackgroundimage-shrink_200_800/profile-displaybackgroundimage-shrink_200_800/0/1704491632101?e=1767830400&v=beta&t=ZQHV4YsuZu1fUEe4KyIv-xAlaBPsTSZ_ezMAxbzToak"
+        },
+        {
+          "width": 1400,
+          "height": 350,
+          "url": "https://media.licdn.com/dms/image/v2/D4D16AQE-JnriiMBJVw/profile-displaybackgroundimage-shrink_350_1400/profile-displaybackgroundimage-shrink_350_1400/0/1704491632101?e=1767830400&v=beta&t=73liyIK-whxHk0k7a1MuoLl-ukNVm_FECd9R_lfh7_U"
+        }
+      ],
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": true,
+      "isVerified": true,
+      "country": "United States",
+      "city": "Austin, Texas",
+      "region": "Austin, Texas, United States",
+      "company": "AppSumo",
+      "jobTitle": "Chief Sumo & CEO",
+      "original_username": "noahkagan",
+      "expected_name": "Noah Kagan"
+    },
+    {
+      "linkedinUsername": "",
+      "name": "",
+      "headline": "",
+      "profilePicture": "",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "original_username": "sahaborja",
+      "expected_name": "Sahil Bloom"
+    },
+    {
+      "linkedinUsername": "chrisdo",
+      "name": "Chris Douglas",
+      "headline": "Director, Customer Success, Cloud and AI Platforms @ Microsoft | Computer Science",
+      "profilePicture": "",
+      "bannerImage": [
+        {
+          "width": 800,
+          "height": 200,
+          "url": "https://media.licdn.com/dms/image/v2/C5616AQEIgROAeFvtvQ/profile-displaybackgroundimage-shrink_200_800/profile-displaybackgroundimage-shrink_200_800/0/1516241124881?e=1767830400&v=beta&t=VmKFnwpXlkUAVs9wvJtl55edic1a4U3DjDw-3enwlD0"
+        },
+        {
+          "width": 1400,
+          "height": 350,
+          "url": "https://media.licdn.com/dms/image/v2/C5616AQEIgROAeFvtvQ/profile-displaybackgroundimage-shrink_350_1400/profile-displaybackgroundimage-shrink_350_1400/0/1516241125122?e=1767830400&v=beta&t=ggFMlfaR2hoz_irHvlspMHAdPRgWZPHbEyc-hMa1yWA"
+        }
+      ],
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": true,
+      "country": "United States",
+      "city": "Greater Chattanooga",
+      "region": "Greater Chattanooga",
+      "company": "Microsoft",
+      "jobTitle": "Managing Director",
+      "original_username": "chrisdo",
+      "expected_name": "Chris Do"
+    },
+    {
+      "linkedinUsername": "jasonfried",
+      "name": "Jason Fried",
+      "headline": "Practicing releasing the bow string without first saying 'now'. ",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/C5603AQEa0eE2K_e4Ag/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1601308896391?e=1767830400&v=beta&t=O3pKeBmVHye3Go049EHLkkoQnXzQ1zW3ns6K1w24A30",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "country": "United States",
+      "city": "New York City Metropolitan Area",
+      "region": "New York City Metropolitan Area",
+      "company": "EatWorkSleep",
+      "jobTitle": "Founder & Fractional CTO",
+      "original_username": "jasonfried",
+      "expected_name": "Jason Fried"
+    },
+    {
+      "linkedinUsername": "",
+      "name": "",
+      "headline": "",
+      "profilePicture": "",
+      "bannerImage": "",
+      "followers": 0,
+      "connections": 0,
+      "isTopVoice": false,
+      "isCreator": false,
+      "isVerified": false,
+      "original_username": "dhaborja",
+      "expected_name": "Dharmesh Shah"
+    }
+  ],
+  "errors": [],
+  "total_processed": 18
+}

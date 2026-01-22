@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, name, followers, country, headline FROM linkedin_influencers WHERE name LIKE '%Bill%' LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT id, name, followers, country, headline FROM linkedin_influencers WHERE name LIKE '%Bill%' LIMIT 5;",
+  "rows": [
+    {
+      "id": "60001",
+      "name": "Bill Gates",
+      "followers": "36000000",
+      "country": "USA",
+      "headline": "Chair, Gates Foundation and Founder, Breakthrough Energy"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tfollowers\tcountry\theadline\n60001\tBill Gates\t36000000\tUSA\tChair, Gates Foundation and Founder, Breakthrough Energy\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

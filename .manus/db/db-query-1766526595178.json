@@ -1,0 +1,90 @@
+{
+  "query": "SELECT id, name, linkedinUsername, followers, profilePicture, headline FROM linkedin_influencers ORDER BY followers DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT id, name, linkedinUsername, followers, profilePicture, headline FROM linkedin_influencers ORDER BY followers DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "60001",
+      "name": "Bill Gates",
+      "linkedinUsername": "williamhgates",
+      "followers": "36000000",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_800_800/B56ZRi8g.aGsAc-/0/1736826818808?e=1767830400&v=beta&t=oOCeExdCqh2VUIqrFc6AabP5vQf2V7a0Vne5jouwnyg",
+      "headline": "Chair, Gates Foundation and Founder, Breakthrough Energy"
+    },
+    {
+      "id": "60002",
+      "name": "Richard Branson",
+      "linkedinUsername": "rbranson",
+      "followers": "19500000",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/C4D03AQHh6_Wth5f3rQ/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1625181963183?e=1767830400&v=beta&t=uLRNaRjMtL-v4i4l5B2PAuDYx4hMjZ8EBLcTiTcJ4jY",
+      "headline": "Founder at Virgin Group"
+    },
+    {
+      "id": "60003",
+      "name": "Arianna Huffington",
+      "linkedinUsername": "ariannahuffington",
+      "followers": "12000000",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/C4D03AQHmPuoZ-4Jh6w/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1602549160281?e=1767830400&v=beta&t=o11_w2XOHLGU5OQaBvSJijaqPQP2ZehwKCCy5H8lj7o",
+      "headline": "Founder and CEO at Thrive Global | Passionate about Health and AI"
+    },
+    {
+      "id": "60004",
+      "name": "Satya Nadella",
+      "linkedinUsername": "sataborwankar",
+      "followers": "11000000",
+      "profilePicture": "",
+      "headline": "Tech Expert"
+    },
+    {
+      "id": "60005",
+      "name": "Narendra Modi",
+      "linkedinUsername": "naaborwankar",
+      "followers": "10000000",
+      "profilePicture": "",
+      "headline": "Politics Expert"
+    },
+    {
+      "id": "60006",
+      "name": "Simon Sinek",
+      "linkedinUsername": "simonsinek",
+      "followers": "7500000",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/C4D03AQFiCE97-9SoTg/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1646165485525?e=1767830400&v=beta&t=uVIo-6ALz2ZsY2gEmqIvlgacM0b7v39OoPehi4wcH30",
+      "headline": "Optimist, New York Times bestselling author of \"Start with Why\" and \"The Infinite Game\", and founder of The Optimism Company"
+    },
+    {
+      "id": "60007",
+      "name": "Adam Grant",
+      "linkedinUsername": "adammgrant",
+      "followers": "6800000",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/C4E03AQFGdrbBw3FYhA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1629123595757?e=1767830400&v=beta&t=mdTiurrRVMK-QulCEyZuLfQ4deCnZUT2J6B0FlEvOYM",
+      "headline": "Organizational psychologist at Wharton, #1 NYT bestselling author of THINK AGAIN, host of the TED podcast Re:Thinking"
+    },
+    {
+      "id": "60008",
+      "name": "Gary Vaynerchuk",
+      "linkedinUsername": "garyvaynerchuk",
+      "followers": "5200000",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/D4E03AQFAvHbFTXirbw/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1718257337092?e=1767830400&v=beta&t=J25WhQoRtXdjHSw1FOZPPx40bZEBHYn_sk5Th9XPBc8",
+      "headline": "Chairman – VaynerX, CEO – VaynerMedia, Creator – VeeFriends"
+    },
+    {
+      "id": "60010",
+      "name": "Barack Obama",
+      "linkedinUsername": "barackobama",
+      "followers": "4500000",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/D4E03AQGcice3q3BiUQ/profile-displayphoto-scale_100_100/B4EZoczRWLJgAc-/0/1761419796900?e=1767830400&v=beta&t=7JsXuCrju66LFld-sJCk_bu6wVh1yj_Ap0vWc4nwLpY",
+      "headline": "Former President of the United States of America"
+    },
+    {
+      "id": "60009",
+      "name": "Brené Brown",
+      "linkedinUsername": "brenebrown",
+      "followers": "4500000",
+      "profilePicture": "https://media.licdn.com/dms/image/v2/D5603AQEFOXiSPcWWbA/profile-displayphoto-scale_100_100/B56Zjh3j9sHQAg-/0/1756136096324?e=1767830400&v=beta&t=qsTGrL9AGR0-NlINZC2NLDNGg5_Zi_nePxeca5TIarM",
+      "headline": "University of Houston + University of Texas at Austin | Researcher. Storyteller. Courage-builder. "
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tlinkedinUsername\tfollowers\tprofilePicture\theadline\n60001\tBill Gates\twilliamhgates\t36000000\thttps://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_800_800/B56ZRi8g.aGsAc-/0/1736826818808?e=1767830400&v=beta&t=oOCeExdCqh2VUIqrFc6AabP5vQf2V7a0Vne5jouwnyg\tChair, Gates Foundation and Founder, Breakthrough Energy\n60002\tRichard Branson\trbranson\t19500000\thttps://media.licdn.com/dms/image/v2/C4D03AQHh6_Wth5f3rQ/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1625181963183?e=1767830400&v=beta&t=uLRNaRjMtL-v4i4l5B2PAuDYx4hMjZ8EBLcTiTcJ4jY\tFounder at Virgin Group\n60003\tArianna Huffington\tariannahuffington\t12000000\thttps://media.licdn.com/dms/image/v2/C4D03AQHmPuoZ-4Jh6w/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1602549160281?e=1767830400&v=beta&t=o11_w2XOHLGU5OQaBvSJijaqPQP2ZehwKCCy5H8lj7o\tFounder and CEO at Thrive Global | Passionate about Health and AI\n60004\tSatya Nadella\tsataborwankar\t11000000\t\tTech Expert\n60005\tNarendra Modi\tnaaborwankar\t10000000\t\tPolitics Expert\n60006\tSimon Sinek\tsimonsinek\t7500000\thttps://media.licdn.com/dms/image/v2/C4D03AQFiCE97-9SoTg/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1646165485525?e=1767830400&v=beta&t=uVIo-6ALz2ZsY2gEmqIvlgacM0b7v39OoPehi4wcH30\tOptimist, New York Times bestselling author of \"Start with Why\" and \"The Infinite Game\", and founder of The Optimism Company\n60007\tAdam Grant\tadammgrant\t6800000\thttps://media.licdn.com/dms/image/v2/C4E03AQFGdrbBw3FYhA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1629123595757?e=1767830400&v=beta&t=mdTiurrRVMK-QulCEyZuLfQ4deCnZUT2J6B0FlEvOYM\tOrganizational psychologist at Wharton, #1 NYT bestselling author of THINK AGAIN, host of the TED podcast Re:Thinking\n60008\tGary Vaynerchuk\tgaryvaynerchuk\t5200000\thttps://media.licdn.com/dms/image/v2/D4E03AQFAvHbFTXirbw/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1718257337092?e=1767830400&v=beta&t=J25WhQoRtXdjHSw1FOZPPx40bZEBHYn_sk5Th9XPBc8\tChairman – VaynerX, CEO – VaynerMedia, Creator – VeeFriends\n60010\tBarack Obama\tbarackobama\t4500000\thttps://media.licdn.com/dms/image/v2/D4E03AQGcice3q3BiUQ/profile-displayphoto-scale_100_100/B4EZoczRWLJgAc-/0/1761419796900?e=1767830400&v=beta&t=7JsXuCrju66LFld-sJCk_bu6wVh1yj_Ap0vWc4nwLpY\tFormer President of the United States of America\n60009\tBrené Brown\tbrenebrown\t4500000\thttps://media.licdn.com/dms/image/v2/D5603AQEFOXiSPcWWbA/profile-displayphoto-scale_100_100/B56Zjh3j9sHQAg-/0/1756136096324?e=1767830400&v=beta&t=qsTGrL9AGR0-NlINZC2NLDNGg5_Zi_nePxeca5TIarM\tUniversity of Houston + University of Texas at Austin | Researcher. Storyteller. Courage-builder. \n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

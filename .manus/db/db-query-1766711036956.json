@@ -1,0 +1,988 @@
+{
+  "query": "SELECT id, linkedinUsername, name, followers FROM linkedin_influencers ORDER BY linkedinUsername, id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT id, linkedinUsername, name, followers FROM linkedin_influencers ORDER BY linkedinUsername, id;",
+  "rows": [
+    {
+      "id": "90001",
+      "linkedinUsername": "NULL",
+      "name": "Youssef Koutari",
+      "followers": "542000"
+    },
+    {
+      "id": "90002",
+      "linkedinUsername": "NULL",
+      "name": "Guillaume Moubeche",
+      "followers": "380000"
+    },
+    {
+      "id": "90003",
+      "linkedinUsername": "NULL",
+      "name": "Caroline Mignaux",
+      "followers": "320000"
+    },
+    {
+      "id": "90004",
+      "linkedinUsername": "NULL",
+      "name": "Thibault Louis",
+      "followers": "280000"
+    },
+    {
+      "id": "90005",
+      "linkedinUsername": "NULL",
+      "name": "Nina Ramen",
+      "followers": "310000"
+    },
+    {
+      "id": "90006",
+      "linkedinUsername": "NULL",
+      "name": "Gary Vaynerchuk",
+      "followers": "5200000"
+    },
+    {
+      "id": "90007",
+      "linkedinUsername": "NULL",
+      "name": "Simon Sinek",
+      "followers": "4800000"
+    },
+    {
+      "id": "90008",
+      "linkedinUsername": "NULL",
+      "name": "Justin Welsh",
+      "followers": "680000"
+    },
+    {
+      "id": "90009",
+      "linkedinUsername": "NULL",
+      "name": "Sahil Bloom",
+      "followers": "520000"
+    },
+    {
+      "id": "90010",
+      "linkedinUsername": "NULL",
+      "name": "Alex Hormozi",
+      "followers": "890000"
+    },
+    {
+      "id": "90011",
+      "linkedinUsername": "NULL",
+      "name": "Steven Bartlett",
+      "followers": "2100000"
+    },
+    {
+      "id": "90012",
+      "linkedinUsername": "NULL",
+      "name": "Richard Branson",
+      "followers": "19500000"
+    },
+    {
+      "id": "90013",
+      "linkedinUsername": "NULL",
+      "name": "Lea-Sophie Cramer",
+      "followers": "180000"
+    },
+    {
+      "id": "90014",
+      "linkedinUsername": "NULL",
+      "name": "Muna AbuSulayman",
+      "followers": "450000"
+    },
+    {
+      "id": "90015",
+      "linkedinUsername": "NULL",
+      "name": "Badr Jafar",
+      "followers": "280000"
+    },
+    {
+      "id": "90016",
+      "linkedinUsername": "NULL",
+      "name": "Ankur Warikoo",
+      "followers": "1200000"
+    },
+    {
+      "id": "90017",
+      "linkedinUsername": "NULL",
+      "name": "Varun Mayya",
+      "followers": "380000"
+    },
+    {
+      "id": "90018",
+      "linkedinUsername": "NULL",
+      "name": "Satya Nadella",
+      "followers": "11000000"
+    },
+    {
+      "id": "90019",
+      "linkedinUsername": "NULL",
+      "name": "Sundar Pichai",
+      "followers": "8500000"
+    },
+    {
+      "id": "90020",
+      "linkedinUsername": "NULL",
+      "name": "Andrew Ng",
+      "followers": "950000"
+    },
+    {
+      "id": "90021",
+      "linkedinUsername": "NULL",
+      "name": "Jeb Blount",
+      "followers": "420000"
+    },
+    {
+      "id": "90022",
+      "linkedinUsername": "NULL",
+      "name": "Adam Grant",
+      "followers": "6200000"
+    },
+    {
+      "id": "90023",
+      "linkedinUsername": "NULL",
+      "name": "Ray Dalio",
+      "followers": "3800000"
+    },
+    {
+      "id": "90024",
+      "linkedinUsername": "NULL",
+      "name": "Neil Patel",
+      "followers": "580000"
+    },
+    {
+      "id": "90025",
+      "linkedinUsername": "NULL",
+      "name": "Melanie Perkins",
+      "followers": "420000"
+    },
+    {
+      "id": "90026",
+      "linkedinUsername": "NULL",
+      "name": "Barbara Corcoran",
+      "followers": "890000"
+    },
+    {
+      "id": "90027",
+      "linkedinUsername": "NULL",
+      "name": "Isra García",
+      "followers": "220000"
+    },
+    {
+      "id": "90028",
+      "linkedinUsername": "NULL",
+      "name": "Flávio Augusto",
+      "followers": "680000"
+    },
+    {
+      "id": "90029",
+      "linkedinUsername": "NULL",
+      "name": "Tobias Lütke",
+      "followers": "320000"
+    },
+    {
+      "id": "90030",
+      "linkedinUsername": "NULL",
+      "name": "Bill Gates",
+      "followers": "36000000"
+    },
+    {
+      "id": "90031",
+      "linkedinUsername": "NULL",
+      "name": "Richard Branson",
+      "followers": "19500000"
+    },
+    {
+      "id": "90032",
+      "linkedinUsername": "NULL",
+      "name": "Arianna Huffington",
+      "followers": "12000000"
+    },
+    {
+      "id": "90033",
+      "linkedinUsername": "NULL",
+      "name": "Satya Nadella",
+      "followers": "11000000"
+    },
+    {
+      "id": "90034",
+      "linkedinUsername": "NULL",
+      "name": "Narendra Modi",
+      "followers": "10000000"
+    },
+    {
+      "id": "90035",
+      "linkedinUsername": "NULL",
+      "name": "Simon Sinek",
+      "followers": "7500000"
+    },
+    {
+      "id": "90036",
+      "linkedinUsername": "NULL",
+      "name": "Adam Grant",
+      "followers": "6800000"
+    },
+    {
+      "id": "90037",
+      "linkedinUsername": "NULL",
+      "name": "Gary Vaynerchuk",
+      "followers": "5200000"
+    },
+    {
+      "id": "90038",
+      "linkedinUsername": "NULL",
+      "name": "Brené Brown",
+      "followers": "4500000"
+    },
+    {
+      "id": "90039",
+      "linkedinUsername": "NULL",
+      "name": "Barack Obama",
+      "followers": "4500000"
+    },
+    {
+      "id": "90040",
+      "linkedinUsername": "NULL",
+      "name": "Sundar Pichai",
+      "followers": "4200000"
+    },
+    {
+      "id": "90041",
+      "linkedinUsername": "NULL",
+      "name": "Ray Dalio",
+      "followers": "3500000"
+    },
+    {
+      "id": "90042",
+      "linkedinUsername": "NULL",
+      "name": "Tony Robbins",
+      "followers": "3500000"
+    },
+    {
+      "id": "90043",
+      "linkedinUsername": "NULL",
+      "name": "Emmanuel Macron",
+      "followers": "3500000"
+    },
+    {
+      "id": "90044",
+      "linkedinUsername": "NULL",
+      "name": "Reid Hoffman",
+      "followers": "3200000"
+    },
+    {
+      "id": "90045",
+      "linkedinUsername": "NULL",
+      "name": "Alex Hormozi",
+      "followers": "2800000"
+    },
+    {
+      "id": "90046",
+      "linkedinUsername": "NULL",
+      "name": "Andrew Ng",
+      "followers": "2800000"
+    },
+    {
+      "id": "90047",
+      "linkedinUsername": "NULL",
+      "name": "Nithin Kamath",
+      "followers": "2500000"
+    },
+    {
+      "id": "90048",
+      "linkedinUsername": "NULL",
+      "name": "Steven Bartlett",
+      "followers": "2100000"
+    },
+    {
+      "id": "90049",
+      "linkedinUsername": "NULL",
+      "name": "Nikhil Kamath",
+      "followers": "2100000"
+    },
+    {
+      "id": "90050",
+      "linkedinUsername": "NULL",
+      "name": "Grant Cardone",
+      "followers": "2100000"
+    },
+    {
+      "id": "90051",
+      "linkedinUsername": "NULL",
+      "name": "Daniel Pink",
+      "followers": "1800000"
+    },
+    {
+      "id": "90052",
+      "linkedinUsername": "NULL",
+      "name": "Sara Blakely",
+      "followers": "1800000"
+    },
+    {
+      "id": "90053",
+      "linkedinUsername": "NULL",
+      "name": "Jensen Huang",
+      "followers": "1800000"
+    },
+    {
+      "id": "90054",
+      "linkedinUsername": "NULL",
+      "name": "Ursula von der Leyen",
+      "followers": "1800000"
+    },
+    {
+      "id": "90055",
+      "linkedinUsername": "NULL",
+      "name": "Andrew Huberman",
+      "followers": "1500000"
+    },
+    {
+      "id": "90056",
+      "linkedinUsername": "NULL",
+      "name": "Arianna Huffington",
+      "followers": "1500000"
+    },
+    {
+      "id": "90057",
+      "linkedinUsername": "NULL",
+      "name": "Sahil Bloom",
+      "followers": "1200000"
+    },
+    {
+      "id": "90058",
+      "linkedinUsername": "NULL",
+      "name": "Daniel Pink",
+      "followers": "1200000"
+    },
+    {
+      "id": "90059",
+      "linkedinUsername": "NULL",
+      "name": "Guillaume Pley",
+      "followers": "1200000"
+    },
+    {
+      "id": "90060",
+      "linkedinUsername": "NULL",
+      "name": "Lewis Hamilton",
+      "followers": "1200000"
+    },
+    {
+      "id": "90061",
+      "linkedinUsername": "NULL",
+      "name": "Dharmesh Shah",
+      "followers": "1100000"
+    },
+    {
+      "id": "90062",
+      "linkedinUsername": "NULL",
+      "name": "Alex Xu",
+      "followers": "950000"
+    },
+    {
+      "id": "90063",
+      "linkedinUsername": "NULL",
+      "name": "Sam Altman",
+      "followers": "950000"
+    },
+    {
+      "id": "90064",
+      "linkedinUsername": "NULL",
+      "name": "Lex Fridman",
+      "followers": "850000"
+    },
+    {
+      "id": "90065",
+      "linkedinUsername": "NULL",
+      "name": "Patrick Bet-David",
+      "followers": "850000"
+    },
+    {
+      "id": "90066",
+      "linkedinUsername": "NULL",
+      "name": "Rafael Nadal",
+      "followers": "850000"
+    },
+    {
+      "id": "90067",
+      "linkedinUsername": "NULL",
+      "name": "Justin Welsh",
+      "followers": "750000"
+    },
+    {
+      "id": "90068",
+      "linkedinUsername": "NULL",
+      "name": "Jean-Marc Jancovici",
+      "followers": "650000"
+    },
+    {
+      "id": "90069",
+      "linkedinUsername": "NULL",
+      "name": "Tim Denning",
+      "followers": "650000"
+    },
+    {
+      "id": "90070",
+      "linkedinUsername": "NULL",
+      "name": "Ethan Mollick",
+      "followers": "580000"
+    },
+    {
+      "id": "90071",
+      "linkedinUsername": "NULL",
+      "name": "Youssef Koutari",
+      "followers": "542000"
+    },
+    {
+      "id": "90072",
+      "linkedinUsername": "NULL",
+      "name": "Tim Denning",
+      "followers": "520000"
+    },
+    {
+      "id": "90073",
+      "linkedinUsername": "NULL",
+      "name": "Jasmin Alić",
+      "followers": "480000"
+    },
+    {
+      "id": "90074",
+      "linkedinUsername": "NULL",
+      "name": "Jasmin Alić",
+      "followers": "480000"
+    },
+    {
+      "id": "90075",
+      "linkedinUsername": "NULL",
+      "name": "Guillaume Moubeche",
+      "followers": "450000"
+    },
+    {
+      "id": "90076",
+      "linkedinUsername": "NULL",
+      "name": "Noah Kagan",
+      "followers": "450000"
+    },
+    {
+      "id": "90077",
+      "linkedinUsername": "NULL",
+      "name": "Aravind Srinivas",
+      "followers": "450000"
+    },
+    {
+      "id": "90078",
+      "linkedinUsername": "NULL",
+      "name": "Nicolas Cole",
+      "followers": "450000"
+    },
+    {
+      "id": "90079",
+      "linkedinUsername": "NULL",
+      "name": "Naval Ravikant",
+      "followers": "420000"
+    },
+    {
+      "id": "90080",
+      "linkedinUsername": "NULL",
+      "name": "Nina Ramen",
+      "followers": "380000"
+    },
+    {
+      "id": "90081",
+      "linkedinUsername": "NULL",
+      "name": "Lara Acosta",
+      "followers": "380000"
+    },
+    {
+      "id": "90082",
+      "linkedinUsername": "NULL",
+      "name": "Dickie Bush",
+      "followers": "380000"
+    },
+    {
+      "id": "90083",
+      "linkedinUsername": "NULL",
+      "name": "Lara Acosta",
+      "followers": "380000"
+    },
+    {
+      "id": "90084",
+      "linkedinUsername": "NULL",
+      "name": "Benoit Dubos",
+      "followers": "350000"
+    },
+    {
+      "id": "90085",
+      "linkedinUsername": "NULL",
+      "name": "Thibault Louis",
+      "followers": "320000"
+    },
+    {
+      "id": "90086",
+      "linkedinUsername": "NULL",
+      "name": "Oussama Ammar",
+      "followers": "320000"
+    },
+    {
+      "id": "90087",
+      "linkedinUsername": "NULL",
+      "name": "Maud Alavès",
+      "followers": "280000"
+    },
+    {
+      "id": "90088",
+      "linkedinUsername": "NULL",
+      "name": "Christopher Parola",
+      "followers": "250000"
+    },
+    {
+      "id": "90089",
+      "linkedinUsername": "NULL",
+      "name": "Shubham Sharma",
+      "followers": "240000"
+    },
+    {
+      "id": "90090",
+      "linkedinUsername": "NULL",
+      "name": "Violette Dorange",
+      "followers": "220000"
+    },
+    {
+      "id": "90091",
+      "linkedinUsername": "NULL",
+      "name": "Ruben Taieb",
+      "followers": "200000"
+    },
+    {
+      "id": "90092",
+      "linkedinUsername": "NULL",
+      "name": "Fadi Ghandour",
+      "followers": "180000"
+    },
+    {
+      "id": "90093",
+      "linkedinUsername": "NULL",
+      "name": "Roxanne Varza",
+      "followers": "180000"
+    },
+    {
+      "id": "90094",
+      "linkedinUsername": "NULL",
+      "name": "Badr Jafar",
+      "followers": "150000"
+    },
+    {
+      "id": "90095",
+      "linkedinUsername": "NULL",
+      "name": "Caroline Mignaux",
+      "followers": "150000"
+    },
+    {
+      "id": "90096",
+      "linkedinUsername": "NULL",
+      "name": "Ronaldo Mouchawar",
+      "followers": "120000"
+    },
+    {
+      "id": "60007",
+      "linkedinUsername": "adammgrant",
+      "name": "Adam Grant",
+      "followers": "6800000"
+    },
+    {
+      "id": "60033",
+      "linkedinUsername": "aleaborwankar",
+      "name": "Alex Xu",
+      "followers": "950000"
+    },
+    {
+      "id": "60016",
+      "linkedinUsername": "alexhormozi",
+      "name": "Alex Hormozi",
+      "followers": "2800000"
+    },
+    {
+      "id": "60026",
+      "linkedinUsername": "andrewhuberman",
+      "name": "Andrew Huberman",
+      "followers": "1500000"
+    },
+    {
+      "id": "60017",
+      "linkedinUsername": "andrewyng",
+      "name": "Andrew Ng",
+      "followers": "2800000"
+    },
+    {
+      "id": "60027",
+      "linkedinUsername": "araborwankar",
+      "name": "Arianna Huffington",
+      "followers": "1500000"
+    },
+    {
+      "id": "60048",
+      "linkedinUsername": "aravindsrinivas",
+      "name": "Aravind Srinivas",
+      "followers": "450000"
+    },
+    {
+      "id": "60003",
+      "linkedinUsername": "ariannahuffington",
+      "name": "Arianna Huffington",
+      "followers": "12000000"
+    },
+    {
+      "id": "60065",
+      "linkedinUsername": "badrjafar",
+      "name": "Badr Jafar",
+      "followers": "150000"
+    },
+    {
+      "id": "60010",
+      "linkedinUsername": "barackobama",
+      "name": "Barack Obama",
+      "followers": "4500000"
+    },
+    {
+      "id": "60055",
+      "linkedinUsername": "benoitdubos",
+      "name": "Benoit Dubos",
+      "followers": "350000"
+    },
+    {
+      "id": "60009",
+      "linkedinUsername": "brenebrown",
+      "name": "Brené Brown",
+      "followers": "4500000"
+    },
+    {
+      "id": "60066",
+      "linkedinUsername": "carolinemignaux",
+      "name": "Caroline Mignaux",
+      "followers": "150000"
+    },
+    {
+      "id": "60059",
+      "linkedinUsername": "christopherparola",
+      "name": "Christopher Parola",
+      "followers": "250000"
+    },
+    {
+      "id": "60029",
+      "linkedinUsername": "danielhpink",
+      "name": "Daniel Pink",
+      "followers": "1200000"
+    },
+    {
+      "id": "60022",
+      "linkedinUsername": "danielpink",
+      "name": "Daniel Pink",
+      "followers": "1800000"
+    },
+    {
+      "id": "60032",
+      "linkedinUsername": "dharmesh",
+      "name": "Dharmesh Shah",
+      "followers": "1100000"
+    },
+    {
+      "id": "60053",
+      "linkedinUsername": "dickiebush",
+      "name": "Dickie Bush",
+      "followers": "380000"
+    },
+    {
+      "id": "60014",
+      "linkedinUsername": "emmanuelmacron",
+      "name": "Emmanuel Macron",
+      "followers": "3500000"
+    },
+    {
+      "id": "60041",
+      "linkedinUsername": "emollick",
+      "name": "Ethan Mollick",
+      "followers": "580000"
+    },
+    {
+      "id": "60063",
+      "linkedinUsername": "fadighandour",
+      "name": "Fadi Ghandour",
+      "followers": "180000"
+    },
+    {
+      "id": "60021",
+      "linkedinUsername": "gaborwankar",
+      "name": "Grant Cardone",
+      "followers": "2100000"
+    },
+    {
+      "id": "60008",
+      "linkedinUsername": "garyvaynerchuk",
+      "name": "Gary Vaynerchuk",
+      "followers": "5200000"
+    },
+    {
+      "id": "60046",
+      "linkedinUsername": "guillaumemoubeche",
+      "name": "Guillaume Moubeche",
+      "followers": "450000"
+    },
+    {
+      "id": "60030",
+      "linkedinUsername": "guillaumepley",
+      "name": "Guillaume Pley",
+      "followers": "1200000"
+    },
+    {
+      "id": "60054",
+      "linkedinUsername": "iamlara",
+      "name": "Lara Acosta",
+      "followers": "380000"
+    },
+    {
+      "id": "60044",
+      "linkedinUsername": "jasmiinalic",
+      "name": "Jasmin Alić",
+      "followers": "480000"
+    },
+    {
+      "id": "60045",
+      "linkedinUsername": "jasmin-alic",
+      "name": "Jasmin Alić",
+      "followers": "480000"
+    },
+    {
+      "id": "60024",
+      "linkedinUsername": "jenhsunhuang",
+      "name": "Jensen Huang",
+      "followers": "1800000"
+    },
+    {
+      "id": "60039",
+      "linkedinUsername": "jmjancovici",
+      "name": "Jean-Marc Jancovici",
+      "followers": "650000"
+    },
+    {
+      "id": "60038",
+      "linkedinUsername": "justinwelsh",
+      "name": "Justin Welsh",
+      "followers": "750000"
+    },
+    {
+      "id": "60052",
+      "linkedinUsername": "laraacosta",
+      "name": "Lara Acosta",
+      "followers": "380000"
+    },
+    {
+      "id": "60031",
+      "linkedinUsername": "lewishamilton",
+      "name": "Lewis Hamilton",
+      "followers": "1200000"
+    },
+    {
+      "id": "60035",
+      "linkedinUsername": "lexfridman",
+      "name": "Lex Fridman",
+      "followers": "850000"
+    },
+    {
+      "id": "60058",
+      "linkedinUsername": "maudalaves",
+      "name": "Maud Alavès",
+      "followers": "280000"
+    },
+    {
+      "id": "60005",
+      "linkedinUsername": "naaborwankar",
+      "name": "Narendra Modi",
+      "followers": "10000000"
+    },
+    {
+      "id": "60050",
+      "linkedinUsername": "naval-ravikant",
+      "name": "Naval Ravikant",
+      "followers": "420000"
+    },
+    {
+      "id": "60049",
+      "linkedinUsername": "nicolascole77",
+      "name": "Nicolas Cole",
+      "followers": "450000"
+    },
+    {
+      "id": "60020",
+      "linkedinUsername": "nikhilkamathcio",
+      "name": "Nikhil Kamath",
+      "followers": "2100000"
+    },
+    {
+      "id": "60051",
+      "linkedinUsername": "ninaramen",
+      "name": "Nina Ramen",
+      "followers": "380000"
+    },
+    {
+      "id": "60018",
+      "linkedinUsername": "nitaborwankar",
+      "name": "Nithin Kamath",
+      "followers": "2500000"
+    },
+    {
+      "id": "60047",
+      "linkedinUsername": "noahkagan",
+      "name": "Noah Kagan",
+      "followers": "450000"
+    },
+    {
+      "id": "60013",
+      "linkedinUsername": "officialtonyrobbins",
+      "name": "Tony Robbins",
+      "followers": "3500000"
+    },
+    {
+      "id": "60057",
+      "linkedinUsername": "oussamaammar",
+      "name": "Oussama Ammar",
+      "followers": "320000"
+    },
+    {
+      "id": "60036",
+      "linkedinUsername": "patrickbetdavid",
+      "name": "Patrick Bet-David",
+      "followers": "850000"
+    },
+    {
+      "id": "60015",
+      "linkedinUsername": "raborwankar",
+      "name": "Reid Hoffman",
+      "followers": "3200000"
+    },
+    {
+      "id": "60037",
+      "linkedinUsername": "rafaelnadal",
+      "name": "Rafael Nadal",
+      "followers": "850000"
+    },
+    {
+      "id": "60012",
+      "linkedinUsername": "raydalio",
+      "name": "Ray Dalio",
+      "followers": "3500000"
+    },
+    {
+      "id": "60002",
+      "linkedinUsername": "rbranson",
+      "name": "Richard Branson",
+      "followers": "19500000"
+    },
+    {
+      "id": "60067",
+      "linkedinUsername": "ronaldomouchawar",
+      "name": "Ronaldo Mouchawar",
+      "followers": "120000"
+    },
+    {
+      "id": "60064",
+      "linkedinUsername": "roxannevarza",
+      "name": "Roxanne Varza",
+      "followers": "180000"
+    },
+    {
+      "id": "60062",
+      "linkedinUsername": "rubentaieb",
+      "name": "Ruben Taieb",
+      "followers": "200000"
+    },
+    {
+      "id": "60028",
+      "linkedinUsername": "sahilbloom",
+      "name": "Sahil Bloom",
+      "followers": "1200000"
+    },
+    {
+      "id": "60034",
+      "linkedinUsername": "samaltman",
+      "name": "Sam Altman",
+      "followers": "950000"
+    },
+    {
+      "id": "60023",
+      "linkedinUsername": "sarablakely",
+      "name": "Sara Blakely",
+      "followers": "1800000"
+    },
+    {
+      "id": "60004",
+      "linkedinUsername": "sataborwankar",
+      "name": "Satya Nadella",
+      "followers": "11000000"
+    },
+    {
+      "id": "60060",
+      "linkedinUsername": "shubhamsharma",
+      "name": "Shubham Sharma",
+      "followers": "240000"
+    },
+    {
+      "id": "60006",
+      "linkedinUsername": "simonsinek",
+      "name": "Simon Sinek",
+      "followers": "7500000"
+    },
+    {
+      "id": "60019",
+      "linkedinUsername": "stevenbartlett",
+      "name": "Steven Bartlett",
+      "followers": "2100000"
+    },
+    {
+      "id": "60011",
+      "linkedinUsername": "sundarpichai",
+      "name": "Sundar Pichai",
+      "followers": "4200000"
+    },
+    {
+      "id": "60056",
+      "linkedinUsername": "thibaultlouis",
+      "name": "Thibault Louis",
+      "followers": "320000"
+    },
+    {
+      "id": "60043",
+      "linkedinUsername": "timdenning",
+      "name": "Tim Denning",
+      "followers": "520000"
+    },
+    {
+      "id": "60040",
+      "linkedinUsername": "timdenning1",
+      "name": "Tim Denning",
+      "followers": "650000"
+    },
+    {
+      "id": "60025",
+      "linkedinUsername": "uraborwankar",
+      "name": "Ursula von der Leyen",
+      "followers": "1800000"
+    },
+    {
+      "id": "60061",
+      "linkedinUsername": "violettedorange",
+      "name": "Violette Dorange",
+      "followers": "220000"
+    },
+    {
+      "id": "60001",
+      "linkedinUsername": "williamhgates",
+      "name": "Bill Gates",
+      "followers": "36000000"
+    },
+    {
+      "id": "60042",
+      "linkedinUsername": "youssefkoutari",
+      "name": "Youssef Koutari",
+      "followers": "542000"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tlinkedinUsername\tname\tfollowers\n90001\tNULL\tYoussef Koutari\t542000\n90002\tNULL\tGuillaume Moubeche\t380000\n90003\tNULL\tCaroline Mignaux\t320000\n90004\tNULL\tThibault Louis\t280000\n90005\tNULL\tNina Ramen\t310000\n90006\tNULL\tGary Vaynerchuk\t5200000\n90007\tNULL\tSimon Sinek\t4800000\n90008\tNULL\tJustin Welsh\t680000\n90009\tNULL\tSahil Bloom\t520000\n90010\tNULL\tAlex Hormozi\t890000\n90011\tNULL\tSteven Bartlett\t2100000\n90012\tNULL\tRichard Branson\t19500000\n90013\tNULL\tLea-Sophie Cramer\t180000\n90014\tNULL\tMuna AbuSulayman\t450000\n90015\tNULL\tBadr Jafar\t280000\n90016\tNULL\tAnkur Warikoo\t1200000\n90017\tNULL\tVarun Mayya\t380000\n90018\tNULL\tSatya Nadella\t11000000\n90019\tNULL\tSundar Pichai\t8500000\n90020\tNULL\tAndrew Ng\t950000\n90021\tNULL\tJeb Blount\t420000\n90022\tNULL\tAdam Grant\t6200000\n90023\tNULL\tRay Dalio\t3800000\n90024\tNULL\tNeil Patel\t580000\n90025\tNULL\tMelanie Perkins\t420000\n90026\tNULL\tBarbara Corcoran\t890000\n90027\tNULL\tIsra García\t220000\n90028\tNULL\tFlávio Augusto\t680000\n90029\tNULL\tTobias Lütke\t320000\n90030\tNULL\tBill Gates\t36000000\n90031\tNULL\tRichard Branson\t19500000\n90032\tNULL\tArianna Huffington\t12000000\n90033\tNULL\tSatya Nadella\t11000000\n90034\tNULL\tNarendra Modi\t10000000\n90035\tNULL\tSimon Sinek\t7500000\n90036\tNULL\tAdam Grant\t6800000\n90037\tNULL\tGary Vaynerchuk\t5200000\n90038\tNULL\tBrené Brown\t4500000\n90039\tNULL\tBarack Obama\t4500000\n90040\tNULL\tSundar Pichai\t4200000\n90041\tNULL\tRay Dalio\t3500000\n90042\tNULL\tTony Robbins\t3500000\n90043\tNULL\tEmmanuel Macron\t3500000\n90044\tNULL\tReid Hoffman\t3200000\n90045\tNULL\tAlex Hormozi\t2800000\n90046\tNULL\tAndrew Ng\t2800000\n90047\tNULL\tNithin Kamath\t2500000\n90048\tNULL\tSteven Bartlett\t2100000\n90049\tNULL\tNikhil Kamath\t2100000\n90050\tNULL\tGrant Cardone\t2100000\n90051\tNULL\tDaniel Pink\t1800000\n90052\tNULL\tSara Blakely\t1800000\n90053\tNULL\tJensen Huang\t1800000\n90054\tNULL\tUrsula von der Leyen\t1800000\n90055\tNULL\tAndrew Huberman\t1500000\n90056\tNULL\tArianna Huffington\t1500000\n90057\tNULL\tSahil Bloom\t1200000\n90058\tNULL\tDaniel Pink\t1200000\n90059\tNULL\tGuillaume Pley\t1200000\n90060\tNULL\tLewis Hamilton\t1200000\n90061\tNULL\tDharmesh Shah\t1100000\n90062\tNULL\tAlex Xu\t950000\n90063\tNULL\tSam Altman\t950000\n90064\tNULL\tLex Fridman\t850000\n90065\tNULL\tPatrick Bet-David\t850000\n90066\tNULL\tRafael Nadal\t850000\n90067\tNULL\tJustin Welsh\t750000\n90068\tNULL\tJean-Marc Jancovici\t650000\n90069\tNULL\tTim Denning\t650000\n90070\tNULL\tEthan Mollick\t580000\n90071\tNULL\tYoussef Koutari\t542000\n90072\tNULL\tTim Denning\t520000\n90073\tNULL\tJasmin Alić\t480000\n90074\tNULL\tJasmin Alić\t480000\n90075\tNULL\tGuillaume Moubeche\t450000\n90076\tNULL\tNoah Kagan\t450000\n90077\tNULL\tAravind Srinivas\t450000\n90078\tNULL\tNicolas Cole\t450000\n90079\tNULL\tNaval Ravikant\t420000\n90080\tNULL\tNina Ramen\t380000\n90081\tNULL\tLara Acosta\t380000\n90082\tNULL\tDickie Bush\t380000\n90083\tNULL\tLara Acosta\t380000\n90084\tNULL\tBenoit Dubos\t350000\n90085\tNULL\tThibault Louis\t320000\n90086\tNULL\tOussama Ammar\t320000\n90087\tNULL\tMaud Alavès\t280000\n90088\tNULL\tChristopher Parola\t250000\n90089\tNULL\tShubham Sharma\t240000\n90090\tNULL\tViolette Dorange\t220000\n90091\tNULL\tRuben Taieb\t200000\n90092\tNULL\tFadi Ghandour\t180000\n90093\tNULL\tRoxanne Varza\t180000\n90094\tNULL\tBadr Jafar\t150000\n90095\tNULL\tCaroline Mignaux\t150000\n90096\tNULL\tRonaldo Mouchawar\t120000\n60007\tadammgrant\tAdam Grant\t6800000\n60033\taleaborwankar\tAlex Xu\t950000\n60016\talexhormozi\tAlex Hormozi\t2800000\n60026\tandrewhuberman\tAndrew Huberman\t1500000\n60017\tandrewyng\tAndrew Ng\t2800000\n60027\taraborwankar\tArianna Huffington\t1500000\n60048\taravindsrinivas\tAravind Srinivas\t450000\n60003\tariannahuffington\tArianna Huffington\t12000000\n60065\tbadrjafar\tBadr Jafar\t150000\n60010\tbarackobama\tBarack Obama\t4500000\n60055\tbenoitdubos\tBenoit Dubos\t350000\n60009\tbrenebrown\tBrené Brown\t4500000\n60066\tcarolinemignaux\tCaroline Mignaux\t150000\n60059\tchristopherparola\tChristopher Parola\t250000\n60029\tdanielhpink\tDaniel Pink\t1200000\n60022\tdanielpink\tDaniel Pink\t1800000\n60032\tdharmesh\tDharmesh Shah\t1100000\n60053\tdickiebush\tDickie Bush\t380000\n60014\temmanuelmacron\tEmmanuel Macron\t3500000\n60041\temollick\tEthan Mollick\t580000\n60063\tfadighandour\tFadi Ghandour\t180000\n60021\tgaborwankar\tGrant Cardone\t2100000\n60008\tgaryvaynerchuk\tGary Vaynerchuk\t5200000\n60046\tguillaumemoubeche\tGuillaume Moubeche\t450000\n60030\tguillaumepley\tGuillaume Pley\t1200000\n60054\tiamlara\tLara Acosta\t380000\n60044\tjasmiinalic\tJasmin Alić\t480000\n60045\tjasmin-alic\tJasmin Alić\t480000\n60024\tjenhsunhuang\tJensen Huang\t1800000\n60039\tjmjancovici\tJean-Marc Jancovici\t650000\n60038\tjustinwelsh\tJustin Welsh\t750000\n60052\tlaraacosta\tLara Acosta\t380000\n60031\tlewishamilton\tLewis Hamilton\t1200000\n60035\tlexfridman\tLex Fridman\t850000\n60058\tmaudalaves\tMaud Alavès\t280000\n60005\tnaaborwankar\tNarendra Modi\t10000000\n60050\tnaval-ravikant\tNaval Ravikant\t420000\n60049\tnicolascole77\tNicolas Cole\t450000\n60020\tnikhilkamathcio\tNikhil Kamath\t2100000\n60051\tninaramen\tNina Ramen\t380000\n60018\tnitaborwankar\tNithin Kamath\t2500000\n60047\tnoahkagan\tNoah Kagan\t450000\n60013\tofficialtonyrobbins\tTony Robbins\t3500000\n60057\toussamaammar\tOussama Ammar\t320000\n60036\tpatrickbetdavid\tPatrick Bet-David\t850000\n60015\traborwankar\tReid Hoffman\t3200000\n60037\trafaelnadal\tRafael Nadal\t850000\n60012\traydalio\tRay Dalio\t3500000\n60002\trbranson\tRichard Branson\t19500000\n60067\tronaldomouchawar\tRonaldo Mouchawar\t120000\n60064\troxannevarza\tRoxanne Varza\t180000\n60062\trubentaieb\tRuben Taieb\t200000\n60028\tsahilbloom\tSahil Bloom\t1200000\n60034\tsamaltman\tSam Altman\t950000\n60023\tsarablakely\tSara Blakely\t1800000\n60004\tsataborwankar\tSatya Nadella\t11000000\n60060\tshubhamsharma\tShubham Sharma\t240000\n60006\tsimonsinek\tSimon Sinek\t7500000\n60019\tstevenbartlett\tSteven Bartlett\t2100000\n60011\tsundarpichai\tSundar Pichai\t4200000\n60056\tthibaultlouis\tThibault Louis\t320000\n60043\ttimdenning\tTim Denning\t520000\n60040\ttimdenning1\tTim Denning\t650000\n60025\turaborwankar\tUrsula von der Leyen\t1800000\n60061\tviolettedorange\tViolette Dorange\t220000\n60001\twilliamhgates\tBill Gates\t36000000\n60042\tyoussefkoutari\tYoussef Koutari\t542000\n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

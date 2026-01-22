@@ -1,0 +1,130 @@
+{
+  "query": "SELECT name, COUNT(*) as cnt FROM linkedin_influencers GROUP BY name HAVING cnt > 1 ORDER BY cnt DESC LIMIT 30;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user Zd6KbRY6RwQkGBw.e73eeb1704d6 --database MHgbg38edqPMmynmo4KzJ4 --execute SELECT name, COUNT(*) as cnt FROM linkedin_influencers GROUP BY name HAVING cnt > 1 ORDER BY cnt DESC LIMIT 30;",
+  "rows": [
+    {
+      "name": "Jasmin Alić",
+      "cnt": "3"
+    },
+    {
+      "name": "Lara Acosta",
+      "cnt": "3"
+    },
+    {
+      "name": "Tim Denning",
+      "cnt": "3"
+    },
+    {
+      "name": "Arianna Huffington",
+      "cnt": "3"
+    },
+    {
+      "name": "Daniel Pink",
+      "cnt": "3"
+    },
+    {
+      "name": "Benoit Dubos",
+      "cnt": "2"
+    },
+    {
+      "name": "Grant Cardone",
+      "cnt": "2"
+    },
+    {
+      "name": "Satya Nadella",
+      "cnt": "2"
+    },
+    {
+      "name": "Guillaume Moubeche",
+      "cnt": "2"
+    },
+    {
+      "name": "Sara Blakely",
+      "cnt": "2"
+    },
+    {
+      "name": "Lewis Hamilton",
+      "cnt": "2"
+    },
+    {
+      "name": "Simon Sinek",
+      "cnt": "2"
+    },
+    {
+      "name": "Gary Vaynerchuk",
+      "cnt": "2"
+    },
+    {
+      "name": "Roxanne Varza",
+      "cnt": "2"
+    },
+    {
+      "name": "Maud Alavès",
+      "cnt": "2"
+    },
+    {
+      "name": "Rafael Nadal",
+      "cnt": "2"
+    },
+    {
+      "name": "Ursula von der Leyen",
+      "cnt": "2"
+    },
+    {
+      "name": "Naval Ravikant",
+      "cnt": "2"
+    },
+    {
+      "name": "Sundar Pichai",
+      "cnt": "2"
+    },
+    {
+      "name": "Sam Altman",
+      "cnt": "2"
+    },
+    {
+      "name": "Guillaume Pley",
+      "cnt": "2"
+    },
+    {
+      "name": "Alex Hormozi",
+      "cnt": "2"
+    },
+    {
+      "name": "Caroline Mignaux",
+      "cnt": "2"
+    },
+    {
+      "name": "Christopher Parola",
+      "cnt": "2"
+    },
+    {
+      "name": "Andrew Ng",
+      "cnt": "2"
+    },
+    {
+      "name": "Barack Obama",
+      "cnt": "2"
+    },
+    {
+      "name": "Badr Jafar",
+      "cnt": "2"
+    },
+    {
+      "name": "Richard Branson",
+      "cnt": "2"
+    },
+    {
+      "name": "Steven Bartlett",
+      "cnt": "2"
+    },
+    {
+      "name": "Ruben Taieb",
+      "cnt": "2"
+    }
+  ],
+  "messages": [],
+  "stdout": "name\tcnt\nJasmin Alić\t3\nLara Acosta\t3\nTim Denning\t3\nArianna Huffington\t3\nDaniel Pink\t3\nBenoit Dubos\t2\nGrant Cardone\t2\nSatya Nadella\t2\nGuillaume Moubeche\t2\nSara Blakely\t2\nLewis Hamilton\t2\nSimon Sinek\t2\nGary Vaynerchuk\t2\nRoxanne Varza\t2\nMaud Alavès\t2\nRafael Nadal\t2\nUrsula von der Leyen\t2\nNaval Ravikant\t2\nSundar Pichai\t2\nSam Altman\t2\nGuillaume Pley\t2\nAlex Hormozi\t2\nCaroline Mignaux\t2\nChristopher Parola\t2\nAndrew Ng\t2\nBarack Obama\t2\nBadr Jafar\t2\nRichard Branson\t2\nSteven Bartlett\t2\nRuben Taieb\t2\n",
+  "stderr": "",
+  "execution_time_ms": 106
+}
