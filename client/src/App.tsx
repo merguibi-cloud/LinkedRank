@@ -1,10 +1,12 @@
 import { Suspense, lazy } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch } from "wouter";
+import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { UserProfileProvider } from "./contexts/UserProfileContext";
+import { LinkedInStatusProvider } from "./contexts/LinkedInStatusContext";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { LinkedInOAuthHandler } from "./components/LinkedInOAuthHandler";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -19,12 +21,13 @@ const Admin = lazy(() => import("./pages/Admin"));
 const Resources = lazy(() => import("./pages/Resources"));
 const Schedule = lazy(() => import("./pages/Schedule"));
 const AutoPublish = lazy(() => import("./pages/AutoPublish"));
-const Pricing = lazy(() => import("./pages/Pricing"));
 const GuideLinkedIn2025 = lazy(() => import("./pages/resources/GuideLinkedIn2025"));
 const TrendingContent = lazy(() => import("./pages/TrendingContent"));
 const TopPosts = lazy(() => import("./pages/TopPosts"));
 const AgentsDashboard = lazy(() => import("./pages/AgentsDashboard"));
 const Carousels = lazy(() => import("./pages/Carousels"));
+const MediaLibrary = lazy(() => import("./pages/MediaLibrary"));
+const MesOutils = lazy(() => import("./pages/MesOutils"));
 const EngagementManager = lazy(() => import("./pages/EngagementManager"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Achievements = lazy(() => import("./pages/Achievements"));
@@ -52,6 +55,8 @@ const Voice = lazy(() => import("./pages/Voice"));
 const TemplateAnalyticsPage = lazy(() => import("./pages/TemplateAnalyticsPage"));
 const PremiumPacks = lazy(() => import("./pages/PremiumPacks"));
 const RealtimeCollab = lazy(() => import("./pages/RealtimeCollab"));
+const Login = lazy(() => import("./pages/Login"));
+const Signup = lazy(() => import("./pages/Signup"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const Confidentialite = lazy(() => import("./pages/legal/Confidentialite"));
@@ -69,6 +74,7 @@ const CookieConsent = lazy(() => import("./components/CookieConsent"));
 
 // Import direct pour l'onboarding (nécessaire au démarrage)
 import { InteractiveOnboarding, useOnboarding } from "./components/InteractiveOnboarding";
+import { OnboardingRedirect } from "./components/OnboardingRedirect";
 
 // Composant de chargement léger
 function PageLoader() {
@@ -87,7 +93,17 @@ function Router() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
         <Route path={"/"} component={Home} />
+        <Route path={"/login"} component={Login} />
+        <Route path={"/signup"} component={Signup} />
         <Route path={"/generate"} component={Generator} />
+        <Route path={"/generator"}><Redirect to="/generate" /></Route>
+        <Route path={"/settings/linkedin"}><Redirect to="/linkedin-settings" /></Route>
+        <Route path={"/agents/meet"}><Redirect to="/meet-the-agents" /></Route>
+        <Route path={"/live-analytics"}><Redirect to="/analytics/live" /></Route>
+        <Route path={"/editorial-calendar"}><Redirect to="/calendar" /></Route>
+        <Route path={"/realtime-collab"}><Redirect to="/collaboration/realtime" /></Route>
+        <Route path={"/premium-packs"}><Redirect to="/templates/premium" /></Route>
+        <Route path={"/template-analytics"}><Redirect to="/templates/analytics" /></Route>
         <Route path={"/rankings/france"} component={RankingsFrance} />
         <Route path={"/rankings/world"} component={RankingsWorld} />
         <Route path={"/onboarding"} component={Onboarding} />
@@ -97,13 +113,15 @@ function Router() {
         <Route path={"/resources/guide-linkedin-2025"} component={GuideLinkedIn2025} />
         <Route path={"/schedule"} component={Schedule} />
         <Route path={"/auto-publish"} component={AutoPublish} />
-        <Route path={"/pricing"} component={Pricing} />
+        <Route path={"/pricing"}><Redirect to="/" /></Route>
         <Route path={"/trending"} component={TrendingContent} />
         <Route path={"/top-posts"} component={TopPosts} />
         <Route path={"/agents-dashboard"} component={AgentsDashboard} />
         <Route path={"/agents"} component={AgentsSimple} />
         <Route path={"/meet-the-agents"} component={MeetTheAgents} />
         <Route path={"/carousels"} component={Carousels} />
+        <Route path={"/mes-outils"} component={MesOutils} />
+        <Route path={"/media-library"} component={MediaLibrary} />
         <Route path={"/engagement"} component={EngagementManager} />
         <Route path={"/analytics"} component={Analytics} />
         <Route path={"/analytics/advanced"} component={AdvancedAnalytics} />
@@ -148,6 +166,8 @@ function AppContent() {
   return (
     <>
       <ScrollToTop />
+      <LinkedInOAuthHandler />
+      <OnboardingRedirect />
       {showOnboarding && (
         <InteractiveOnboarding 
           onComplete={completeOnboarding}
@@ -174,6 +194,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
         <UserProfileProvider>
+          <LinkedInStatusProvider>
           <TooltipProvider>
             <Toaster 
               position="bottom-center"
@@ -187,6 +208,7 @@ function App() {
             />
             <AppContent />
           </TooltipProvider>
+          </LinkedInStatusProvider>
         </UserProfileProvider>
       </ThemeProvider>
     </ErrorBoundary>

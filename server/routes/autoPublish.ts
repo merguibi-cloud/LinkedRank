@@ -1,56 +1,20 @@
-import { Router, Request, Response, NextFunction } from "express";
-import { getDb, getUserByOpenId } from "../db";
+import { Router, Request, Response } from "express";
+import { getDb } from "../db";
 import { autoPublishSettings, autoPublishSchedule, autoPublishQueue, linkedinInfluencers } from "../../drizzle/schema";
 import { eq, desc, like, or, and, sql } from "drizzle-orm";
 import { generateLinkedInPost } from "../services/ai";
-import { sdk } from "../_core/sdk";
-import { COOKIE_NAME } from "@shared/const";
-import { parse as parseCookieHeader } from "cookie";
+import { type AuthenticatedRequest, requireAuth } from "../_core/authMiddleware";
 
 type ScheduleSlot = {
   dayOfWeek: number;
   publishTime: string;
   isActive?: boolean;
+  publishDate?: string | null;
 };
 
 const router = Router();
 
-// Authentication middleware for auto-publish routes
-async function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  try {
-    const cookieHeader = req.headers.cookie;
-    if (!cookieHeader) {
-      return res.status(401).json({ error: "No session cookie" });
-    }
-    
-    const cookies = parseCookieHeader(cookieHeader);
-    const sessionCookie = cookies[COOKIE_NAME];
-    
-    if (!sessionCookie) {
-      return res.status(401).json({ error: "No session cookie" });
-    }
-    
-    const session = await sdk.verifySession(sessionCookie);
-    if (!session) {
-      return res.status(401).json({ error: "Invalid session" });
-    }
-    
-    const user = await getUserByOpenId(session.openId);
-    if (!user) {
-      return res.status(401).json({ error: "User not found" });
-    }
-    
-    (req as any).userId = user.id;
-    (req as any).user = user;
-    next();
-  } catch (error) {
-    console.error("Auth middleware error:", error);
-    return res.status(401).json({ error: "Authentication failed" });
-  }
-}
-
-// Apply auth middleware to all routes
-router.use(authMiddleware);
+router.use(requireAuth);
 
 // Get user's auto-publish settings
 router.get("/settings", async (req: Request, res: Response) => {
@@ -75,12 +39,45 @@ router.get("/settings", async (req: Request, res: Response) => {
       .from(autoPublishSchedule)
       .where(eq(autoPublishSchedule.userId, userId));
 
+    let parsedTopics: Record<string, unknown> = {};
+    if (settings?.inspirationTopics) {
+      try {
+        parsedTopics = JSON.parse(settings.inspirationTopics);
+      } catch {
+        parsedTopics = {};
+      }
+    }
+
+    let inspiringCreators: number[] = [];
+    if (settings?.inspirationCreators) {
+      try {
+        inspiringCreators = JSON.parse(settings.inspirationCreators);
+      } catch {
+        inspiringCreators = [];
+      }
+    }
+
     return res.json({
-      settings: settings || null,
+      settings: settings
+        ? {
+            ...settings,
+            objectives: (parsedTopics.objectives as string[]) || [],
+            contentTypes: (parsedTopics.contentTypes as string[]) || [],
+            inspiringCreators,
+            imageType: (parsedTopics.imageType as string) || "ai",
+            aiImageStyle: (parsedTopics.aiImageStyle as string) || "professional",
+            aiImageFormat: (parsedTopics.aiImageFormat as string) || "1536x1024",
+            imageStyle: (parsedTopics.imageStyle as string) || "gradient",
+            colorPalette: (parsedTopics.colorPalette as string) || "violet",
+            includeImage: parsedTopics.includeImage !== false,
+            customQuote: (parsedTopics.customQuote as string) || "",
+          }
+        : null,
       schedule: schedule.map((s) => ({
         dayOfWeek: s.dayOfWeek,
         publishTime: s.publishTime,
         isActive: s.isActive,
+        publishDate: s.publishDate ?? null,
       })),
     });
   } catch (error) {
@@ -111,37 +108,45 @@ router.post("/settings", async (req: Request, res: Response) => {
       .where(eq(autoPublishSettings.userId, userId))
       .limit(1);
 
+    const inspirationTopics = JSON.stringify({
+      objectives: settings.objectives || [],
+      contentTypes: settings.contentTypes || [],
+      imageType: settings.imageType || "ai",
+      aiImageStyle: settings.aiImageStyle || "professional",
+      aiImageFormat: settings.aiImageFormat || "1536x1024",
+      imageStyle: settings.imageStyle || "gradient",
+      colorPalette: settings.colorPalette || "violet",
+      includeImage: settings.includeImage !== false,
+      customQuote: settings.customQuote || "",
+    });
+
+    const inspirationCreators = JSON.stringify(settings.inspiringCreators || []);
+
+    const settingsPayload = {
+      isEnabled: settings.isEnabled as boolean,
+      sector: settings.sector as string,
+      targetAudience: settings.targetAudience as string,
+      tone: settings.tone as "professional" | "casual" | "inspirational" | "educational" | "provocative",
+      language: settings.language as "FR" | "EN" | "AR" | "ES" | "DE",
+      viralityLevel: settings.viralityLevel as "low" | "medium" | "high",
+      contentLength: settings.contentLength as "short" | "medium" | "long",
+      includeEmojis: settings.includeEmojis as boolean,
+      includeHashtags: settings.includeHashtags as boolean,
+      includeCallToAction: settings.includeCallToAction as boolean,
+      personalContext: settings.personalContext as string,
+      inspirationCreators,
+      inspirationTopics,
+    };
+
     if (existingSettings.length > 0) {
       await db
         .update(autoPublishSettings)
-        .set({
-          isEnabled: settings.isEnabled as boolean,
-          sector: settings.sector as string,
-          targetAudience: settings.targetAudience as string,
-          tone: settings.tone as "professional" | "casual" | "inspirational" | "educational" | "provocative",
-          language: settings.language as "FR" | "EN" | "AR" | "ES" | "DE",
-          viralityLevel: settings.viralityLevel as "low" | "medium" | "high",
-          contentLength: settings.contentLength as "short" | "medium" | "long",
-          includeEmojis: settings.includeEmojis as boolean,
-          includeHashtags: settings.includeHashtags as boolean,
-          includeCallToAction: settings.includeCallToAction as boolean,
-          personalContext: settings.personalContext as string,
-        })
+        .set(settingsPayload)
         .where(eq(autoPublishSettings.userId, userId));
     } else {
       await db.insert(autoPublishSettings).values({
         userId,
-        isEnabled: settings.isEnabled as boolean,
-        sector: settings.sector as string,
-        targetAudience: settings.targetAudience as string,
-        tone: settings.tone as "professional" | "casual" | "inspirational" | "educational" | "provocative",
-        language: settings.language as "FR" | "EN" | "AR" | "ES" | "DE",
-        viralityLevel: settings.viralityLevel as "low" | "medium" | "high",
-        contentLength: settings.contentLength as "short" | "medium" | "long",
-        includeEmojis: settings.includeEmojis as boolean,
-        includeHashtags: settings.includeHashtags as boolean,
-        includeCallToAction: settings.includeCallToAction as boolean,
-        personalContext: settings.personalContext as string,
+        ...settingsPayload,
       });
     }
 
@@ -157,6 +162,7 @@ router.post("/settings", async (req: Request, res: Response) => {
           dayOfWeek: s.dayOfWeek,
           publishTime: s.publishTime,
           isActive: s.isActive ?? true,
+          publishDate: s.publishDate ?? null,
         }))
       );
     }
@@ -283,6 +289,7 @@ router.get("/suggested-influencers", async (req: Request, res: Response) => {
           name: linkedinInfluencers.name,
           headline: linkedinInfluencers.headline,
           profilePicture: linkedinInfluencers.profilePicture,
+          linkedinUsername: linkedinInfluencers.linkedinUsername,
           followers: linkedinInfluencers.followers,
           country: linkedinInfluencers.country,
           industry: linkedinInfluencers.industry,
@@ -300,6 +307,7 @@ router.get("/suggested-influencers", async (req: Request, res: Response) => {
           name: linkedinInfluencers.name,
           headline: linkedinInfluencers.headline,
           profilePicture: linkedinInfluencers.profilePicture,
+          linkedinUsername: linkedinInfluencers.linkedinUsername,
           followers: linkedinInfluencers.followers,
           country: linkedinInfluencers.country,
           industry: linkedinInfluencers.industry,

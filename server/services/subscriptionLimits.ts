@@ -91,70 +91,11 @@ export async function getUserUsageStats(userId: number): Promise<UsageStats> {
  * Check if user can perform an action based on their plan
  */
 export async function canUserPerformAction(
-  userId: number,
-  action: "ai_generation" | "auto_publish" | "image_generation" | "analytics" | "api_access"
+  _userId: number,
+  _action: "ai_generation" | "auto_publish" | "image_generation" | "analytics" | "api_access"
 ): Promise<{ allowed: boolean; reason?: string; upgradeRequired?: boolean }> {
-  const planId = await getUserPlan(userId);
-  const limits = getPlanLimits(planId);
-  const usage = await getUserUsageStats(userId);
-
-  switch (action) {
-    case "ai_generation":
-      if (limits.aiGenerationsPerMonth === null) {
-        return { allowed: true };
-      }
-      if (usage.aiGenerationsThisMonth >= limits.aiGenerationsPerMonth) {
-        return {
-          allowed: false,
-          reason: `Vous avez atteint votre limite de ${limits.aiGenerationsPerMonth} générations IA ce mois-ci.`,
-          upgradeRequired: true,
-        };
-      }
-      return { allowed: true };
-
-    case "auto_publish":
-      if (!limits.hasAutoPublish) {
-        return {
-          allowed: false,
-          reason: "La publication automatique n'est pas disponible avec votre plan actuel.",
-          upgradeRequired: true,
-        };
-      }
-      return { allowed: true };
-
-    case "image_generation":
-      if (!limits.hasImageGeneration) {
-        return {
-          allowed: false,
-          reason: "La génération d'images IA n'est pas disponible avec votre plan actuel.",
-          upgradeRequired: true,
-        };
-      }
-      return { allowed: true };
-
-    case "analytics":
-      if (!limits.hasAnalytics) {
-        return {
-          allowed: false,
-          reason: "Les analytics avancés ne sont pas disponibles avec votre plan actuel.",
-          upgradeRequired: true,
-        };
-      }
-      return { allowed: true };
-
-    case "api_access":
-      if (!limits.hasApiAccess) {
-        return {
-          allowed: false,
-          reason: "L'accès API n'est pas disponible avec votre plan actuel.",
-          upgradeRequired: true,
-        };
-      }
-      return { allowed: true };
-
-    default:
-      return { allowed: true };
-  }
+  // Abonnements désactivés — accès illimité pour tous
+  return { allowed: true };
 }
 
 /**
@@ -179,21 +120,15 @@ export async function getRemainingUsage(
   plan: string;
   planName: string;
 }> {
-  const planId = await getUserPlan(userId);
-  const limits = getPlanLimits(planId);
   const usage = await getUserUsageStats(userId);
-  const plan = getPlan(planId);
-
-  const aiLimit = limits.aiGenerationsPerMonth;
-  const aiUsed = usage.aiGenerationsThisMonth;
 
   return {
     aiGenerations: {
-      used: aiUsed,
-      limit: aiLimit,
-      remaining: aiLimit === null ? null : Math.max(0, aiLimit - aiUsed),
+      used: usage.aiGenerationsThisMonth,
+      limit: null,
+      remaining: null,
     },
-    plan: planId,
-    planName: plan?.name || "Starter",
+    plan: "free",
+    planName: "Gratuit",
   };
 }

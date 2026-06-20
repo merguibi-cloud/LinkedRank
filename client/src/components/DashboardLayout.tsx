@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useLinkedInStatus } from "@/hooks/useLinkedInStatus";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, Sparkles, Calendar, Zap, Bot, Layers, TrendingUp, FileText, Crown, MessageSquare, BarChart3, Megaphone, Linkedin, FlaskConical, GraduationCap, Activity, Trophy, Gamepad2, Gift, UserPlus, Target, Bell, Settings, ListTodo, Timer, CalendarDays, Users2, Mic } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, Sparkles, Calendar, Zap, Bot, Layers, TrendingUp, FileText, Crown, MessageSquare, BarChart3, Megaphone, Linkedin, FlaskConical, GraduationCap, Activity, Trophy, Gamepad2, Gift, UserPlus, Target, Bell, Settings, ListTodo, Timer, CalendarDays, Users2, Mic, FolderOpen, Wrench } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -45,6 +46,7 @@ const menuCategories: MenuCategory[] = [
     title: "Essentiel",
     items: [
       { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+      { icon: Wrench, label: "Mes Outils", path: "/mes-outils", badge: "🛠️" },
       { icon: Sparkles, label: "Générateur", path: "/generate", badge: "IA" },
       { icon: Bot, label: "Mes Agents", path: "/agents" },
     ]
@@ -52,6 +54,7 @@ const menuCategories: MenuCategory[] = [
   {
     title: "Création",
     items: [
+      { icon: FolderOpen, label: "Médiathèque", path: "/mes-outils?tab=mediatheque", badge: "📁" },
       { icon: Layers, label: "Carrousels", path: "/carousels" },
       { icon: FileText, label: "Templates", path: "/templates" },
       { icon: Mic, label: "Dictée vocale", path: "/voice", badge: "🎙️" },
@@ -61,7 +64,7 @@ const menuCategories: MenuCategory[] = [
   {
     title: "Optimisation",
     items: [
-      { icon: GraduationCap, label: "Coaching IA", path: "/coaching", badge: "Pro" },
+      { icon: GraduationCap, label: "Coaching IA", path: "/coaching" },
       { icon: FlaskConical, label: "A/B Testing", path: "/ab-testing" },
       { icon: TrendingUp, label: "Tendances", path: "/trending" },
     ]
@@ -113,6 +116,19 @@ const menuCategories: MenuCategory[] = [
 
 // Flatten pour compatibilité
 const menuItems = menuCategories.flatMap(cat => cat.items);
+
+function isMenuItemActive(location: string, itemPath: string): boolean {
+  if (itemPath.includes("?")) {
+    const [path, query] = itemPath.split("?");
+    const tab = new URLSearchParams(query).get("tab");
+    const currentTab = new URLSearchParams(window.location.search).get("tab");
+    return location === path && currentTab === tab;
+  }
+  if (itemPath === "/mes-outils") {
+    return location === "/mes-outils" && !window.location.search.includes("tab=mediatheque");
+  }
+  return location === itemPath || location.startsWith(`${itemPath}/`);
+}
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 280;
@@ -189,6 +205,7 @@ function DashboardLayoutContent({
   setSidebarWidth,
 }: DashboardLayoutContentProps) {
   const { user, logout } = useAuth();
+  const { status: linkedInStatus } = useLinkedInStatus();
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
@@ -273,7 +290,7 @@ function DashboardLayoutContent({
                 )}
                 <SidebarMenu className="px-2 py-0">
                   {category.items.map(item => {
-                    const isActive = location === item.path;
+                    const isActive = isMenuItemActive(location, item.path);
                     return (
                       <SidebarMenuItem key={item.path}>
                         <SidebarMenuButton
@@ -305,6 +322,13 @@ function DashboardLayoutContent({
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <Avatar className="h-9 w-9 border shrink-0">
+                    {linkedInStatus.connected && linkedInStatus.profilePicture ? (
+                      <AvatarImage
+                        src={linkedInStatus.profilePicture}
+                        alt={linkedInStatus.profileName ?? "Profil LinkedIn"}
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : null}
                     <AvatarFallback className="text-xs font-medium">
                       {user?.name?.charAt(0).toUpperCase()}
                     </AvatarFallback>

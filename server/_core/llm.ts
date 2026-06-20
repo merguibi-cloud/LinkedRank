@@ -62,6 +62,7 @@ export type InvokeParams = {
   tool_choice?: ToolChoice;
   maxTokens?: number;
   max_tokens?: number;
+  temperature?: number;
   outputSchema?: OutputSchema;
   output_schema?: OutputSchema;
   responseFormat?: ResponseFormat;
@@ -209,16 +210,50 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+const resolveApiUrl = () => {
+  const base = ENV.forgeApiUrl.replace(/\/$/, "");
+  if (base.includes("generativelanguage.googleapis.com")) {
+    return `${base}/chat/completions`;
+  }
+  return `${base}/v1/chat/completions`;
+};
 
 const assertApiKey = () => {
   if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+    throw new Error(
+      "Aucune clé IA configurée. Ajoutez GEMINI_API_KEY ou OPENAI_API_KEY dans le fichier .env"
+    );
   }
 };
+
+function formatLlmError(status: number, errorText: string): string {
+  const provider = ENV.llmProvider === "gemini" ? "Gemini" : "OpenAI";
+
+  try {
+    const parsed = JSON.parse(errorText) as {
+      error?: { code?: string; message?: string; status?: string };
+    };
+    const code = parsed.error?.code ?? parsed.error?.status;
+
+    if (code === "insufficient_quota" || status === 429) {
+      return ENV.llmProvider === "gemini"
+        ? "Quota Gemini épuisé. Vérifiez votre quota sur https://aistudio.google.com/"
+        : "Quota OpenAI épuisé. Ajoutez des crédits sur https://platform.openai.com/account/billing";
+    }
+
+    if (code === "invalid_api_key" || status === 401) {
+      return `Clé ${provider} invalide. Vérifiez votre clé API dans le fichier .env.`;
+    }
+
+    if (parsed.error?.message) {
+      return parsed.error.message;
+    }
+  } catch {
+    // ignore JSON parse errors
+  }
+
+  return `Erreur API ${provider} (${status}): ${errorText}`;
+}
 
 const normalizeResponseFormat = ({
   responseFormat,
@@ -273,6 +308,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     tools,
     toolChoice,
     tool_choice,
+    maxTokens,
+    max_tokens,
+    temperature,
     outputSchema,
     output_schema,
     responseFormat,
@@ -280,9 +318,14 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } = params;
 
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model: ENV.llmModel,
     messages: messages.map(normalizeMessage),
+    max_tokens: maxTokens ?? max_tokens ?? 4096,
   };
+
+  if (typeof temperature === "number") {
+    payload.temperature = temperature;
+  }
 
   if (tools && tools.length > 0) {
     payload.tools = tools;
@@ -294,11 +337,6 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   );
   if (normalizedToolChoice) {
     payload.tool_choice = normalizedToolChoice;
-  }
-
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
   }
 
   const normalizedResponseFormat = normalizeResponseFormat({
@@ -323,9 +361,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
+    throw new Error(formatLlmError(response.status, errorText));
   }
 
   return (await response.json()) as InvokeResult;

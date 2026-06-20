@@ -31,15 +31,15 @@ interface DailyChallenge {
 
 export function GamificationWidget() {
   const [, setLocation] = useLocation();
-  const [xp, setXp] = useState(4850);
-  const [level, setLevel] = useState(4);
-  const [streak, setStreak] = useState(12);
+  const [xp] = useState(0);
+  const [level] = useState(1);
+  const [streak] = useState(0);
   const [showLevelUp, setShowLevelUp] = useState(false);
   
   const [dailyChallenges] = useState<DailyChallenge[]>([
-    { id: "1", title: "Publier un post", progress: 1, target: 1, xpReward: 100, completed: true },
-    { id: "2", title: "Répondre à 5 commentaires", progress: 3, target: 5, xpReward: 75, completed: false },
-    { id: "3", title: "Envoyer 3 invitations", progress: 2, target: 3, xpReward: 50, completed: false }
+    { id: "1", title: "Générer un post", progress: 0, target: 1, xpReward: 100, completed: false },
+    { id: "2", title: "Publier sur LinkedIn", progress: 0, target: 1, xpReward: 150, completed: false },
+    { id: "3", title: "Connecter LinkedIn", progress: 0, target: 1, xpReward: 50, completed: false },
   ]);
 
   const LEVELS = [

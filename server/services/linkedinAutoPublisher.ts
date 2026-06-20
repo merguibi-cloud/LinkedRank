@@ -5,6 +5,7 @@
 
 import { getLinkedinSettings } from "../db";
 import { postToLinkedIn } from "./linkedin";
+import { notifyPostPublished } from "./notificationService";
 
 export interface GeneratedPostContent {
   title?: string;
@@ -79,6 +80,8 @@ export async function publishToLinkedIn(
 
     if (result.success) {
       console.log("[LinkedInAutoPublisher] Successfully published, postId:", result.postId);
+      const preview = post.title || fullContent.slice(0, 80).replace(/\n/g, " ");
+      await notifyPostPublished(userId, preview);
       return {
         success: true,
         linkedinPostId: result.postId,

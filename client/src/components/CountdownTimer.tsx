@@ -130,36 +130,6 @@ function TimeUnit({ value, label }: { value: number; label: string }) {
   );
 }
 
-// Urgency banner with countdown
 export function UrgencyBanner() {
-  const [isVisible, setIsVisible] = useState(true);
-  
-  if (!isVisible) return null;
-  
-  return (
-    <div className="bg-gradient-to-r from-rose/20 to-violet/20 border-y border-white/10 py-3 relative">
-      <div className="container flex items-center justify-center gap-4 flex-wrap">
-        <span className="text-white font-medium">
-          🔥 Offre Flash : -50% sur le plan Pro
-        </span>
-        <CountdownTimer variant="compact" />
-        <a 
-          href="/pricing" 
-          className="text-violet-light hover:text-white font-semibold underline underline-offset-4"
-        >
-          En profiter →
-        </a>
-        <button
-          onClick={() => setIsVisible(false)}
-          className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-white/10 transition-colors"
-          aria-label="Fermer la bannière"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/70">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-    </div>
-  );
+  return null;
 }

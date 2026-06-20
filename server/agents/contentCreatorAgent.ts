@@ -1,44 +1,60 @@
 /**
  * Content Creator Agent
- * 
+ *
  * An AI agent that generates personalized LinkedIn content based on:
  * - User's profile and business context
  * - Past content performance
  * - User feedback and preferences
  * - Current trends
+ * - Editorial choices catalog (angles, hooks, formats)
  */
 
-import { 
-  createTask, 
-  updateTaskStatus, 
-  addMemory, 
-  getAgentMemories,
+import {
+  createTask,
+  updateTaskStatus,
+  addMemory,
   getRelevantMemories,
   logAgentActivity,
-  getAgentById
+  getAgentById,
 } from "../services/agentService";
 import { generateLinkedInPost } from "../services/ai";
-
-// Content format type
-type ContentFormat = "citation" | "carousel" | "infographic" | "story" | "tips" | "question" | "text";
+import {
+  LINKEDIN_ENGAGEMENT_METHOD,
+  LINKEDIN_CIT_METHOD,
+  LINKEDIN_ALGORITHM_TIPS,
+  LINKEDIN_POST_STRUCTURE_CHECKLIST,
+} from "../services/linkedinPostMethodology";
+import { buildLearningContext } from "../services/agentLearningService";
+import {
+  type ContentAngleId,
+  type GeneratableFormat,
+  type ContentChoice,
+  buildContentChoice,
+  buildPersonalContext,
+  resolveAiFormat,
+  getEditorialMix,
+  getAngleById,
+  pickHookForAngle,
+  inferAngleFromContent,
+  computeAnglePerformance,
+  computeFormatPerformance,
+  TOPIC_PILLARS,
+} from "../services/contentChoices";
 import { getDb } from "../db";
-import { userProfiles, linkedinPosts, generatedPosts } from "../../drizzle/schema";
-import { eq, desc } from "drizzle-orm";
-import type { 
-  TaskInputData, 
-  TaskOutputData,
-  AgentMemory,
-  ContentFormat as ContentType
-} from "../../shared/agentTypes";
-
-// Content formats the agent can generate
-type GeneratableFormat = "text" | "carousel" | "infographic" | "poll";
+import { userProfiles, generatedPosts } from "../../drizzle/schema";
+import { eq, desc, and } from "drizzle-orm";
+import type { TaskInputData, TaskOutputData, AgentMemory } from "../../shared/agentTypes";
 
 interface ContentGenerationContext {
   userProfile: any;
   pastPosts: any[];
   memories: AgentMemory[];
   preferences: ContentPreferences;
+  learning: Awaited<ReturnType<typeof buildLearningContext>>;
+  anglePerformance: Partial<Record<ContentAngleId, number>>;
+  formatPerformance: Partial<Record<GeneratableFormat, number>>;
+  recentAngles: ContentAngleId[];
+  recentTopics: string[];
 }
 
 interface ContentPreferences {
@@ -57,12 +73,12 @@ interface ContentPreferences {
 export class ContentCreatorAgent {
   private agentId: number;
   private userId: number;
-  
+
   constructor(agentId: number, userId: number) {
     this.agentId = agentId;
     this.userId = userId;
   }
-  
+
   /**
    * Generate content based on a topic or let the agent choose
    */
@@ -72,81 +88,69 @@ export class ContentCreatorAgent {
     tone?: string;
     keywords?: string[];
     inspirationPosts?: string[];
+    angle?: ContentAngleId;
   }): Promise<{ taskId: number; content?: TaskOutputData }> {
-    // Create a task for this generation
     const task = await createTask(this.agentId, this.userId, {
       type: "generate_post",
-      title: input.topic 
-        ? `Générer un post sur: ${input.topic}`
-        : "Générer un post personnalisé",
-      description: `Format: ${input.format || "text"}, Ton: ${input.tone || "auto"}`,
+      title: input.topic ? `Générer un post sur: ${input.topic}` : "Générer un post personnalisé",
+      description: `Format: ${input.format || "auto"}, Ton: ${input.tone || "auto"}`,
       inputData: input as TaskInputData,
     });
-    
+
     try {
-      // Update task status to in_progress
       await updateTaskStatus(task.id, "in_progress");
-      
-      // Gather context for generation
+
       const context = await this.gatherContext();
-      
-      // Determine the best topic if not provided
-      const topic = input.topic || await this.suggestTopic(context);
-      
-      // Determine the best format
-      const format = input.format || this.suggestFormat(topic, context);
-      
-      // Generate the content
+
+      const choice = this.resolveEditorialChoice(input, context);
+
       const generatedContent = await this.createContent({
-        topic,
-        format,
-        tone: input.tone || context.preferences.tone,
+        choice,
+        tone: input.tone || choice.tone || context.preferences.tone,
         keywords: input.keywords,
         context,
       });
-      
-      // Prepare output data
+
       const outputData: TaskOutputData = {
         generatedContent: generatedContent.content,
         generatedTitle: generatedContent.title,
         hashtags: generatedContent.hashtags,
         imageUrl: generatedContent.imageUrl,
+        recommendations: [choice.rationale],
       };
-      
-      // Check if approval is required
+
       const agent = await getAgentById(this.agentId);
-      
+
       if (agent?.requiresApproval) {
         await updateTaskStatus(task.id, "awaiting_approval", outputData);
         await logAgentActivity(
-          this.agentId, 
-          this.userId, 
-          "content_generated", 
+          this.agentId,
+          this.userId,
+          "content_generated",
           "info",
-          `Contenu généré sur "${topic}" - En attente d'approbation`,
+          `Contenu généré — ${choice.rationale} — En attente d'approbation`,
           task.id
         );
       } else {
         await updateTaskStatus(task.id, "completed", outputData);
         await logAgentActivity(
-          this.agentId, 
-          this.userId, 
-          "content_generated", 
+          this.agentId,
+          this.userId,
+          "content_generated",
           "info",
-          `Contenu généré et approuvé automatiquement sur "${topic}"`,
+          `Contenu généré et approuvé automatiquement — ${choice.rationale}`,
           task.id
         );
       }
-      
+
       return { taskId: task.id, content: outputData };
-      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       await updateTaskStatus(task.id, "failed", undefined, errorMessage);
       await logAgentActivity(
-        this.agentId, 
-        this.userId, 
-        "content_generation_failed", 
+        this.agentId,
+        this.userId,
+        "content_generation_failed",
         "error",
         `Échec de génération: ${errorMessage}`,
         task.id
@@ -154,47 +158,102 @@ export class ContentCreatorAgent {
       throw error;
     }
   }
-  
+
   /**
    * Gather all context needed for content generation
    */
   private async gatherContext(): Promise<ContentGenerationContext> {
     const db = (await getDb())!;
-    
-    // Get user profile
-    const [userProfile] = await db.select()
+
+    const [userProfile] = await db
+      .select()
       .from(userProfiles)
       .where(eq(userProfiles.userId, this.userId));
-    
-    // Get past posts for style learning
-    const pastPosts = await db.select()
-      .from(linkedinPosts)
-      .where(eq(linkedinPosts.status, "published"))
-      .orderBy(desc(linkedinPosts.publishedAt))
+
+    const pastPosts = await db
+      .select()
+      .from(generatedPosts)
+      .where(and(eq(generatedPosts.userId, this.userId), eq(generatedPosts.status, "published")))
+      .orderBy(desc(generatedPosts.publishedAt))
       .limit(20);
-    
-    // Get agent memories
+
     const memories = await getRelevantMemories(this.agentId, "generate_post");
-    
-    // Extract preferences from memories and profile
     const preferences = this.extractPreferences(userProfile, memories);
-    
+    const learning = await buildLearningContext(this.userId, this.agentId);
+
+    const anglePerformance = computeAnglePerformance(pastPosts);
+    const formatPerformance = computeFormatPerformance(pastPosts);
+
+    const recentAngles = pastPosts
+      .slice(0, 5)
+      .map((p) => inferAngleFromContent(p.content))
+      .filter(Boolean) as ContentAngleId[];
+
+    const recentTopics = pastPosts
+      .slice(0, 5)
+      .map((p) => p.theme)
+      .filter(Boolean) as string[];
+
     return {
       userProfile,
       pastPosts,
       memories,
       preferences,
+      learning,
+      anglePerformance,
+      formatPerformance,
+      recentAngles,
+      recentTopics,
     };
   }
-  
+
+  /**
+   * Résout le choix éditorial complet (sujet + angle + accroche + format)
+   */
+  private resolveEditorialChoice(
+    input: { topic?: string; format?: GeneratableFormat; angle?: ContentAngleId },
+    context: ContentGenerationContext
+  ): ContentChoice {
+    if (input.topic && input.angle) {
+      const angle = getAngleById(input.angle);
+      const hook = pickHookForAngle(input.angle);
+      const format = input.format || angle.preferredMedia || "text";
+      return {
+        topic: input.topic,
+        angle,
+        hook,
+        format,
+        tone: context.preferences.tone,
+        rationale: `Sujet imposé · angle ${angle.name}`,
+      };
+    }
+
+    const choice = buildContentChoice({
+      topic: input.topic,
+      profileTopics: context.preferences.topics,
+      industry: context.userProfile?.industry,
+      learning: context.learning,
+      avoidTopics: [
+        ...context.preferences.avoidTopics,
+        ...(context.learning.avoidPatterns || []),
+      ],
+      recentTopics: context.recentTopics,
+      recentAngles: context.recentAngles,
+      anglePerformance: context.anglePerformance,
+      formatPerformance: context.formatPerformance,
+      preferredTone: context.preferences.tone,
+    });
+
+    if (input.format) choice.format = input.format;
+    if (input.angle) choice.angle = getAngleById(input.angle);
+
+    return choice;
+  }
+
   /**
    * Extract content preferences from profile and memories
    */
-  private extractPreferences(
-    profile: any, 
-    memories: AgentMemory[]
-  ): ContentPreferences {
-    // Default preferences
+  private extractPreferences(profile: any, memories: AgentMemory[]): ContentPreferences {
     const defaults: ContentPreferences = {
       tone: profile?.preferredTone || "professional",
       topics: [],
@@ -204,112 +263,38 @@ export class ContentCreatorAgent {
       emojiUsage: "minimal",
       postLength: "medium",
     };
-    
-    // Override with memories
+
     for (const memory of memories) {
       if (memory.type === "user_preference") {
-        if (memory.key === "preferred_topics") {
-          defaults.topics = memory.value;
-        } else if (memory.key === "avoid_topics") {
-          defaults.avoidTopics = memory.value;
-        } else if (memory.key === "writing_style") {
-          defaults.writingStyle = memory.value;
-        } else if (memory.key === "hashtag_style") {
-          defaults.hashtagStyle = memory.value;
-        } else if (memory.key === "emoji_usage") {
-          defaults.emojiUsage = memory.value;
-        } else if (memory.key === "post_length") {
-          defaults.postLength = memory.value;
-        }
+        if (memory.key === "preferred_topics") defaults.topics = memory.value;
+        else if (memory.key === "avoid_topics") defaults.avoidTopics = memory.value;
+        else if (memory.key === "writing_style") defaults.writingStyle = memory.value;
+        else if (memory.key === "hashtag_style") defaults.hashtagStyle = memory.value;
+        else if (memory.key === "emoji_usage") defaults.emojiUsage = memory.value;
+        else if (memory.key === "post_length") defaults.postLength = memory.value;
       }
-      
       if (memory.type === "content_style" && memory.key === "tone") {
         defaults.tone = memory.value;
       }
     }
-    
-    // Add topics from profile
+
     if (profile?.expertise) {
       try {
         const expertise = JSON.parse(profile.expertise);
         defaults.topics = [...defaults.topics, ...expertise];
-      } catch {}
-    }
-    
-    return defaults;
-  }
-  
-  /**
-   * Suggest a topic based on context
-   */
-  private async suggestTopic(context: ContentGenerationContext): Promise<string> {
-    const topics = [
-      ...context.preferences.topics,
-      "leadership",
-      "productivité",
-      "innovation",
-      "développement personnel",
-      "entrepreneuriat",
-    ];
-    
-    // Filter out recently used topics
-    const recentTopics = context.pastPosts
-      .slice(0, 5)
-      .map(p => p.theme)
-      .filter(Boolean);
-    
-    const availableTopics = topics.filter(t => !recentTopics.includes(t));
-    
-    // Return a random topic from available ones
-    return availableTopics[Math.floor(Math.random() * availableTopics.length)] 
-      || topics[0];
-  }
-  
-  /**
-   * Suggest the best format for a topic
-   */
-  private suggestFormat(
-    topic: string, 
-    context: ContentGenerationContext
-  ): GeneratableFormat {
-    // Analyze past performance by format
-    const formatPerformance: Record<string, number> = {
-      text: 0,
-      carousel: 0,
-      infographic: 0,
-      poll: 0,
-    };
-    
-    for (const post of context.pastPosts) {
-      const engagement = (post.likes || 0) + (post.comments || 0) * 2;
-      const format = post.mediaType === "none" ? "text" : post.mediaType;
-      if (formatPerformance[format] !== undefined) {
-        formatPerformance[format] += engagement;
+      } catch {
+        /* ignore */
       }
     }
-    
-    // Educational topics work well with carousels
-    const educationalKeywords = ["comment", "étapes", "guide", "conseils", "tips"];
-    if (educationalKeywords.some(k => topic.toLowerCase().includes(k))) {
-      return "carousel";
-    }
-    
-    // Data-heavy topics work well with infographics
-    const dataKeywords = ["statistiques", "chiffres", "données", "étude"];
-    if (dataKeywords.some(k => topic.toLowerCase().includes(k))) {
-      return "infographic";
-    }
-    
-    // Default to text for most topics
-    return "text";
+
+    return defaults;
   }
-  
+
   /**
    * Create the actual content
    */
   private async createContent(params: {
-    topic: string;
-    format: GeneratableFormat;
+    choice: ContentChoice;
     tone: string;
     keywords?: string[];
     context: ContentGenerationContext;
@@ -319,45 +304,75 @@ export class ContentCreatorAgent {
     hashtags: string[];
     imageUrl?: string;
   }> {
-    const { topic, format, tone, keywords, context } = params;
-    
-    // Build the prompt with context
-    const systemPrompt = this.buildSystemPrompt(context);
-    const userPrompt = this.buildUserPrompt(topic, format, tone, keywords);
-    
-    // Use the AI service to generate content
+    const { choice, tone, keywords, context } = params;
+    const { topic, angle, hook, format } = choice;
+
+    const pastPostPreviews = context.pastPosts
+      .slice(0, 3)
+      .map((p) => p.content.replace(/\s+/g, " ").trim().slice(0, 100));
+
+    const personalContext = buildPersonalContext({
+      angle,
+      hook,
+      learning: context.learning,
+      profile: {
+        companyName: context.userProfile?.companyName,
+        industry: context.userProfile?.industry,
+        personalBio: context.userProfile?.personalBio,
+        expertise: context.userProfile?.expertise,
+      },
+      pastPostPreviews,
+    });
+
+    const aiFormat = resolveAiFormat(format, angle);
+    const contentLength = context.preferences.postLength;
+    const includeEmojis = context.preferences.emojiUsage !== "none";
+
+    let enrichedTopic = topic;
+    if (keywords?.length) {
+      enrichedTopic += ` (mots-clés: ${keywords.join(", ")})`;
+    }
+
     const content = await generateLinkedInPost({
-      topic,
+      topic: enrichedTopic,
       tone,
       language: "FR",
-      contentFormat: format,
+      contentFormat: aiFormat,
+      sector: context.userProfile?.industry || "Business",
+      personalContext,
+      contentLength,
+      includeEmojis,
+      includeHashtags: context.preferences.hashtagStyle !== "minimal",
+      includeCallToAction: true,
     });
-    
-    const result = { content, title: topic, imageUrl: undefined };
-    
-    // Extract hashtags from content or generate them
-    const hashtags = this.extractOrGenerateHashtags(result.content, topic);
-    
+
+    const hashtags = this.extractOrGenerateHashtags(content, topic);
+
     return {
-      content: result.content,
-      title: result.title || topic,
+      content,
+      title: topic,
       hashtags,
-      imageUrl: result.imageUrl,
+      imageUrl: undefined,
     };
   }
-  
+
   /**
-   * Build system prompt with agent context
+   * Build system prompt with agent context (used for future LLM direct calls)
    */
   private buildSystemPrompt(context: ContentGenerationContext): string {
     const { userProfile, preferences, memories } = context;
-    
+
     let prompt = `Tu es un expert en création de contenu LinkedIn pour des professionnels.
-Tu dois générer du contenu engageant et authentique.
+Tu dois générer du contenu engageant et authentique en appliquant les méthodologies ci-dessous.
+
+${LINKEDIN_ENGAGEMENT_METHOD}
+
+${LINKEDIN_CIT_METHOD}
+
+${LINKEDIN_ALGORITHM_TIPS}
 
 `;
-    
-    // Add user context
+
     if (userProfile) {
       prompt += `CONTEXTE UTILISATEUR:
 - Entreprise: ${userProfile.companyName || "Non spécifié"}
@@ -367,8 +382,7 @@ Tu dois générer du contenu engageant et authentique.
 
 `;
     }
-    
-    // Add preferences
+
     prompt += `PRÉFÉRENCES DE STYLE:
 - Ton: ${preferences.tone}
 - Style d'écriture: ${preferences.writingStyle}
@@ -377,9 +391,18 @@ Tu dois générer du contenu engageant et authentique.
 - Emojis: ${preferences.emojiUsage}
 
 `;
-    
-    // Add learnings from memories
-    const feedbackMemories = memories.filter(m => m.type === "feedback");
+
+    if (context.learning.insightsSummary) {
+      prompt += `PERFORMANCE DES PUBLICATIONS:
+${context.learning.insightsSummary}
+`;
+      if (context.learning.successfulExamples?.length) {
+        prompt += `Exemples performants: ${context.learning.successfulExamples.join(" | ")}\n`;
+      }
+      prompt += "\n";
+    }
+
+    const feedbackMemories = memories.filter((m) => m.type === "feedback");
     if (feedbackMemories.length > 0) {
       prompt += `APPRENTISSAGES DES RETOURS PRÉCÉDENTS:
 `;
@@ -387,90 +410,85 @@ Tu dois générer du contenu engageant et authentique.
         if (memory.value.rejectionReason) {
           prompt += `- Éviter: ${memory.value.rejectionReason}\n`;
         }
+        if (memory.value.approved && memory.value.topic) {
+          prompt += `- Sujet approuvé: ${memory.value.topic}\n`;
+        }
       }
       prompt += "\n";
     }
-    
-    // Add best practices
-    const bestPractices = memories.filter(m => m.type === "best_practice");
-    if (bestPractices.length > 0) {
-      prompt += `BONNES PRATIQUES À SUIVRE:
-`;
-      for (const bp of bestPractices) {
-        prompt += `- ${bp.value}\n`;
-      }
-    }
-    
+
     return prompt;
   }
-  
+
   /**
    * Build user prompt for content generation
    */
   private buildUserPrompt(
-    topic: string, 
-    format: GeneratableFormat, 
+    choice: ContentChoice,
     tone: string,
     keywords?: string[]
   ): string {
-    let prompt = `Génère un post LinkedIn sur le sujet: "${topic}"
+    let prompt = `Génère un post LinkedIn sur le sujet: "${choice.topic}"
 
-Format: ${format}
+Angle éditorial: ${choice.angle.emoji} ${choice.angle.name} — ${choice.angle.description}
+Accroche (${choice.hook.name}): ${choice.hook.template}
+Format: ${choice.format}
 Ton: ${tone}
 `;
-    
-    if (keywords && keywords.length > 0) {
+
+    if (keywords?.length) {
       prompt += `Mots-clés à inclure: ${keywords.join(", ")}\n`;
     }
-    
+
     prompt += `
-INSTRUCTIONS:
-1. Commence par un hook accrocheur qui capte l'attention
-2. Développe le sujet avec des insights pertinents
-3. Termine par un appel à l'action ou une question engageante
-4. Le contenu doit être authentique et apporter de la valeur
+${LINKEDIN_POST_STRUCTURE_CHECKLIST}
 
 Génère uniquement le contenu du post, sans commentaires supplémentaires.`;
-    
+
     return prompt;
   }
-  
+
   /**
    * Extract or generate hashtags
    */
   private extractOrGenerateHashtags(content: string, topic: string): string[] {
-    // Extract existing hashtags from content
     const existingHashtags = content.match(/#\w+/g) || [];
-    
+
     if (existingHashtags.length >= 3) {
       return existingHashtags.slice(0, 5);
     }
-    
-    // Generate additional hashtags based on topic
+
+    const pillar = TOPIC_PILLARS.find(
+      (p) => topic.toLowerCase().includes(p.name.toLowerCase()) || topic.toLowerCase().includes(p.id)
+    );
+
     const topicHashtags = [
-      `#${topic.replace(/\s+/g, "")}`,
-      "#LinkedIn",
+      `#${topic.replace(/\s+/g, "").replace(/[^a-zA-Z0-9À-ÿ]/g, "")}`,
+      pillar ? `#${pillar.name.replace(/\s+/g, "")}` : "#LinkedIn",
       "#PersonalBranding",
       "#Leadership",
       "#Entrepreneuriat",
     ];
-    
+
     const allHashtags = [...existingHashtags, ...topicHashtags];
-    const uniqueHashtags = allHashtags.filter((tag, index) => allHashtags.indexOf(tag) === index);
-    return uniqueHashtags.slice(0, 5);
+    const unique = allHashtags.filter((tag, index) => allHashtags.indexOf(tag) === index);
+    return unique.slice(0, 5);
   }
-  
+
   /**
    * Learn from user feedback
    */
-  async learnFromFeedback(taskId: number, feedback: {
-    approved: boolean;
-    rating?: number;
-    comments?: string;
-    modifications?: string;
-  }): Promise<void> {
+  async learnFromFeedback(
+    taskId: number,
+    feedback: {
+      approved: boolean;
+      rating?: number;
+      comments?: string;
+      modifications?: string;
+    }
+  ): Promise<void> {
     const memoryKey = `feedback_${taskId}`;
-    
+
     await addMemory(this.agentId, this.userId, {
       type: "feedback",
       key: memoryKey,
@@ -479,8 +497,7 @@ Génère uniquement le contenu du post, sans commentaires supplémentaires.`;
       source: "user_feedback",
       context: feedback.comments,
     });
-    
-    // If there are specific modifications, learn from them
+
     if (feedback.modifications) {
       await addMemory(this.agentId, this.userId, {
         type: "content_style",
@@ -493,7 +510,7 @@ Génère uniquement le contenu du post, sans commentaires supplémentaires.`;
         source: "user_modification",
       });
     }
-    
+
     await logAgentActivity(
       this.agentId,
       this.userId,
@@ -503,7 +520,7 @@ Génère uniquement le contenu du post, sans commentaires supplémentaires.`;
       taskId
     );
   }
-  
+
   /**
    * Generate a content calendar for the next N days
    */
@@ -513,6 +530,7 @@ Génère uniquement le contenu du post, sans commentaires supplémentaires.`;
       date: Date;
       topic: string;
       format: GeneratableFormat;
+      angle: ContentAngleId;
       status: "planned" | "generated";
     }>;
   }> {
@@ -522,108 +540,80 @@ Génère uniquement le contenu du post, sans commentaires supplémentaires.`;
       description: `Génération d'un calendrier éditorial pour ${days} jours`,
       inputData: { days } as any,
     });
-    
+
     try {
       await updateTaskStatus(task.id, "in_progress");
-      
+
       const context = await this.gatherContext();
       const calendar: Array<{
         date: Date;
         topic: string;
         format: GeneratableFormat;
+        angle: ContentAngleId;
         status: "planned" | "generated";
       }> = [];
-      
-      // Generate topics for each day
-      const topics = await this.generateTopicsForPeriod(days, context);
-      
+
+      const editorialMix = getEditorialMix(days);
+      const usedTopics: string[] = [...context.recentTopics];
+
       const startDate = new Date();
+      let mixIndex = 0;
+
       for (let i = 0; i < days; i++) {
         const date = new Date(startDate);
         date.setDate(date.getDate() + i);
-        
-        // Skip weekends for professional content
+
         if (date.getDay() === 0 || date.getDay() === 6) continue;
-        
-        const topic = topics[i % topics.length];
-        const format = this.suggestFormat(topic, context);
-        
+
+        const angleId = editorialMix[mixIndex % editorialMix.length];
+        mixIndex++;
+
+        const choice = buildContentChoice({
+          profileTopics: context.preferences.topics,
+          industry: context.userProfile?.industry,
+          learning: context.learning,
+          avoidTopics: context.preferences.avoidTopics,
+          recentTopics: usedTopics,
+          recentAngles: calendar.map((c) => c.angle),
+          anglePerformance: context.anglePerformance,
+          formatPerformance: context.formatPerformance,
+          preferredTone: context.preferences.tone,
+        });
+
+        choice.angle = getAngleById(angleId);
+
+        usedTopics.push(choice.topic);
+
         calendar.push({
           date,
-          topic,
-          format,
+          topic: choice.topic,
+          format: choice.format,
+          angle: angleId,
           status: "planned",
         });
       }
-      
+
       const outputData: TaskOutputData = {
-        recommendations: calendar.map(c => 
-          `${c.date.toLocaleDateString("fr-FR")}: ${c.topic} (${c.format})`
+        recommendations: calendar.map(
+          (c) =>
+            `${c.date.toLocaleDateString("fr-FR")}: ${c.topic} — ${getAngleById(c.angle).emoji} ${getAngleById(c.angle).name} (${c.format})`
         ),
       };
-      
+
       await updateTaskStatus(task.id, "awaiting_approval", outputData);
-      
+
       return { taskId: task.id, calendar };
-      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       await updateTaskStatus(task.id, "failed", undefined, errorMessage);
       throw error;
     }
   }
-  
-  /**
-   * Generate diverse topics for a period
-   */
-  private async generateTopicsForPeriod(
-    days: number, 
-    context: ContentGenerationContext
-  ): Promise<string[]> {
-    const baseTopics = [
-      ...context.preferences.topics,
-      "Leadership et management",
-      "Productivité et organisation",
-      "Innovation et technologie",
-      "Développement personnel",
-      "Networking et relations",
-      "Stratégie d'entreprise",
-      "Communication professionnelle",
-      "Gestion du temps",
-      "Motivation et mindset",
-      "Tendances du marché",
-    ];
-    
-    // Filter out avoided topics
-    const filteredTopics = baseTopics.filter(
-      t => !context.preferences.avoidTopics.some(
-        avoid => t.toLowerCase().includes(avoid.toLowerCase())
-      )
-    );
-    
-    // Shuffle and return enough topics
-    return this.shuffleArray(filteredTopics).slice(0, days);
-  }
-  
-  /**
-   * Shuffle an array
-   */
-  private shuffleArray<T>(array: T[]): T[] {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  }
 }
 
 /**
  * Factory function to create a Content Creator Agent
  */
-export function createContentCreatorAgent(
-  agentId: number, 
-  userId: number
-): ContentCreatorAgent {
+export function createContentCreatorAgent(agentId: number, userId: number): ContentCreatorAgent {
   return new ContentCreatorAgent(agentId, userId);
 }

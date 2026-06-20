@@ -4,6 +4,12 @@
  */
 
 import { invokeLLM } from "../_core/llm";
+import {
+  LINKEDIN_ENGAGEMENT_METHOD,
+  LINKEDIN_CIT_METHOD,
+  LINKEDIN_ALGORITHM_TIPS,
+  LINKEDIN_POST_STRUCTURE_CHECKLIST,
+} from "./linkedinPostMethodology";
 
 export interface UserContext {
   companyName?: string;
@@ -19,6 +25,18 @@ export interface UserContext {
   uniqueSellingPoints?: string;
 }
 
+export interface LearningContext {
+  insightsSummary?: string;
+  topPerformingTopics?: string[];
+  underperformingTopics?: string[];
+  bestTones?: string[];
+  avoidPatterns?: string[];
+  successfulExamples?: string[];
+  failedExamples?: string[];
+  bestPostingTimes?: string[];
+  approvalRate?: number;
+}
+
 export interface GenerationRequest {
   theme: string;
   tone: "professional" | "casual" | "inspirational" | "educational" | "provocative";
@@ -26,6 +44,17 @@ export interface GenerationRequest {
   userContext: UserContext;
   additionalInstructions?: string;
   postType?: "story" | "tips" | "question" | "announcement" | "motivation" | "insight";
+  learningContext?: LearningContext;
+}
+
+export interface MediaContext {
+  id: number;
+  title?: string;
+  description?: string;
+  aiDescription?: string;
+  fileUrl: string;
+  mediaType: "image" | "video" | "document";
+  tags?: string[];
 }
 
 export interface GeneratedContent {
@@ -61,8 +90,83 @@ const LANGUAGE_INSTRUCTIONS: Record<string, string> = {
   DE: "Schreibe auf Deutsch. Verwende einen direkten, wirkungsvollen Stil für LinkedIn.",
 };
 
+function extractMessageText(
+  rawContent: string | Array<{ text?: string; type?: string }> | undefined
+): string {
+  if (!rawContent) return "";
+  if (typeof rawContent === "string") return rawContent;
+  return rawContent
+    .map(part => (typeof part === "string" ? part : part.text ?? ""))
+    .join("");
+}
+
+function parseGeneratedContentJson(text: string): GeneratedContent {
+  const trimmed = text.trim();
+  const candidates = [
+    trimmed,
+    trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate) as GeneratedContent;
+    } catch {
+      // continue
+    }
+
+    const start = candidate.indexOf("{");
+    const end = candidate.lastIndexOf("}");
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(candidate.slice(start, end + 1)) as GeneratedContent;
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  throw new Error("Impossible de lire la réponse de l'IA. Réessayez.");
+}
+
+function buildLearningPromptSection(learning?: LearningContext): string {
+  if (!learning) return "";
+
+  const parts: string[] = ["\n\nAPPRENTISSAGE PERSONNALISÉ (basé sur l'historique de cet utilisateur):"];
+
+  if (learning.insightsSummary) {
+    parts.push(`- Synthèse: ${learning.insightsSummary}`);
+  }
+  if (learning.topPerformingTopics?.length) {
+    parts.push(`- Sujets qui ont bien marché: ${learning.topPerformingTopics.join(", ")}`);
+  }
+  if (learning.underperformingTopics?.length) {
+    parts.push(`- Sujets peu performants à éviter: ${learning.underperformingTopics.join(", ")}`);
+  }
+  if (learning.bestTones?.length) {
+    parts.push(`- Tons efficaces: ${learning.bestTones.join(", ")}`);
+  }
+  if (learning.avoidPatterns?.length) {
+    parts.push(`- À ne pas reproduire: ${learning.avoidPatterns.join(", ")}`);
+  }
+  if (learning.successfulExamples?.length) {
+    parts.push(`- Exemples de posts réussis: ${learning.successfulExamples.join(" | ")}`);
+  }
+  if (learning.failedExamples?.length) {
+    parts.push(`- Exemples de posts faibles: ${learning.failedExamples.join(" | ")}`);
+  }
+  if (learning.bestPostingTimes?.length) {
+    parts.push(`- Meilleurs créneaux: ${learning.bestPostingTimes.join(", ")}`);
+  }
+
+  parts.push(
+    "\nUtilise ces données pour proposer un contenu plus pertinent et adapté à cet utilisateur."
+  );
+
+  return parts.join("\n");
+}
+
 export async function generateLinkedInPost(request: GenerationRequest): Promise<GeneratedContent> {
-  const { theme, tone, language, userContext, additionalInstructions, postType = "insight" } = request;
+  const { theme, tone, language, userContext, additionalInstructions, postType = "insight", learningContext } = request;
 
   const contextParts: string[] = [];
   
@@ -92,27 +196,23 @@ export async function generateLinkedInPost(request: GenerationRequest): Promise<
     ? `\n\nContexte de l'utilisateur:\n${contextParts.join("\n")}`
     : "";
 
-  const systemPrompt = `Tu es un expert en création de contenu LinkedIn viral. Tu crées des posts qui génèrent de l'engagement (likes, commentaires, partages).
+  const systemPrompt = `Tu es un expert en création de contenu LinkedIn viral. Tu crées des posts qui génèrent de l'engagement (likes, commentaires, partages, dwell time) en appliquant rigoureusement les méthodologies ci-dessous.
 
-Règles de formatage LinkedIn:
-- Commence par un hook puissant (première ligne accrocheuse)
-- Utilise des phrases courtes et percutantes
-- Ajoute des sauts de ligne pour aérer le texte
-- Utilise des emojis avec parcimonie (1-3 max)
-- Termine par un call-to-action ou une question
-- Le post doit faire entre 150 et 300 mots
+${LINKEDIN_ENGAGEMENT_METHOD}
+
+${LINKEDIN_CIT_METHOD}
+
+${LINKEDIN_ALGORITHM_TIPS}
+
+Contraintes supplémentaires:
+- Le post doit faire environ 120 à 180 mots (~150 mots idéal)
 - Pas de liens dans le corps du texte
 
-${LANGUAGE_INSTRUCTIONS[language]}`;
+${LINKEDIN_POST_STRUCTURE_CHECKLIST}
 
-  const userPrompt = `Génère un post LinkedIn sur le thème: "${theme}"
+${LANGUAGE_INSTRUCTIONS[language]}
 
-Type de post: ${POST_TYPE_TEMPLATES[postType]}
-Ton souhaité: ${TONE_DESCRIPTIONS[tone]}
-${userContextStr}
-${additionalInstructions ? `\nInstructions supplémentaires: ${additionalInstructions}` : ""}
-
-Réponds UNIQUEMENT avec un JSON valide dans ce format exact:
+IMPORTANT: Réponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour:
 {
   "title": "Titre court du post (max 50 caractères)",
   "content": "Le contenu complet du post LinkedIn",
@@ -121,25 +221,39 @@ Réponds UNIQUEMENT avec un JSON valide dans ce format exact:
   "callToAction": "L'action que tu veux que les lecteurs fassent"
 }`;
 
+  const learningSection = buildLearningPromptSection(learningContext);
+
+  const userPrompt = `Génère un post LinkedIn sur le thème: "${theme}"
+
+Type de post: ${POST_TYPE_TEMPLATES[postType]}
+Ton souhaité: ${TONE_DESCRIPTIONS[tone]}
+${userContextStr}
+${learningSection}
+${additionalInstructions ? `\nInstructions supplémentaires: ${additionalInstructions}` : ""}`;
+
   try {
     const response = await invokeLLM({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      maxTokens: 1500,
+      maxTokens: 8192,
+      temperature: 0.8,
+      responseFormat: { type: "json_object" },
     });
 
-    const rawContent = response.choices[0]?.message?.content || "";
-    const content = typeof rawContent === "string" ? rawContent : (rawContent[0] as { text?: string })?.text || "";
-    
-    // Extract JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("Failed to parse AI response as JSON");
+    const finishReason = response.choices[0]?.finish_reason;
+    const content = extractMessageText(response.choices[0]?.message?.content);
+
+    if (!content) {
+      throw new Error("La réponse de l'IA est vide. Réessayez.");
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as GeneratedContent;
+    if (finishReason === "length") {
+      console.warn("[ContentGenerator] Réponse tronquée par la limite de tokens");
+    }
+
+    const parsed = parseGeneratedContentJson(content);
     
     // Validate required fields
     if (!parsed.content) {
@@ -155,8 +269,87 @@ Réponds UNIQUEMENT avec un JSON valide dans ce format exact:
     };
   } catch (error) {
     console.error("Content generation error:", error);
-    throw new Error(`Failed to generate content: ${error instanceof Error ? error.message : "Unknown error"}`);
+    throw error instanceof Error ? error : new Error("Erreur inconnue lors de la génération");
   }
+}
+
+export async function generatePostFromMedia(
+  request: GenerationRequest & { media: MediaContext }
+): Promise<GeneratedContent> {
+  const { media, theme, tone, language, userContext, additionalInstructions, postType = "insight" } = request;
+
+  const contextParts: string[] = [];
+  if (userContext.companyName) contextParts.push(`Entreprise: ${userContext.companyName}`);
+  if (userContext.industry) contextParts.push(`Secteur: ${userContext.industry}`);
+  if (userContext.expertise?.length) contextParts.push(`Expertise: ${userContext.expertise.join(", ")}`);
+
+  const userContextStr = contextParts.length > 0
+    ? `\n\nContexte de l'utilisateur:\n${contextParts.join("\n")}`
+    : "";
+
+  const mediaContext = [
+    media.title && `Titre du média: ${media.title}`,
+    media.description && `Description: ${media.description}`,
+    media.aiDescription && `Analyse IA du visuel: ${media.aiDescription}`,
+    media.tags?.length && `Tags: ${media.tags.join(", ")}`,
+    `Type: ${media.mediaType}`,
+  ].filter(Boolean).join("\n");
+
+  const systemPrompt = `Tu es un expert en création de contenu LinkedIn viral. L'utilisateur a téléversé un visuel dans sa médiathèque et veut un post qui l'accompagne parfaitement.
+
+${LINKEDIN_ENGAGEMENT_METHOD}
+
+${LINKEDIN_CIT_METHOD}
+
+Règles spécifiques au média:
+- Le post doit compléter et mettre en valeur le visuel/média fourni
+- Environ 120 à 180 mots, pas de liens dans le corps du texte
+
+${LINKEDIN_POST_STRUCTURE_CHECKLIST}
+
+${LANGUAGE_INSTRUCTIONS[language]}
+
+IMPORTANT: Réponds UNIQUEMENT avec un objet JSON valide:
+{
+  "title": "Titre court (max 50 caractères)",
+  "content": "Contenu complet du post LinkedIn",
+  "hashtags": ["hashtag1", "hashtag2", "hashtag3"],
+  "suggestedMedia": "${media.fileUrl}",
+  "callToAction": "Action souhaitée"
+}`;
+
+  const userPrompt = `Crée un post LinkedIn pour accompagner ce média.
+
+Thématique: "${theme}"
+Type: ${POST_TYPE_TEMPLATES[postType]}
+Ton: ${TONE_DESCRIPTIONS[tone]}
+
+Informations sur le média:
+${mediaContext}
+${userContextStr}
+${additionalInstructions ? `\nInstructions: ${additionalInstructions}` : ""}`;
+
+  const response = await invokeLLM({
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    maxTokens: 8192,
+    temperature: 0.8,
+    responseFormat: { type: "json_object" },
+  });
+
+  const content = extractMessageText(response.choices[0]?.message?.content);
+  if (!content) throw new Error("La réponse de l'IA est vide.");
+
+  const parsed = parseGeneratedContentJson(content);
+  return {
+    title: parsed.title || media.title || theme,
+    content: parsed.content,
+    hashtags: parsed.hashtags || [],
+    suggestedMedia: media.mediaType === "image" ? media.fileUrl : parsed.suggestedMedia,
+    callToAction: parsed.callToAction,
+  };
 }
 
 export async function generateMultiplePosts(

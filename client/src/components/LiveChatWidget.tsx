@@ -13,18 +13,20 @@ interface Message {
 }
 
 const quickReplies = [
-  "Comment fonctionne l'essai gratuit ?",
-  "Quelles sont les différences entre les plans ?",
+  "Comment démarrer gratuitement ?",
+  "Quelles fonctionnalités sont disponibles ?",
   "Comment connecter mon LinkedIn ?",
-  "Puis-je annuler à tout moment ?",
+  "Comment générer du contenu IA ?",
 ];
 
 const botResponses: Record<string, string> = {
-  "essai": "L'essai gratuit dure 14 jours et vous donne accès à toutes les fonctionnalités Pro. Aucune carte bancaire n'est requise ! 🎉",
-  "plan": "Le plan Starter est gratuit avec 5 générations IA/mois. Le plan Pro à 19€/mois offre des générations illimitées, la publication auto et les analytics avancés. Le plan Business à 59€/mois est pour les équipes avec jusqu'à 10 comptes.",
-  "linkedin": "Pour connecter votre LinkedIn, cliquez sur 'Se connecter avec LinkedIn' depuis le Dashboard. La connexion est sécurisée via OAuth et nous ne stockons jamais votre mot de passe.",
-  "annuler": "Oui, vous pouvez annuler à tout moment ! Vous conserverez l'accès jusqu'à la fin de votre période de facturation. Aucun engagement, aucune surprise.",
-  "default": "Je suis là pour vous aider ! Posez-moi une question sur LinkedAgents ou utilisez les suggestions rapides ci-dessous. 😊",
+  "essai": "LinkedAgents est entièrement gratuit pour l'instant ! Créez un compte et accédez à toutes les fonctionnalités sans carte bancaire. 🎉",
+  "plan": "Toutes les fonctionnalités sont actuellement gratuites : générations IA, publication automatique, analytics et plus encore.",
+  "linkedin": "Pour connecter votre LinkedIn, utilisez le bouton « Connecter LinkedIn » dans le Dashboard ou les paramètres. La connexion est sécurisée via OAuth.",
+  "generer": "Rendez-vous sur /generate pour créer un post avec l'IA. Choisissez un thème, un ton et laissez Léa rédiger pour vous.",
+  "fonctionnalite": "Vous pouvez générer du contenu IA, planifier des posts, connecter LinkedIn pour publier, et explorer les classements de créateurs.",
+  "annuler": "Aucun abonnement n'est requis pour l'instant. Profitez librement de toutes les fonctionnalités !",
+  "default": "Je suis l'assistant FAQ de LinkedAgents. Posez une question ou utilisez les suggestions ci-dessous.",
 };
 
 function getBotResponse(message: string): string {
@@ -34,6 +36,12 @@ function getBotResponse(message: string): string {
   }
   if (lowerMessage.includes("plan") || lowerMessage.includes("différence") || lowerMessage.includes("prix")) {
     return botResponses.plan;
+  }
+  if (lowerMessage.includes("générer") || lowerMessage.includes("generer") || lowerMessage.includes("contenu")) {
+    return botResponses.generer;
+  }
+  if (lowerMessage.includes("fonctionnalit") || lowerMessage.includes("disponible")) {
+    return botResponses.fonctionnalite;
   }
   if (lowerMessage.includes("linkedin") || lowerMessage.includes("connecter")) {
     return botResponses.linkedin;
@@ -49,7 +57,7 @@ export function LiveChatWidget() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      text: "Bonjour ! 👋 Je suis l'assistant LinkedAgents. Comment puis-je vous aider aujourd'hui ?",
+      text: "Bonjour ! 👋 Je suis l'assistant FAQ de LinkedAgents. Posez-moi une question sur l'utilisation de la plateforme.",
       isBot: true,
       timestamp: new Date(),
     },
@@ -104,8 +112,6 @@ export function LiveChatWidget() {
         )}
       >
         <MessageCircle className="w-6 h-6 text-white" />
-        {/* Notification dot */}
-        <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose rounded-full animate-pulse" />
       </motion.button>
 
       {/* Chat Window */}
@@ -124,8 +130,8 @@ export function LiveChatWidget() {
                   <Bot className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white">Support LinkedAgents</h3>
-                  <p className="text-xs text-white/80">Répond généralement en quelques secondes</p>
+                  <h3 className="font-semibold text-white">Assistant FAQ</h3>
+                  <p className="text-xs text-white/80">Réponses automatisées</p>
                 </div>
               </div>
               <button
@@ -222,7 +228,7 @@ export function LiveChatWidget() {
             {/* Powered by */}
             <div className="px-4 pb-3 flex items-center justify-center gap-1 text-xs text-muted-foreground">
               <Sparkles className="w-3 h-3" />
-              Propulsé par l'IA LinkedAgents
+              Assistant automatisé — pas de support humain en direct
             </div>
           </motion.div>
         )}

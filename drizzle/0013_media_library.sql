@@ -1,0 +1,20 @@
+CREATE TABLE `media_library` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int NOT NULL,
+	`title` varchar(255),
+	`description` text,
+	`tags` text,
+	`fileUrl` text NOT NULL,
+	`fileKey` varchar(255) NOT NULL,
+	`fileName` varchar(255) NOT NULL,
+	`mimeType` varchar(100) NOT NULL,
+	`fileSize` int DEFAULT 0,
+	`mediaType` enum('image','video','document') NOT NULL,
+	`aiDescription` text,
+	`aiSuggestedTheme` varchar(100),
+	`usageCount` int DEFAULT 0,
+	`lastUsedAt` timestamp,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `media_library_id` PRIMARY KEY(`id`)
+);

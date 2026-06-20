@@ -11,216 +11,276 @@ import {
   Bot,
   Star,
   ChevronRight,
-  Crown,
+  Lock,
+  CheckCircle2,
+  Clock,
+  PenLine,
 } from "lucide-react";
 import { Link } from "wouter";
+import {
+  AGENTS_ROSTER,
+  COLOR_CLASSES,
+  type AgentRosterEntry,
+} from "@/lib/agentsRoster";
 
-const agents = [
-  {
-    id: "content-creator",
-    name: "Léa",
-    role: "Créatrice de Contenu",
-    emoji: "✨",
-    avatar: "👩‍💻",
-    color: "violet",
-    gradient: "from-violet to-purple-600",
-    personality: "Créative et inspirante",
-    description: "Léa génère des posts LinkedIn captivants adaptés à votre style et votre audience.",
-    skills: ["Storytelling", "Hooks viraux", "Copywriting"],
-    stats: { posts: "15K+", engagement: "4.8%", satisfaction: "98%" },
-    quote: "Chaque post est une opportunité de connecter !",
-    bestFor: "Créer du contenu engageant",
-  },
-  {
-    id: "trend-hunter",
-    name: "Max",
-    role: "Chasseur de Tendances",
-    emoji: "🔥",
-    avatar: "🕵️",
-    color: "rose",
-    gradient: "from-rose to-red-600",
-    personality: "Curieux et avant-gardiste",
-    description: "Max surveille les tendances LinkedIn 24/7 et identifie les sujets qui vont buzzer.",
-    skills: ["Veille tendances", "Analyse virale", "Prédiction"],
-    stats: { trends: "8K+", accuracy: "94%", early: "48h avant" },
-    quote: "Les tendances de demain, je les repère aujourd'hui !",
-    bestFor: "Rester à la pointe",
-  },
-  {
-    id: "engagement-booster",
-    name: "Emma",
-    role: "Booster d'Engagement",
-    emoji: "💬",
-    avatar: "🤝",
-    color: "green",
-    gradient: "from-green-500 to-emerald-600",
-    personality: "Sociable et empathique",
-    description: "Emma optimise vos interactions et vous aide à construire une communauté engagée.",
-    skills: ["Réponses intelligentes", "Community", "Networking"],
-    stats: { interactions: "45K+", response: "99%", growth: "+156%" },
-    quote: "Chaque commentaire est une chance de créer une connexion !",
-    bestFor: "Développer votre réseau",
-  },
-  {
-    id: "analytics-guru",
-    name: "Alex",
-    role: "Analyste Performance",
-    emoji: "📊",
-    avatar: "🧠",
-    color: "blue",
-    gradient: "from-blue-500 to-cyan-600",
-    personality: "Méthodique et perspicace",
-    description: "Alex analyse vos données en profondeur pour identifier ce qui fonctionne.",
-    skills: ["Data analysis", "Reporting", "Optimisation"],
-    stats: { data: "2.5M", insights: "12K+", accuracy: "97%" },
-    quote: "Les données racontent une histoire !",
-    bestFor: "Améliorer vos performances",
-  },
-  {
-    id: "scheduler",
-    name: "Sam",
-    role: "Planificateur Intelligent",
-    emoji: "📅",
-    avatar: "⏰",
-    color: "gold",
-    gradient: "from-amber-500 to-orange-600",
-    personality: "Organisé et fiable",
-    description: "Sam planifie vos publications aux moments optimaux pour maximiser la portée.",
-    skills: ["Timing optimal", "Planification", "Automatisation"],
-    stats: { scheduled: "28K+", timing: "92%", consistency: "100%" },
-    quote: "Le bon contenu au bon moment !",
-    bestFor: "Publier régulièrement",
-  },
-];
+const leaAgent = AGENTS_ROSTER.find(a => a.availability === "available")!;
+const comingSoonAgents = AGENTS_ROSTER.filter(a => a.availability === "coming_soon");
+
+function AvailabilityBadge({ agent }: { agent: AgentRosterEntry }) {
+  if (agent.availability === "available") {
+    return (
+      <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 gap-1">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+        </span>
+        Disponible
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge className="bg-white/10 text-white/70 border-white/20 gap-1">
+      <Clock className="w-3 h-3" />
+      Arrive bientôt
+    </Badge>
+  );
+}
+
+function AgentCard({
+  agent,
+  featured = false,
+  expanded,
+  onToggle,
+}: {
+  agent: AgentRosterEntry;
+  featured?: boolean;
+  expanded?: boolean;
+  onToggle?: () => void;
+}) {
+  const colors = COLOR_CLASSES[agent.color] ?? COLOR_CLASSES.violet;
+  const isAvailable = agent.availability === "available";
+  const isComingSoon = !isAvailable;
+
+  return (
+    <Card
+      className={[
+        "relative overflow-hidden border transition-all duration-300",
+        featured
+          ? `bg-gradient-to-br from-violet-950/80 via-card/80 to-fuchsia-950/40 border-violet-500/40 shadow-xl shadow-violet-500/10`
+          : isComingSoon
+            ? "bg-card/30 border-white/5 opacity-80 hover:opacity-95"
+            : `${colors.bg} ${colors.border} hover:border-white/20`,
+        onToggle ? "cursor-pointer" : "",
+      ].join(" ")}
+      onClick={onToggle}
+    >
+      {isComingSoon && (
+        <div className="absolute inset-0 bg-background/20 backdrop-blur-[1px] pointer-events-none z-[1]" />
+      )}
+
+      <CardContent className={`relative z-[2] ${featured ? "p-8" : "p-5"}`}>
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-start gap-4">
+            <div
+              className={[
+                "rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg",
+                agent.gradient,
+                featured ? "w-20 h-20 text-4xl" : "w-14 h-14 text-2xl",
+                isComingSoon ? "grayscale-[30%]" : "",
+              ].join(" ")}
+            >
+              {agent.avatar}
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h3 className={`font-bold text-white ${featured ? "text-2xl" : "text-lg"}`}>
+                  {agent.name}
+                </h3>
+                <span>{agent.emoji}</span>
+              </div>
+              <p className={`text-sm font-medium ${colors.text}`}>{agent.role}</p>
+              <p className="text-xs text-white/50 mt-0.5">{agent.personality}</p>
+            </div>
+          </div>
+          <AvailabilityBadge agent={agent} />
+        </div>
+
+        <p className={`text-sm text-white/70 mb-4 ${featured ? "text-base leading-relaxed" : ""}`}>
+          {agent.description}
+        </p>
+
+        {(featured || expanded) && (
+          <>
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {agent.skills.map(skill => (
+                <Badge
+                  key={skill}
+                  variant="outline"
+                  className={`text-xs ${colors.border} ${colors.text} bg-black/20`}
+                >
+                  {skill}
+                </Badge>
+              ))}
+            </div>
+
+            <div className={`p-3 rounded-xl ${colors.bg} border ${colors.border} mb-4`}>
+              <p className="text-sm italic text-white/80">&ldquo;{agent.quote}&rdquo;</p>
+            </div>
+
+            <div className="flex items-center gap-2 text-sm mb-4">
+              <Star className={`w-4 h-4 ${colors.text}`} />
+              <span className="text-white/60">Idéal pour :</span>
+              <span className="text-white font-medium">{agent.bestFor}</span>
+            </div>
+          </>
+        )}
+
+        {isAvailable && agent.ctaHref ? (
+          <Link href={agent.ctaHref}>
+            <Button
+              className={`w-full bg-gradient-to-r ${agent.gradient} hover:opacity-90 shadow-lg ${colors.glow}`}
+              size={featured ? "lg" : "default"}
+            >
+              <PenLine className="w-4 h-4 mr-2" />
+              {agent.ctaLabel ?? `Activer ${agent.name}`}
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
+          </Link>
+        ) : (
+          <Button
+            disabled
+            variant="outline"
+            className="w-full border-white/10 text-white/40 bg-white/5 cursor-not-allowed"
+          >
+            <Lock className="w-4 h-4 mr-2" />
+            Arrive bientôt
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function MeetTheAgents() {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
-  const getColorClasses = (color: string) => {
-    const colors: Record<string, { bg: string; border: string; text: string }> = {
-      violet: { bg: "bg-violet/20", border: "border-violet/30", text: "text-violet-light" },
-      rose: { bg: "bg-rose/20", border: "border-rose/30", text: "text-rose" },
-      green: { bg: "bg-green-500/20", border: "border-green-500/30", text: "text-green-400" },
-      blue: { bg: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400" },
-      gold: { bg: "bg-amber-500/20", border: "border-amber-500/30", text: "text-amber-400" },
-    };
-    return colors[color] || { bg: "bg-white/10", border: "border-white/20", text: "text-white" };
-  };
-
   return (
     <DashboardLayout>
-      <div className="space-y-8">
-        <div className="text-center max-w-3xl mx-auto">
-          <Badge className="bg-violet/20 text-violet-light border-violet/30 mb-4">
-            <Bot className="w-3 h-3 mr-1" />
-            Votre Équipe IA
-          </Badge>
-          <h1 className="text-4xl font-bold text-white mb-4">
-            Rencontrez vos <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet to-rose">Agents IA</span>
-          </h1>
-          <p className="text-lg text-white/60">
-            5 agents spécialisés travaillent 24/7 pour développer votre présence LinkedIn.
-          </p>
-        </div>
+      <div className="space-y-10 pb-8">
+        {/* Hero */}
+        <div className="relative overflow-hidden rounded-3xl border border-violet-500/20 bg-gradient-to-br from-violet-950/50 via-card/50 to-rose-950/30 p-8 md:p-12">
+          <div className="absolute top-0 right-0 w-72 h-72 bg-violet-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+          <div className="absolute bottom-0 left-0 w-56 h-56 bg-rose-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {agents.map((agent) => {
-            const colors = getColorClasses(agent.color);
-            return (
-              <Card
-                key={agent.id}
-                className="bg-card/50 border-white/10 hover:border-white/20 transition-all cursor-pointer"
-                onClick={() => setSelectedAgent(selectedAgent === agent.id ? null : agent.id)}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${agent.gradient} flex items-center justify-center text-3xl shadow-lg`}>
-                      {agent.avatar}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-xl font-bold text-white">{agent.name}</h3>
-                        <span className="text-xl">{agent.emoji}</span>
-                      </div>
-                      <p className={`text-sm ${colors.text}`}>{agent.role}</p>
-                      <p className="text-xs text-white/50 mt-1">{agent.personality}</p>
-                    </div>
-                  </div>
+          <div className="relative text-center max-w-3xl mx-auto">
+            <Badge className="bg-violet-500/20 text-violet-200 border-violet-500/30 mb-4">
+              <Bot className="w-3 h-3 mr-1" />
+              LinkedAgents — Équipe IA
+            </Badge>
+            <h1 className="text-3xl md:text-5xl font-bold text-white mb-4 leading-tight">
+              Votre équipe IA pour{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-300 via-fuchsia-300 to-rose-300">
+                dominer LinkedIn
+              </span>
+            </h1>
+            <p className="text-lg text-white/60 mb-8">
+              Commencez avec <strong className="text-white">Léa</strong>, votre créatrice de contenu.
+              Les autres agents arrivent progressivement.
+            </p>
 
-                  <p className="text-sm text-white/70 mb-4">{agent.description}</p>
-
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {agent.skills.map((skill) => (
-                      <Badge key={skill} variant="outline" className={`text-xs ${colors.border} ${colors.text}`}>
-                        {skill}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-white/5 mb-4">
-                    {Object.entries(agent.stats).map(([key, value]) => (
-                      <div key={key} className="text-center">
-                        <p className="text-sm font-semibold text-white">{value}</p>
-                        <p className="text-xs text-white/40 capitalize">{key}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className={`p-3 rounded-lg ${colors.bg} ${colors.border} border mb-4`}>
-                    <p className="text-sm italic text-white/80">"{agent.quote}"</p>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <Star className={`w-4 h-4 ${colors.text}`} />
-                    <span className="text-white/60">Idéal pour:</span>
-                    <span className="text-white">{agent.bestFor}</span>
-                  </div>
-
-                  <Link href="/agents">
-                    <Button className={`w-full mt-4 bg-gradient-to-r ${agent.gradient} hover:opacity-90`}>
-                      Activer {agent.name}
-                      <ChevronRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        <div className="mt-12 p-8 rounded-2xl bg-gradient-to-r from-violet/20 to-rose/20 border border-violet/30">
-          <div className="text-center max-w-2xl mx-auto">
-            <Crown className="w-12 h-12 text-amber-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-4">
-              Pourquoi travailler avec nos agents ?
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-violet/30 flex items-center justify-center mx-auto mb-3">
-                  <Zap className="w-6 h-6 text-violet-light" />
-                </div>
-                <h3 className="font-semibold text-white mb-2">Disponibles 24/7</h3>
-                <p className="text-sm text-white/60">Vos agents travaillent pendant que vous dormez</p>
+            <div className="flex flex-wrap justify-center gap-4">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span className="text-sm text-emerald-200">1 agent disponible</span>
               </div>
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-rose/30 flex items-center justify-center mx-auto mb-3">
-                  <TrendingUp className="w-6 h-6 text-rose" />
-                </div>
-                <h3 className="font-semibold text-white mb-2">Résultats prouvés</h3>
-                <p className="text-sm text-white/60">+340% d'engagement en moyenne</p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-green-500/30 flex items-center justify-center mx-auto mb-3">
-                  <Users className="w-6 h-6 text-green-400" />
-                </div>
-                <h3 className="font-semibold text-white mb-2">Personnalisés</h3>
-                <p className="text-sm text-white/60">Ils apprennent de votre style unique</p>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
+                <Clock className="w-4 h-4 text-white/50" />
+                <span className="text-sm text-white/60">{comingSoonAgents.length} arrive bientôt</span>
               </div>
             </div>
-            <Link href="/agents/setup">
-              <Button size="lg" className="mt-8 bg-gradient-to-r from-violet to-rose hover:opacity-90">
+          </div>
+        </div>
+
+        {/* Léa — featured */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-violet-400" />
+            <h2 className="text-xl font-semibold text-white">Agent disponible</h2>
+          </div>
+          <AgentCard agent={leaAgent} featured />
+        </div>
+
+        {/* Coming soon grid */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-white/40" />
+              <h2 className="text-xl font-semibold text-white">Bientôt disponibles</h2>
+            </div>
+            <p className="text-sm text-white/40 hidden sm:block">
+              Inscrivez-vous pour être notifié du lancement
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {comingSoonAgents.map(agent => (
+              <AgentCard
+                key={agent.id}
+                agent={agent}
+                expanded={selectedAgent === agent.id}
+                onToggle={() =>
+                  setSelectedAgent(selectedAgent === agent.id ? null : agent.id)
+                }
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Benefits */}
+        <div className="p-8 rounded-3xl bg-gradient-to-r from-violet-500/10 via-transparent to-rose-500/10 border border-white/10">
+          <div className="text-center max-w-2xl mx-auto">
+            <h2 className="text-2xl font-bold text-white mb-2">Pourquoi une équipe d&apos;agents ?</h2>
+            <p className="text-white/50 mb-8">
+              Chaque agent aura une mission précise. Léa pose déjà les bases de votre présence LinkedIn.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                {
+                  icon: Zap,
+                  title: "Disponibles 24/7",
+                  desc: "Vos agents travaillent pendant que vous dormez",
+                  color: "text-violet-400",
+                  bg: "bg-violet-500/20",
+                },
+                {
+                  icon: TrendingUp,
+                  title: "Spécialisés",
+                  desc: "Un rôle précis pour chaque étape de votre stratégie",
+                  color: "text-rose-400",
+                  bg: "bg-rose-500/20",
+                },
+                {
+                  icon: Users,
+                  title: "Personnalisés",
+                  desc: "Ils apprennent de votre style et votre secteur",
+                  color: "text-emerald-400",
+                  bg: "bg-emerald-500/20",
+                },
+              ].map(item => (
+                <div key={item.title} className="text-center p-4 rounded-2xl bg-white/5 border border-white/5">
+                  <div className={`w-12 h-12 rounded-2xl ${item.bg} flex items-center justify-center mx-auto mb-3`}>
+                    <item.icon className={`w-6 h-6 ${item.color}`} />
+                  </div>
+                  <h3 className="font-semibold text-white mb-1">{item.title}</h3>
+                  <p className="text-sm text-white/50">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+            <Link href="/generate">
+              <Button size="lg" className="mt-8 bg-gradient-to-r from-violet-500 to-rose-500 hover:opacity-90">
                 <Sparkles className="w-5 h-5 mr-2" />
-                Configurer mon équipe IA
+                Commencer avec Léa
               </Button>
             </Link>
           </div>

@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+import { getSignupUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import Navbar from "@/components/Navbar";
+import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
 import { QuickActions } from "@/components/QuickActions";
 import { AgentStatusWidget } from "@/components/AgentStatusWidget";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { ContextualHelp } from "@/components/ContextualHelp";
 import { AIRecommendations } from "@/components/AIRecommendations";
 import { GamificationWidget } from "@/components/GamificationWidget";
-import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { PersonalizedTips, WelcomeWidget } from "@/components/PersonalizedTips";
 import { toast } from "sonner";
 import {
@@ -44,9 +44,10 @@ export default function Dashboard() {
   const [copiedPostId, setCopiedPostId] = useState<number | null>(null);
 
   // Fetch user's generated posts
-  const { data: postsData } = trpc.posts.list.useQuery({
-    limit: 10,
-  });
+  const { data: postsData } = trpc.generator.myPosts.useQuery(
+    { limit: 10, offset: 0 },
+    { enabled: !!user }
+  );
 
   // Fetch top content for inspiration
   const { data: topContent } = trpc.posts.list.useQuery({
@@ -75,6 +76,7 @@ export default function Dashboard() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({ content }),
       });
 
@@ -84,7 +86,9 @@ export default function Dashboard() {
         toast.success("Post publié sur LinkedIn avec succès !");
       } else if (data.error === "LinkedIn not connected") {
         // Redirect to LinkedIn auth with format=json
-        const authResponse = await fetch("/api/linkedin/auth?format=json");
+        const authResponse = await fetch("/api/linkedin/auth?format=json", {
+          credentials: "include",
+        });
         const authData = await authResponse.json();
         if (authData.authUrl) {
           toast.info("Redirection vers LinkedIn pour autorisation...");
@@ -93,7 +97,9 @@ export default function Dashboard() {
           toast.error("Erreur de configuration LinkedIn");
         }
       } else if (data.error === "LinkedIn token expired, please reconnect") {
-        const authResponse = await fetch("/api/linkedin/auth?format=json");
+        const authResponse = await fetch("/api/linkedin/auth?format=json", {
+          credentials: "include",
+        });
         const authData = await authResponse.json();
         if (authData.authUrl) {
           toast.info("Token expiré, reconnexion à LinkedIn...");
@@ -127,8 +133,8 @@ export default function Dashboard() {
             <p className="text-muted-foreground mb-8">
               Connectez-vous pour accéder à tous vos outils de création de contenu, vos statistiques et vos posts générés.
             </p>
-            <a href={getLoginUrl()}>
-              <Button className="btn-gradient">Se connecter</Button>
+            <a href={getSignupUrl("/dashboard")}>
+              <Button className="btn-gradient">Créer un compte</Button>
             </a>
           </div>
         </div>
@@ -136,33 +142,35 @@ export default function Dashboard() {
     );
   }
 
+  const postCount = postsData?.posts?.length ?? 0;
+
   const stats = [
     {
       label: "Posts générés",
-      value: postsData?.posts?.length || 47,
+      value: postCount.toString(),
       icon: Sparkles,
-      change: "+18 ce mois",
+      change: postCount > 0 ? "Depuis votre inscription" : "Générez votre premier post",
       color: "violet",
     },
     {
-      label: "Vues totales",
-      value: "125K",
+      label: "Vues LinkedIn",
+      value: "—",
       icon: Eye,
-      change: "+32% vs mois dernier",
+      change: "Connectez LinkedIn pour suivre",
       color: "rose",
     },
     {
-      label: "Engagement moyen",
-      value: "5.8%",
+      label: "Engagement",
+      value: "—",
       icon: Heart,
-      change: "+1.2% vs mois dernier",
+      change: "Disponible après connexion LinkedIn",
       color: "gold",
     },
     {
-      label: "Streak actuel",
-      value: "12 🔥",
+      label: "Publications planifiées",
+      value: "—",
       icon: Calendar,
-      change: "Record personnel battu !",
+      change: "Planifiez depuis le calendrier",
       color: "emerald",
     },
   ];
@@ -212,9 +220,9 @@ export default function Dashboard() {
       <OnboardingWizard />
       <Navbar />
 
-      <div className="container py-8">
+      <div className="container py-6 md:py-8">
         {/* Welcome Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-3xl font-bold text-white mb-2">
             Bonjour, {user.name?.split(" ")[0] || "Créateur"} 👋
           </h1>
@@ -222,6 +230,8 @@ export default function Dashboard() {
             Prêt à créer du contenu qui performe ? Voici votre tableau de bord.
           </p>
         </div>
+
+        <LinkedInConnectBanner />
 
         {/* Widget de bienvenue personnalisé */}
         <div className="mb-6">
@@ -257,8 +267,10 @@ export default function Dashboard() {
               </div>
               <div className="text-2xl font-bold text-white mb-1">{stat.value}</div>
               <div className="text-sm text-muted-foreground">{stat.label}</div>
-              <div className="text-xs text-emerald-400 mt-2 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" />
+              <div className={`text-xs mt-2 flex items-center gap-1 ${
+                stat.value === "—" ? "text-muted-foreground" : "text-emerald-400"
+              }`}>
+                {stat.value !== "—" && <TrendingUp className="w-3 h-3" />}
                 {stat.change}
               </div>
             </div>
@@ -403,16 +415,22 @@ export default function Dashboard() {
                   <p className="text-sm text-white/90 line-clamp-3 mb-2">
                     {post.content}
                   </p>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Heart className="w-3 h-3" />
-                      {Math.floor(Math.random() * 5000) + 1000}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MessageSquare className="w-3 h-3" />
-                      {Math.floor(Math.random() * 200) + 50}
-                    </span>
-                  </div>
+                  {(post.likes > 0 || post.comments > 0) && (
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      {post.likes > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Heart className="w-3 h-3" />
+                          {post.likes}
+                        </span>
+                      )}
+                      {post.comments > 0 && (
+                        <span className="flex items-center gap-1">
+                          <MessageSquare className="w-3 h-3" />
+                          {post.comments}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

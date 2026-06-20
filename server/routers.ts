@@ -1,5 +1,6 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { signOutSupabase } from "./_core/supabase";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
@@ -28,6 +29,7 @@ import {
   markAsRead,
   markAllAsRead,
   deleteNotification,
+  notifyPostsGenerated,
 } from "./services/notificationService";
 import { 
   generateLinkedInPost, 
@@ -38,15 +40,35 @@ import {
   type GenerationRequest,
   type UserContext
 } from "./services/contentGenerator";
+import { buildLearningContext } from "./services/agentLearningService";
+import {
+  ONBOARDING_QUESTIONS,
+  extractProfileFromAnswers,
+  saveOnboardingProfile,
+  isOnboardingComplete,
+} from "./services/voiceOnboardingService";
+import { generatePostImage } from "./services/postImageService";
 import { userProfiles, generatedPosts, linkedinInfluencers } from "../drizzle/schema";
 import { eq, desc, sql, like, or, and } from "drizzle-orm";
 import { canUserPerformAction, getRemainingUsage } from "./services/subscriptionLimits";
+import {
+  uploadMedia,
+  listMedia,
+  getMediaById,
+  updateMedia,
+  deleteMedia,
+  generatePostForMedia,
+  suggestPostsFromLibrary,
+  suggestMediaForPost,
+  reanalyzeMedia,
+} from "./services/mediaLibraryService";
 
 export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      await signOutSupabase(ctx.req, ctx.res);
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return {
@@ -185,6 +207,8 @@ export const appRouter = router({
           uniqueSellingPoints: profile.uniqueSellingPoints || undefined,
         } : {};
 
+        const learningContext = await buildLearningContext(userId);
+
         const request: GenerationRequest = {
           theme: input.theme,
           tone: input.tone,
@@ -192,6 +216,7 @@ export const appRouter = router({
           userContext,
           additionalInstructions: input.additionalInstructions,
           postType: input.postType,
+          learningContext,
         };
 
         const generated = await generateLinkedInPost(request);
@@ -207,6 +232,8 @@ export const appRouter = router({
           prompt: input.additionalInstructions || null,
           status: "generated",
         });
+
+        await notifyPostsGenerated(userId, 1, input.theme, [result.insertId]);
 
         return {
           id: result.insertId,
@@ -258,18 +285,22 @@ export const appRouter = router({
           uniqueSellingPoints: profile.uniqueSellingPoints || undefined,
         } : {};
 
+        const learningContext = await buildLearningContext(userId);
+
         const request: GenerationRequest = {
           theme: input.theme,
           tone: input.tone,
           language: input.language,
           userContext,
           additionalInstructions: input.additionalInstructions,
+          learningContext,
         };
 
         const posts = await generateMultiplePosts(request, input.count);
 
         // Save all to database
         const savedPosts = [];
+        const savedIds: number[] = [];
         for (const post of posts) {
           const [result] = await db.insert(generatedPosts).values({
             userId,
@@ -281,8 +312,11 @@ export const appRouter = router({
             prompt: input.additionalInstructions || null,
             status: "generated",
           });
+          savedIds.push(result.insertId);
           savedPosts.push({ id: result.insertId, ...post });
         }
+
+        await notifyPostsGenerated(userId, savedPosts.length, input.theme, savedIds);
 
         return savedPosts;
       }),
@@ -344,6 +378,127 @@ export const appRouter = router({
             eq(generatedPosts.userId, ctx.user.id)
           ));
         return { success: true };
+      }),
+
+    generatePostImage: protectedProcedure
+      .input(z.object({
+        content: z.string().min(10),
+        title: z.string().min(1),
+        suggestedMedia: z.string().optional(),
+        visualStyle: z.string().optional(),
+        imageSize: z.enum(["1024x1024", "1536x1024", "1024x1536", "1792x1024", "1024x1792"]).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const limitCheck = await canUserPerformAction(ctx.user.id, "image_generation");
+        if (!limitCheck.allowed) {
+          throw new Error(limitCheck.reason || "Génération d'image non disponible");
+        }
+
+        return generatePostImage(input);
+      }),
+  }),
+
+  // Media Library router
+  mediaLibrary: router({
+    list: protectedProcedure
+      .input(z.object({
+        limit: z.number().optional().default(50),
+        offset: z.number().optional().default(0),
+        mediaType: z.enum(["image", "video", "document"]).optional(),
+      }))
+      .query(async ({ ctx, input }) => {
+        return listMedia(ctx.user.id, input);
+      }),
+
+    get: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        return getMediaById(ctx.user.id, input.id);
+      }),
+
+    upload: protectedProcedure
+      .input(z.object({
+        fileName: z.string().min(1),
+        mimeType: z.string().min(1),
+        base64Data: z.string().min(1),
+        title: z.string().optional(),
+        description: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        return uploadMedia(ctx.user.id, input);
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().optional(),
+        description: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { id, ...data } = input;
+        const updated = await updateMedia(ctx.user.id, id, data);
+        if (!updated) throw new Error("Média introuvable");
+        return updated;
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const ok = await deleteMedia(ctx.user.id, input.id);
+        if (!ok) throw new Error("Média introuvable");
+        return { success: true };
+      }),
+
+    reanalyze: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const updated = await reanalyzeMedia(ctx.user.id, input.id);
+        if (!updated) throw new Error("Média introuvable");
+        return updated;
+      }),
+
+    generatePost: protectedProcedure
+      .input(z.object({
+        mediaId: z.number(),
+        tone: z.enum(["professional", "casual", "inspirational", "educational", "provocative"]).optional(),
+        language: z.enum(["FR", "EN", "AR", "ES", "DE"]).optional(),
+        postType: z.enum(["story", "tips", "question", "announcement", "motivation", "insight"]).optional(),
+        additionalInstructions: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const limitCheck = await canUserPerformAction(ctx.user.id, "ai_generation");
+        if (!limitCheck.allowed) {
+          throw new Error(limitCheck.reason || "Limite de génération atteinte");
+        }
+        const { mediaId, ...options } = input;
+        return generatePostForMedia(ctx.user.id, mediaId, options);
+      }),
+
+    suggestPosts: protectedProcedure
+      .input(z.object({
+        count: z.number().min(1).max(5).default(3),
+        tone: z.enum(["professional", "casual", "inspirational", "educational", "provocative"]).optional(),
+        language: z.enum(["FR", "EN", "AR", "ES", "DE"]).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const limitCheck = await canUserPerformAction(ctx.user.id, "ai_generation");
+        if (!limitCheck.allowed) {
+          throw new Error(limitCheck.reason || "Limite de génération atteinte");
+        }
+        const { count, ...options } = input;
+        return suggestPostsFromLibrary(ctx.user.id, count, options);
+      }),
+
+    suggestForPost: protectedProcedure
+      .input(z.object({
+        content: z.string().min(10),
+        title: z.string().optional(),
+        limit: z.number().min(1).max(10).optional(),
+      }))
+      .query(async ({ ctx, input }) => {
+        return suggestMediaForPost(ctx.user.id, input);
       }),
   }),
 
@@ -451,7 +606,12 @@ export const appRouter = router({
           conditions.push(eq(linkedinInfluencers.country, input.country));
         }
         if (input.industry) {
-          conditions.push(eq(linkedinInfluencers.industry, input.industry));
+          conditions.push(
+            or(
+              eq(linkedinInfluencers.industry, input.industry),
+              eq(linkedinInfluencers.sector, input.industry)
+            )
+          );
         }
         if (input.search) {
           conditions.push(
@@ -895,6 +1055,33 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await deleteNotification(input.id, ctx.user.id);
         return { success: true };
+      }),
+  }),
+
+  onboarding: router({
+    getQuestions: protectedProcedure.query(() => ONBOARDING_QUESTIONS),
+
+    getStatus: protectedProcedure.query(async ({ ctx }) => {
+      const completed = await isOnboardingComplete(ctx.user.id);
+      return { completed };
+    }),
+
+    finalize: protectedProcedure
+      .input(
+        z.object({
+          answers: z.array(
+            z.object({
+              questionId: z.string(),
+              question: z.string(),
+              answer: z.string().min(1),
+            })
+          ),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const profile = await extractProfileFromAnswers(input.answers);
+        const result = await saveOnboardingProfile(ctx.user.id, profile);
+        return { profile, schedule: result.schedule };
       }),
   }),
 });

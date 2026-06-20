@@ -110,6 +110,41 @@ export async function exchangeCodeForTokens(
 }
 
 /**
+ * Fallback : récupère la photo via l'API profil classique si userinfo ne la fournit pas.
+ */
+async function fetchLinkedInProfilePicture(
+  accessToken: string
+): Promise<string | undefined> {
+  try {
+    const url = `${LINKEDIN_API_URL}/me?projection=(profilePicture(displayImage~:playableStreams))`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-Restli-Protocol-Version": "2.0.0",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn("[LinkedIn] Profile picture API failed:", await response.text());
+      return undefined;
+    }
+
+    const data = await response.json();
+    const elements = data.profilePicture?.["displayImage~"]?.elements as
+      | Array<{ identifiers?: Array<{ identifier?: string }> }>
+      | undefined;
+
+    if (!elements?.length) return undefined;
+
+    const largest = elements[elements.length - 1];
+    return largest?.identifiers?.[0]?.identifier;
+  } catch (error) {
+    console.warn("[LinkedIn] Profile picture fetch error:", error);
+    return undefined;
+  }
+}
+
+/**
  * Get LinkedIn user profile
  */
 export async function getLinkedInProfile(
@@ -126,7 +161,17 @@ export async function getLinkedInProfile(
     throw new Error(`Failed to get LinkedIn profile: ${error}`);
   }
 
-  return await response.json();
+  const profile: LinkedInProfile = await response.json();
+
+  if (!profile.picture) {
+    const picture = await fetchLinkedInProfilePicture(accessToken);
+    if (picture) {
+      profile.picture = picture;
+      console.log("[LinkedIn] Profile picture resolved via fallback API");
+    }
+  }
+
+  return profile;
 }
 
 /**

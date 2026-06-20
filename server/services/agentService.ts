@@ -11,7 +11,14 @@ import {
   agentLogs 
 } from "../../drizzle/schema";
 import { generateLinkedInPost, type GenerationRequest, type UserContext } from "./contentGenerator";
-import { notifyTaskCompleted, notifyTaskNeedsApproval, notifyTaskFailed } from "./notificationService";
+import { notifyTaskCompleted, notifyTaskFailed, notifyPostPublished, sendTaskCompletionNotification } from "./notificationService";
+import {
+  buildLearningContext,
+  analyzeUserPerformance,
+  recordTaskApproval,
+  recordPublishedPost,
+  syncUserLearning,
+} from "./agentLearningService";
 import { eq, and, desc, sql } from "drizzle-orm";
 import type { 
   Agent, 
@@ -164,10 +171,10 @@ export async function updateAgentConfig(
 export async function initializeUserAgents(userId: number): Promise<Agent[]> {
   const defaultAgents = [
     {
-      name: "Content Creator",
+      name: "Léa",
       type: "content_creator" as AgentType,
-      description: "Génère du contenu personnalisé basé sur votre style et vos objectifs",
-      avatar: "✍️",
+      description: "Créatrice de contenu — génère des posts LinkedIn personnalisés",
+      avatar: "👩‍💻",
     },
     {
       name: "Trend Hunter",
@@ -369,6 +376,30 @@ export async function approveTask(
   
   await logAgentActivity(task.agentId, task.userId, "task_approved", "info", `Task "${task.title}" approved`, taskId);
 
+  await recordTaskApproval(
+    task.agentId,
+    task.userId,
+    {
+      id: task.id,
+      type: task.type,
+      title: task.title,
+      inputData: task.inputData,
+      outputData,
+    },
+    modifications as Record<string, unknown> | undefined
+  );
+
+  const agent = await getAgentById(task.agentId);
+  if (agent) {
+    await notifyTaskCompleted(
+      task.userId,
+      task.agentId,
+      taskId,
+      agent.name,
+      task.title
+    );
+  }
+
   // If autoPublish is enabled and task has generated content, publish to LinkedIn
   let linkedinResult: { success: boolean; linkedinPostId?: string; error?: string } = { success: true };
   
@@ -380,6 +411,17 @@ export async function approveTask(
       if (linkedinResult.success) {
         await logAgentActivity(task.agentId, task.userId, "linkedin_published", "info", 
           `Content published to LinkedIn: ${linkedinResult.linkedinPostId}`, taskId);
+        const postTitle = outputData?.generatedPost?.title;
+        await notifyPostPublished(task.userId, postTitle);
+        await recordPublishedPost(task.userId, {
+          content: outputData.generatedPost.content,
+          theme: (outputData as any).metadata?.theme || (task.inputData as any)?.topic,
+          tone: (outputData as any).metadata?.tone || (task.inputData as any)?.tone,
+          postType: (task.inputData as any)?.postType,
+          linkedinPostId: linkedinResult.linkedinPostId,
+          source: "agent",
+          agentId: task.agentId,
+        });
       } else {
         await logAgentActivity(task.agentId, task.userId, "linkedin_publish_failed", "error", 
           `Failed to publish to LinkedIn: ${linkedinResult.error}`, taskId);
@@ -430,6 +472,8 @@ export async function rejectTask(
   });
   
   await logAgentActivity(task.agentId, task.userId, "task_rejected", "warning", `Task "${task.title}" rejected: ${reason}`, taskId);
+
+  await syncUserLearning(task.userId, task.agentId);
 }
 
 // ============================================
@@ -529,6 +573,8 @@ export async function getRelevantMemories(
     "content_style",
     "feedback",
     "best_practice",
+    "performance_insight",
+    "topic_expertise",
   ];
   
   const results = await db.select()
@@ -729,15 +775,14 @@ export async function processTask(taskId: number): Promise<void> {
     
     await logAgentActivity(task.agentId, task.userId, "task_completed", "info", `Task "${task.title}" ready for approval`, taskId);
     
-    // Send notification to user
+    // Send contextual notification to user
     const agent = await getAgentById(task.agentId);
     if (agent) {
-      await notifyTaskNeedsApproval(
+      await sendTaskCompletionNotification(
         task.userId,
-        task.agentId,
-        taskId,
-        agent.name,
-        task.title
+        { id: agent.id, name: agent.name, avatar: agent.avatar },
+        { id: taskId, type: task.type, title: task.title },
+        outputData
       );
     }
     
@@ -774,14 +819,17 @@ async function processGeneratePostTask(task: any): Promise<any> {
     expertise: inputData.topics || [],
     targetAudience: inputData.targetAudience,
   };
+
+  const learningContext = await buildLearningContext(task.userId, task.agentId);
   
   const request: GenerationRequest = {
     theme: inputData.topic || task.title || "LinkedIn et le personal branding",
-    tone: inputData.tone || "professional",
+    tone: (inputData.tone || learningContext.bestTones?.[0] || "professional") as GenerationRequest["tone"],
     language: inputData.language || "FR",
     userContext,
     additionalInstructions: task.description,
     postType: inputData.postType || "insight",
+    learningContext,
   };
   
   const generatedContent = await generateLinkedInPost(request);
@@ -929,110 +977,102 @@ export async function processAllPendingTasks(userId: number): Promise<{ processe
  */
 async function processAnalyzePerformanceTask(task: any): Promise<any> {
   const inputData = task.inputData || {};
-  
-  // Simulate performance analysis (in production, this would use real LinkedIn data)
+  const analysis = await analyzeUserPerformance(task.userId);
+
+  await syncUserLearning(task.userId, task.agentId);
+
   const performanceData = {
     overview: {
-      totalPosts: 45,
-      totalImpressions: 125000,
-      totalEngagements: 8500,
-      averageEngagementRate: 6.8,
-      followerGrowth: "+12%",
-      period: inputData.period || "last_30_days",
+      totalPosts: analysis.totalPosts,
+      publishedPosts: analysis.publishedPosts,
+      averageEngagement: analysis.avgEngagement,
+      averageEngagementRate: analysis.avgEngagementRate,
+      period: inputData.period || "all_time",
     },
-    topPerformingPosts: [
-      { title: "L'IA et le futur du travail", impressions: 15000, engagements: 1200, engagementRate: 8.0 },
-      { title: "5 conseils pour votre personal branding", impressions: 12000, engagements: 950, engagementRate: 7.9 },
-      { title: "Mon parcours entrepreneurial", impressions: 10000, engagements: 800, engagementRate: 8.0 },
-    ],
-    bestPostingTimes: [
-      { day: "Mardi", time: "08:00-09:00", engagementMultiplier: 1.5 },
-      { day: "Mercredi", time: "12:00-13:00", engagementMultiplier: 1.4 },
-      { day: "Jeudi", time: "17:00-18:00", engagementMultiplier: 1.3 },
-    ],
-    contentTypePerformance: [
-      { type: "Storytelling", avgEngagement: 8.5, count: 12 },
-      { type: "Conseils pratiques", avgEngagement: 7.2, count: 18 },
-      { type: "Actualités secteur", avgEngagement: 5.8, count: 10 },
-      { type: "Carrousels", avgEngagement: 9.2, count: 5 },
-    ],
-    audienceInsights: {
-      topIndustries: ["Tech", "Consulting", "Marketing", "Finance"],
-      topLocations: ["France", "Belgique", "Suisse", "Canada"],
-      seniorityDistribution: {
-        "C-Level": 15,
-        "Director": 25,
-        "Manager": 35,
-        "Individual Contributor": 25,
-      },
-    },
+    topPerformingPosts: analysis.topPerformingPosts.map((p) => ({
+      title: p.title || p.content.slice(0, 60),
+      engagements: p.likes + p.comments + p.shares,
+      engagementScore: p.engagementScore,
+      theme: p.theme,
+      tone: p.tone,
+    })),
+    underperformingPosts: analysis.underperformingPosts.map((p) => ({
+      title: p.title || p.content.slice(0, 60),
+      engagements: p.likes + p.comments + p.shares,
+      engagementScore: p.engagementScore,
+      theme: p.theme,
+    })),
+    bestPostingTimes: analysis.bestPostingTimes.map((t) => ({
+      day: t.day,
+      time: `${t.hour}:00`,
+      engagementScore: t.avgEngagement,
+    })),
+    contentTypePerformance: analysis.bestThemes.map((t) => ({
+      type: t.theme,
+      avgEngagement: t.avgEngagement,
+      count: t.count,
+    })),
+    tonePerformance: analysis.bestTones,
+    rejectedTopics: analysis.rejectedTopics,
+    approvedTopics: analysis.approvedTopics,
   };
-  
-  const recommendations = [
-    {
-      priority: "high",
-      category: "timing",
-      title: "Optimiser les horaires de publication",
-      description: "Publiez davantage le mardi matin et mercredi midi pour maximiser l'engagement.",
-      expectedImpact: "+20% d'engagement",
-    },
-    {
+
+  const recommendations = analysis.insights.map((insight, index) => ({
+    priority: index === 0 ? "high" : index < 3 ? "medium" : "low",
+    category: "content",
+    title: insight.split(":")[0] || insight.slice(0, 50),
+    description: insight,
+    expectedImpact: "Personnalisation basée sur vos données réelles",
+  }));
+
+  if (analysis.bestThemes.length > 0) {
+    recommendations.unshift({
       priority: "high",
       category: "content",
-      title: "Augmenter les carrousels",
-      description: "Les carrousels ont le meilleur taux d'engagement (9.2%). Passez de 5 à 10 par mois.",
-      expectedImpact: "+15% d'impressions",
-    },
-    {
-      priority: "medium",
-      category: "engagement",
-      title: "Répondre plus rapidement aux commentaires",
-      description: "Répondez dans les 2 premières heures pour booster l'algorithme.",
-      expectedImpact: "+10% de reach",
-    },
-    {
+      title: "Doubler sur vos thèmes performants",
+      description: `Vos meilleurs sujets: ${analysis.bestThemes.map((t) => t.theme).join(", ")}`,
+      expectedImpact: "Meilleure pertinence par utilisateur",
+    });
+  }
+
+  if (analysis.worstThemes.length > 0) {
+    recommendations.push({
       priority: "medium",
       category: "content",
-      title: "Plus de storytelling personnel",
-      description: "Le storytelling génère 8.5% d'engagement vs 5.8% pour les actualités.",
-      expectedImpact: "+25% d'engagement",
-    },
-    {
-      priority: "low",
-      category: "audience",
-      title: "Cibler les décideurs",
-      description: "40% de votre audience est C-Level ou Director. Adaptez le contenu.",
-      expectedImpact: "Meilleure conversion",
-    },
-  ];
-  
+      title: "Éviter ou reformuler certains sujets",
+      description: `Sujets peu performants: ${analysis.worstThemes.map((t) => t.theme).join(", ")}`,
+      expectedImpact: "Moins de contenu ignoré par votre audience",
+    });
+  }
+
   const growthPlan = {
-    shortTerm: [
-      "Publier 3 carrousels cette semaine",
-      "Répondre à tous les commentaires sous 2h",
-      "Tester le créneau mardi 8h",
-    ],
+    shortTerm: analysis.bestThemes.slice(0, 2).map(
+      (t) => `Publier sur "${t.theme}" (votre thème le plus performant)`
+    ),
     mediumTerm: [
-      "Augmenter la fréquence à 5 posts/semaine",
-      "Créer une série de posts thématiques",
-      "Collaborer avec 2 influenceurs du secteur",
+      "Analyser l'engagement après chaque publication",
+      "Tester les créneaux horaires identifiés comme performants",
     ],
     longTerm: [
-      "Atteindre 10K followers en 3 mois",
-      "Devenir Top Voice dans votre secteur",
-      "Lancer une newsletter LinkedIn",
+      "Construire une bibliothèque de posts à fort engagement",
+      "Affiner le ton et les formats selon les retours",
     ],
   };
-  
+
+  const viralityScore = analysis.avgEngagement > 0
+    ? Math.min(100, Math.round(analysis.avgEngagement * 10))
+    : 0;
+
   return {
     performanceData,
     recommendations,
     growthPlan,
-    viralityScore: 72,
-    viralityTrend: "+5",
+    viralityScore,
+    viralityTrend: analysis.totalPosts > 0 ? "basé sur vos données" : "données insuffisantes",
     metadata: {
       analyzedAt: new Date().toISOString(),
-      period: inputData.period || "last_30_days",
+      period: inputData.period || "all_time",
+      dataPoints: analysis.totalPosts,
     },
   };
 }

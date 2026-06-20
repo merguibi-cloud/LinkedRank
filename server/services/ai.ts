@@ -1,4 +1,10 @@
-import { callDataApi } from "../_core/dataApi";
+import { invokeLLM } from "../_core/llm";
+import {
+  LINKEDIN_ENGAGEMENT_METHOD,
+  LINKEDIN_CIT_METHOD,
+  LINKEDIN_ALGORITHM_TIPS,
+  LINKEDIN_POST_STRUCTURE_CHECKLIST,
+} from "./linkedinPostMethodology";
 
 interface GeneratePostParams {
   sector?: string;
@@ -129,7 +135,13 @@ export async function generateLinkedInPost(params: GeneratePostParams): Promise<
     ? "Escribe en español."
     : "Schreibe auf Deutsch.";
 
-  const prompt = `Tu es un expert en création de contenu LinkedIn viral. Génère un post LinkedIn performant.
+  const prompt = `Tu es un expert en création de contenu LinkedIn viral. Génère un post LinkedIn performant en appliquant rigoureusement les méthodologies ci-dessous.
+
+${LINKEDIN_ENGAGEMENT_METHOD}
+
+${LINKEDIN_CIT_METHOD}
+
+${LINKEDIN_ALGORITHM_TIPS}
 
 CONTEXTE:
 - Secteur: ${sector}
@@ -147,42 +159,26 @@ ${LENGTH_PROMPTS[contentLength] || LENGTH_PROMPTS.medium}
 
 INSTRUCTIONS:
 - ${languageInstruction}
-${includeEmojis ? "- Utilise des emojis de manière stratégique (2-4 emojis bien placés)." : "- N'utilise PAS d'emojis."}
-${includeHashtags ? "- Termine avec 3-5 hashtags pertinents." : "- N'inclus PAS de hashtags."}
-${includeCallToAction ? "- Termine par une question ou un appel à l'action engageant." : ""}
-- Commence par un hook accrocheur (première ligne très impactante)
-- Utilise des sauts de ligne pour aérer le texte
-- Structure le post pour faciliter la lecture (phrases courtes, paragraphes courts)
+${includeEmojis ? "- Étape 5 : utilise 2-4 emojis bien placés pour structurer le post." : "- N'utilise PAS d'emojis."}
+${includeHashtags ? "- Étape 5 : termine avec 3-5 hashtags pertinents et ciblés." : "- N'inclus PAS de hashtags."}
+${includeCallToAction ? "- Étape 4 : termine par un appel à l'interaction sincère (question ou invitation à commenter)." : ""}
+
+${LINKEDIN_POST_STRUCTURE_CHECKLIST}
 
 IMPORTANT: Génère UNIQUEMENT le contenu du post, sans introduction ni explication. Respecte strictement le FORMAT demandé.`;
 
   try {
-    // Use the Forge API for generation
-    const response = await fetch(process.env.BUILT_IN_FORGE_API_URL + "/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.BUILT_IN_FORGE_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        max_tokens: 2000,
-        temperature: 0.9, // Increased for more variety
-      }),
+    const response = await invokeLLM({
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 2000,
+      temperature: 0.9,
     });
 
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const generatedContent = data.choices?.[0]?.message?.content || "";
+    const rawContent = response.choices?.[0]?.message?.content ?? "";
+    const generatedContent =
+      typeof rawContent === "string"
+        ? rawContent
+        : (rawContent[0] as { text?: string })?.text ?? "";
 
     return generatedContent.trim();
   } catch (error) {

@@ -1,5 +1,14 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { nanoid } from "nanoid";
+import {
+  getUserById,
+  upsertUser,
+  upsertLinkedinSettings,
+  getLinkedinSettings,
+} from "../db";
+import { type AuthenticatedRequest, requireAuth } from "../_core/authMiddleware";
+import { getLinkedInRedirectUri } from "../_core/linkedinRedirect";
+import { resolveAppUser } from "../_core/supabase";
 import {
   getLinkedInAuthUrl,
   exchangeCodeForTokens,
@@ -7,48 +16,126 @@ import {
   postToLinkedIn,
   isLinkedInConfigured,
 } from "../services/linkedin";
-import { upsertLinkedinSettings, getLinkedinSettings } from "../db";
+import {
+  buildLinkedInSettingsPayload,
+  formatLinkedInStatus,
+} from "../services/linkedinAuth";
+import { notifyPostPublished, notifySystem } from "../services/notificationService";
 
 const router = Router();
 
-// Store OAuth states temporarily (in production, use Redis or database)
-const oauthStates = new Map<string, { userId: number; redirectUrl: string }>();
+type OAuthState = {
+  userId?: number;
+  redirectUrl: string;
+};
+
+const oauthStates = new Map<string, OAuthState>();
+
+async function resolveOptionalUserId(
+  req: Request,
+  res: Response
+): Promise<number | undefined> {
+  const user = await resolveAppUser(req, res);
+  return user?.id;
+}
 
 /**
- * Check if LinkedIn is configured
+ * Public setup info — shows which redirect URI to register in LinkedIn Developer Portal
  */
-router.get("/status", (req, res) => {
+router.get("/config", (_req, res) => {
+  const redirectUri = getLinkedInRedirectUri();
   res.json({
     configured: isLinkedInConfigured(),
-    connected: false, // Will be updated based on user's stored tokens
+    redirectUri,
+    scopes: ["openid", "profile", "w_member_social", "email"],
+    endpoints: {
+      connect: "GET /api/linkedin/auth?redirect=/dashboard",
+      status: "GET /api/linkedin/status",
+      publish: "POST /api/linkedin/post",
+      schedule: "GET/POST /api/auto-publish/settings",
+      publishNow: "POST /api/auto-publish/publish-now",
+    },
+    linkedinPortal: "https://www.linkedin.com/developers/apps",
   });
 });
 
 /**
- * Initiate LinkedIn OAuth flow
+ * Check if LinkedIn is configured and connected for the current user
  */
-router.get("/auth", (req, res) => {
+router.get("/status", requireAuth, async (req, res) => {
+  const { userId } = req as AuthenticatedRequest;
+  const settings = await getLinkedinSettings(userId);
+
+  res.json({
+    configured: isLinkedInConfigured(),
+    ...formatLinkedInStatus(settings),
+  });
+});
+
+/**
+ * Refresh profile info from LinkedIn API
+ */
+router.post("/sync", requireAuth, async (req, res) => {
   try {
-    const userId = 1; // For now, hardcoded. In production, get from session
-    const state = nanoid();
-    
-    // Get the base URL for redirect
-    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-    const host = req.headers["x-forwarded-host"] || req.get("host");
-    const redirectUri = `${protocol}://${host}/api/linkedin/callback`;
-    
-    // Store state for verification
-    oauthStates.set(state, {
-      userId,
-      redirectUrl: req.query.redirect as string || "/dashboard",
+    const { userId } = req as AuthenticatedRequest;
+    const settings = await getLinkedinSettings(userId);
+
+    if (!settings?.accessToken) {
+      return res.status(401).json({ error: "LinkedIn not connected" });
+    }
+
+    if (settings.tokenExpiresAt && new Date(settings.tokenExpiresAt) < new Date()) {
+      return res.status(401).json({ error: "LinkedIn token expired, please reconnect" });
+    }
+
+    const profile = await getLinkedInProfile(settings.accessToken);
+
+    await upsertLinkedinSettings(userId, {
+      linkedinUserId: profile.sub,
+      profileName: profile.name,
+      profilePicture: profile.picture ?? null,
+      email: profile.email ?? null,
+      isConnected: true,
     });
 
-    // Clean up old states after 10 minutes
+    const updated = await getLinkedinSettings(userId);
+    res.json({
+      success: true,
+      ...formatLinkedInStatus(updated),
+    });
+  } catch (error) {
+    console.error("LinkedIn sync error:", error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to sync LinkedIn profile",
+    });
+  }
+});
+
+/**
+ * Connect LinkedIn to an existing account (requires app session)
+ */
+router.get("/auth", async (req, res) => {
+  try {
+    const userId = await resolveOptionalUserId(req, res);
+    if (!userId) {
+      const redirect = (req.query.redirect as string) || "/dashboard";
+      return res.redirect(
+        `/login?redirect=${encodeURIComponent(redirect)}&connectLinkedIn=1`
+      );
+    }
+
+    const state = nanoid();
+    const redirectUri = getLinkedInRedirectUri(req);
+
+    oauthStates.set(state, {
+      userId,
+      redirectUrl: (req.query.redirect as string) || "/dashboard",
+    });
+
     setTimeout(() => oauthStates.delete(state), 10 * 60 * 1000);
 
     const authUrl = getLinkedInAuthUrl(redirectUri, state);
-    
-    // If format=json is requested, return JSON, otherwise redirect
+
     if (req.query.format === "json") {
       res.json({ authUrl });
     } else {
@@ -67,7 +154,7 @@ router.get("/auth", (req, res) => {
 });
 
 /**
- * LinkedIn OAuth callback
+ * LinkedIn OAuth callback (public — called by LinkedIn)
  */
 router.get("/callback", async (req, res) => {
   try {
@@ -81,7 +168,6 @@ router.get("/callback", async (req, res) => {
       return res.redirect("/?linkedin_error=missing_params");
     }
 
-    // Verify state
     const storedState = oauthStates.get(state as string);
     if (!storedState) {
       return res.redirect("/?linkedin_error=invalid_state");
@@ -89,28 +175,41 @@ router.get("/callback", async (req, res) => {
 
     oauthStates.delete(state as string);
 
-    // Get the redirect URI (must match exactly)
-    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-    const host = req.headers["x-forwarded-host"] || req.get("host");
-    const redirectUri = `${protocol}://${host}/api/linkedin/callback`;
+    const redirectUri = getLinkedInRedirectUri(req);
 
-    // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code as string, redirectUri);
-
-    // Get user profile
     const profile = await getLinkedInProfile(tokens.accessToken);
 
-    // Store tokens and profile in database
-    await upsertLinkedinSettings(storedState.userId, {
-      linkedinUserId: profile.sub,
-      accessToken: tokens.accessToken,
-      tokenExpiresAt: new Date(Date.now() + tokens.expiresIn * 1000),
-      profileUrl: `https://www.linkedin.com/in/${profile.sub}`,
-      isConnected: true,
-      
+    const userId = storedState.userId;
+
+    if (!userId) {
+      return res.redirect("/login?linkedin_error=session_required");
+    }
+
+    const existingUser = await getUserById(userId);
+    if (!existingUser) {
+      return res.redirect("/?linkedin_error=user_not_found");
+    }
+
+    await upsertUser({
+      openId: existingUser.openId,
+      name: profile.name || existingUser.name,
+      email: profile.email ?? existingUser.email,
+      lastSignedIn: new Date(),
     });
 
-    // Redirect back to app
+    await upsertLinkedinSettings(
+      userId,
+      buildLinkedInSettingsPayload(profile, tokens)
+    );
+
+    await notifySystem(
+      userId,
+      "LinkedIn connecté",
+      `Votre compte LinkedIn (${profile.name || "profil"}) est maintenant lié. Vous pouvez publier directement depuis LinkedRank.`,
+      "medium"
+    );
+
     res.redirect(`${storedState.redirectUrl}?linkedin_connected=true`);
   } catch (error) {
     console.error("LinkedIn callback error:", error);
@@ -118,59 +217,79 @@ router.get("/callback", async (req, res) => {
   }
 });
 
-/**
- * Post to LinkedIn (alias for /post)
- */
-router.post("/publish", async (req, res) => {
+async function publishForUser(
+  userId: number,
+  content: string,
+  imageUrl?: string,
+  hashtags?: string[]
+) {
+  const settings = await getLinkedinSettings(userId);
+
+  if (!settings?.accessToken || !settings?.linkedinUserId) {
+    return {
+      status: 401,
+      body: {
+        error: "LinkedIn not connected. Please connect your LinkedIn account first.",
+      },
+    };
+  }
+
+  if (settings.tokenExpiresAt && new Date(settings.tokenExpiresAt) < new Date()) {
+    return { status: 401, body: { error: "LinkedIn token expired, please reconnect" } };
+  }
+
+  let fullContent = content;
+  if (hashtags && hashtags.length > 0) {
+    const hashtagString = hashtags.map((tag: string) => `#${tag}`).join(" ");
+    fullContent = `${content}\n\n${hashtagString}`;
+  }
+
+  const result = await postToLinkedIn(
+    settings.accessToken,
+    settings.linkedinUserId,
+    fullContent,
+    imageUrl
+  );
+
+  if (result.success) {
+    const preview = content.slice(0, 80).replace(/\n/g, " ");
+    await notifyPostPublished(userId, preview);
+
+    return {
+      status: 200,
+      body: {
+        success: true,
+        postId: result.postId,
+        message: "Post published to LinkedIn successfully",
+      },
+    };
+  }
+
+  const isDuplicate =
+    result.error?.includes("DUPLICATE_POST") || result.error?.includes("duplicate");
+
+  return {
+    status: isDuplicate ? 409 : 500,
+    body: {
+      success: false,
+      error: isDuplicate
+        ? "DUPLICATE_POST: Ce post a déjà été publié sur LinkedIn"
+        : result.error,
+    },
+  };
+}
+
+router.post("/publish", requireAuth, async (req, res) => {
   try {
-    const userId = 1; // For now, hardcoded
+    const { userId } = req as AuthenticatedRequest;
     const { content, hashtags, imageUrl } = req.body;
 
     if (!content) {
       return res.status(400).json({ error: "Content is required" });
     }
 
-    // Get user's LinkedIn settings
-    const settings = await getLinkedinSettings(userId);
-    
-    if (!settings?.accessToken || !settings?.linkedinUserId) {
-      return res.status(401).json({ error: "LinkedIn not connected. Please connect your LinkedIn account first." });
-    }
-
-    // Check if token is expired
-    if (settings.tokenExpiresAt && new Date(settings.tokenExpiresAt) < new Date()) {
-      return res.status(401).json({ error: "LinkedIn token expired, please reconnect" });
-    }
-
-    // Format content with hashtags if provided
-    let fullContent = content;
-    if (hashtags && hashtags.length > 0) {
-      const hashtagString = hashtags.map((tag: string) => `#${tag}`).join(" ");
-      fullContent = `${content}\n\n${hashtagString}`;
-    }
-
-    // Post to LinkedIn
-    const result = await postToLinkedIn(
-      settings.accessToken,
-      settings.linkedinUserId,
-      fullContent,
-      imageUrl
-    );
-
-    if (result.success) {
-      res.json({
-        success: true,
-        postId: result.postId,
-        message: "Post published to LinkedIn successfully",
-      });
-    } else {
-      // Check for duplicate post error
-      const isDuplicate = result.error?.includes("DUPLICATE_POST") || result.error?.includes("duplicate");
-      res.status(isDuplicate ? 409 : 500).json({
-        success: false,
-        error: isDuplicate ? "DUPLICATE_POST: Ce post a déjà été publié sur LinkedIn" : result.error,
-      });
-    }
+    const result = await publishForUser(userId, content, imageUrl, hashtags);
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("LinkedIn publish error:", error);
     res.status(500).json({
@@ -179,52 +298,17 @@ router.post("/publish", async (req, res) => {
   }
 });
 
-/**
- * Post to LinkedIn
- */
-router.post("/post", async (req, res) => {
+router.post("/post", requireAuth, async (req, res) => {
   try {
-    const userId = 1; // For now, hardcoded
+    const { userId } = req as AuthenticatedRequest;
     const { content, imageUrl } = req.body;
 
     if (!content) {
       return res.status(400).json({ error: "Content is required" });
     }
 
-    // Get user's LinkedIn settings
-    const settings = await getLinkedinSettings(userId);
-    
-    if (!settings?.accessToken || !settings?.linkedinUserId) {
-      return res.status(401).json({ error: "LinkedIn not connected" });
-    }
-
-    // Check if token is expired
-    if (settings.tokenExpiresAt && new Date(settings.tokenExpiresAt) < new Date()) {
-      return res.status(401).json({ error: "LinkedIn token expired, please reconnect" });
-    }
-
-    // Post to LinkedIn
-    const result = await postToLinkedIn(
-      settings.accessToken,
-      settings.linkedinUserId,
-      content,
-      imageUrl
-    );
-
-    if (result.success) {
-      res.json({
-        success: true,
-        postId: result.postId,
-        message: "Post published to LinkedIn successfully",
-      });
-    } else {
-      // Check for duplicate post error
-      const isDuplicate = result.error?.includes("DUPLICATE_POST") || result.error?.includes("duplicate");
-      res.status(isDuplicate ? 409 : 500).json({
-        success: false,
-        error: isDuplicate ? "DUPLICATE_POST: Ce post a déjà été publié sur LinkedIn" : result.error,
-      });
-    }
+    const result = await publishForUser(userId, content, imageUrl);
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("LinkedIn post error:", error);
     res.status(500).json({
@@ -233,17 +317,18 @@ router.post("/post", async (req, res) => {
   }
 });
 
-/**
- * Disconnect LinkedIn
- */
-router.post("/disconnect", async (req, res) => {
+router.post("/disconnect", requireAuth, async (req, res) => {
   try {
-    const userId = 1; // For now, hardcoded
+    const { userId } = req as AuthenticatedRequest;
 
     await upsertLinkedinSettings(userId, {
       linkedinUserId: null,
       accessToken: null,
+      refreshToken: null,
       tokenExpiresAt: null,
+      profileName: null,
+      profilePicture: null,
+      email: null,
       profileUrl: null,
       isConnected: false,
     });

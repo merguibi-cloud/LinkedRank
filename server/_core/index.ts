@@ -2,17 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
-import { appRouter } from "../routers";
-import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
-import linkedinRouter from "../routes/linkedin";
-import autoPublishRouter from "../routes/autoPublish";
-import stripeRouter from "../routes/stripe";
-import stripeWebhookRouter from "../routes/stripeWebhook";
-import { startAutoPublishWorker } from "../workers/autoPublishWorker";
-import { startAgentScheduler } from "../services/agentScheduler";
+import { configureApp, logStartupInfo, startBackgroundWorkers } from "./app";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -36,36 +26,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  
-  // IMPORTANT: Stripe webhook must be registered BEFORE express.json()
-  // to ensure raw body is available for signature verification
-  app.use("/api/stripe/webhook", express.raw({ type: "application/json" }), stripeWebhookRouter);
-  
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
-  // LinkedIn API routes
-  app.use("/api/linkedin", linkedinRouter);
-  // Auto-publish API routes
-  app.use("/api/auto-publish", autoPublishRouter);
-  // Stripe API routes (checkout, portal, subscription status)
-  app.use("/api/stripe", stripeRouter);
-  // tRPC API
-  app.use(
-    "/api/trpc",
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
-  // development mode uses Vite, production mode uses static files
-  if (process.env.NODE_ENV === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+  await configureApp(app, server);
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
@@ -75,13 +36,8 @@ async function startServer() {
   }
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-    
-    // Start the auto-publish worker
-    startAutoPublishWorker();
-    
-    // Start the agent scheduler
-    startAgentScheduler();
+    logStartupInfo(port);
+    startBackgroundWorkers();
   });
 }
 

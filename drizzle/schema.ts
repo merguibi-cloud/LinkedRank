@@ -15,6 +15,7 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  passwordHash: text("passwordHash"),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -114,6 +115,9 @@ export const linkedinSettings = mysqlTable("linkedin_settings", {
   refreshToken: text("refreshToken"),
   tokenExpiresAt: timestamp("tokenExpiresAt"),
   linkedinUserId: varchar("linkedinUserId", { length: 100 }),
+  profileName: varchar("profileName", { length: 255 }),
+  profilePicture: text("profilePicture"),
+  email: varchar("email", { length: 320 }),
   profileUrl: text("profileUrl"),
   isConnected: boolean("isConnected").default(false),
   autoPublish: boolean("autoPublish").default(false),
@@ -419,6 +423,9 @@ export const autoPublishSchedule = mysqlTable("auto_publish_schedule", {
   
   // Time (stored as HH:MM format)
   publishTime: varchar("publishTime", { length: 5 }).notNull(),
+
+  // Optional specific date (YYYY-MM-DD) — null means recurring weekly on dayOfWeek
+  publishDate: varchar("publishDate", { length: 10 }),
   
   // Status
   isActive: boolean("isActive").default(true),
@@ -917,3 +924,33 @@ export const notifications = mysqlTable("notifications", {
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
+
+/**
+ * User media library — images, videos and publication drafts for AI-assisted posting
+ */
+export const mediaLibrary = mysqlTable("media_library", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+
+  title: varchar("title", { length: 255 }),
+  description: text("description"),
+  tags: text("tags"), // JSON array of strings
+
+  fileUrl: text("fileUrl").notNull(),
+  fileKey: varchar("fileKey", { length: 255 }).notNull(),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  mimeType: varchar("mimeType", { length: 100 }).notNull(),
+  fileSize: int("fileSize").default(0),
+  mediaType: mysqlEnum("mediaType", ["image", "video", "document"]).notNull(),
+
+  aiDescription: text("aiDescription"),
+  aiSuggestedTheme: varchar("aiSuggestedTheme", { length: 100 }),
+  usageCount: int("usageCount").default(0),
+  lastUsedAt: timestamp("lastUsedAt"),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type MediaLibraryItem = typeof mediaLibrary.$inferSelect;
+export type InsertMediaLibraryItem = typeof mediaLibrary.$inferInsert;

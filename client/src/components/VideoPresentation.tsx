@@ -7,7 +7,7 @@ export function VideoPresentation() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
 
-  // Simulation d'une vidéo de présentation (en production, ce serait une vraie vidéo)
+  // Aperçu interactif guidé (pas une vidéo enregistrée)
   const videoSteps = [
     {
       time: "0:00",
@@ -36,7 +36,7 @@ export function VideoPresentation() {
     {
       time: "1:00",
       title: "Commencez maintenant !",
-      description: "Activez vos agents IA et dominez LinkedIn.",
+      description: "Créez un compte gratuit et configurez vos agents IA.",
       icon: "🚀",
     },
   ];
@@ -82,10 +82,10 @@ export function VideoPresentation() {
             <div className="relative z-10 flex h-full flex-col items-center justify-center p-6 text-center">
               <div className="mb-4 text-5xl">🎬</div>
               <h3 className="text-lg font-bold text-white mb-2">
-                Découvrez LinkedAgents en 60 secondes
+                Aperçu guidé de LinkedAgents
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Une vidéo rapide pour comprendre comment nos agents IA peuvent vous aider
+                Parcourez les étapes clés de la plateforme en quelques clics
               </p>
               
               {/* Play Button */}
@@ -94,9 +94,8 @@ export function VideoPresentation() {
               </div>
             </div>
             
-            {/* Duration Badge */}
             <div className="absolute bottom-3 right-3 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white">
-              1:00
+              Aperçu
             </div>
           </div>
         </div>

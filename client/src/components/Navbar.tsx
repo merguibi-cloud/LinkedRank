@@ -1,12 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { LinkedInStatusBadge } from "@/components/LinkedInStatusBadge";
+import { useLinkedInStatus } from "@/hooks/useLinkedInStatus";
 import { getLoginUrl } from "@/const";
 import { Link, useLocation } from "wouter";
 import { 
   Menu, X, Sparkles, BarChart3, Users, BookOpen, Zap, LogOut, User, ChevronDown, 
-  Linkedin, Bot, Calendar, CreditCard, TrendingUp, Flame, Brain, Trophy, 
+  Linkedin, Bot, Calendar, TrendingUp, Flame, Brain, Trophy, 
   FileText, Target, Lightbulb, Layout, Globe, Award, Rocket, Settings,
-  PenTool, LayoutTemplate, LineChart
+  PenTool, LayoutTemplate, LineChart, FolderOpen, Wrench
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { NotificationCenter } from "./NotificationCenter";
@@ -28,6 +30,7 @@ interface NavItem {
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { status: linkedInStatus } = useLinkedInStatus();
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -58,12 +61,17 @@ export default function Navbar() {
       ]
     },
     {
-      label: "Outils",
+      label: "Mes Outils",
       icon: Lightbulb,
       submenu: [
-        { href: "/templates", label: "Templates", icon: LayoutTemplate, description: "Modèles de posts prêts" },
-        { href: "/analytics/advanced", label: "Analytics Pro", icon: LineChart, description: "Analysez vos performances" },
+        { href: "/mes-outils", label: "Tous les outils", icon: PenTool, description: "Hub de création LinkedIn" },
+        { href: "/mes-outils?tab=mediatheque", label: "Médiathèque", icon: Layout, description: "Vos visuels et publications", badge: "Nouveau" },
+        { href: "/generate", label: "Générateur IA", icon: Sparkles, description: "Créer avec l'IA" },
+        { href: "/carousels", label: "Carrousels", icon: LayoutTemplate, description: "Créer des carrousels" },
+        { href: "/templates", label: "Templates", icon: FileText, description: "Modèles de posts prêts" },
         { href: "/schedule", label: "Calendrier", icon: Calendar, description: "Planifiez vos posts" },
+        { href: "/auto-publish", label: "Auto-Publication", icon: Rocket, description: "Publiez automatiquement" },
+        { href: "/analytics/advanced", label: "Analytics Pro", icon: LineChart, description: "Analysez vos performances" },
         { href: "/achievements", label: "Badges & Niveaux", icon: Trophy, description: "Vos accomplissements", badge: "Fun" },
       ]
     },
@@ -71,11 +79,6 @@ export default function Navbar() {
       label: "Ressources",
       icon: BookOpen,
       href: "/resources",
-    },
-    {
-      label: "Tarifs",
-      icon: CreditCard,
-      href: "/pricing",
     },
   ];
 
@@ -113,9 +116,10 @@ export default function Navbar() {
   };
 
   // LinkedIn OAuth URL
-  const linkedinAuthUrl = "/api/linkedin/auth?redirect=/dashboard";
+  const linkedinAuthUrl = "/login?redirect=/dashboard&connectLinkedIn=1";
 
   return (
+    <>
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-xl">
       <div className="container">
         <div className="flex h-16 items-center justify-between">
@@ -245,9 +249,10 @@ export default function Navbar() {
                   {/* User Dropdown Menu */}
                   {userMenuOpen && (
                     <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-white/10 bg-card/95 backdrop-blur-xl shadow-xl overflow-hidden">
-                      <div className="p-3 border-b border-white/10">
+                      <div className="p-3 border-b border-white/10 space-y-2">
                         <p className="text-sm font-medium text-white truncate">{user.name}</p>
                         <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        <LinkedInStatusBadge showPhoto size="sm" />
                       </div>
                       <div className="p-1">
                         <Link href="/dashboard" onClick={() => setUserMenuOpen(false)}>
@@ -280,13 +285,17 @@ export default function Navbar() {
                             Badges & Niveaux
                           </button>
                         </Link>
-                        <div className="border-t border-white/10 my-1" />
-                        <a href={linkedinAuthUrl}>
-                          <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium bg-gradient-to-r from-[#0A66C2] to-[#0077B5] text-white hover:opacity-90 transition-all">
-                            <Linkedin className="h-4 w-4" />
-                            Connecter LinkedIn
-                          </button>
-                        </a>
+                        {!linkedInStatus.connected && (
+                          <>
+                            <div className="border-t border-white/10 my-1" />
+                            <a href={linkedinAuthUrl}>
+                              <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium bg-gradient-to-r from-[#0A66C2] to-[#0077B5] text-white hover:opacity-90 transition-all">
+                                <Linkedin className="h-4 w-4" />
+                                Connecter LinkedIn
+                              </button>
+                            </a>
+                          </>
+                        )}
                         <button
                           onClick={handleLogout}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
@@ -439,5 +448,8 @@ export default function Navbar() {
         )}
       </div>
     </nav>
+    {/* Réserve l'espace sous la navbar fixe (h-16) pour éviter que le contenu passe dessous */}
+    <div className="h-16 shrink-0" aria-hidden="true" />
+    </>
   );
 }

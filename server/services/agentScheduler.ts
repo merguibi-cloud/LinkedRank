@@ -14,6 +14,7 @@ import {
   getAgentById,
   logAgentActivity
 } from "./agentService";
+import { syncAllUsersLearning } from "./agentLearningService";
 import type { Agent, AgentType, TaskType, ScheduleDay } from "../../shared/agentTypes";
 
 // Map day names to numbers (0 = Sunday, 1 = Monday, etc.)
@@ -334,6 +335,15 @@ export async function processAutonomousTasks(): Promise<{
               `Contenu publié automatiquement sur LinkedIn: ${publishResult.linkedinPostId}`,
               task.id
             );
+            const { recordPublishedPost } = await import("./agentLearningService");
+            await recordPublishedPost(agent.userId, {
+              content: outputData.generatedPost.content,
+              theme: outputData.metadata?.theme,
+              tone: outputData.metadata?.tone,
+              linkedinPostId: publishResult.linkedinPostId,
+              source: "agent",
+              agentId: agent.id,
+            });
             published++;
             console.log(`[AgentScheduler] Auto-published to LinkedIn: ${publishResult.linkedinPostId}`);
           } else {
@@ -379,6 +389,7 @@ export async function processAutonomousTasks(): Promise<{
  * Runs every minute to check for scheduled tasks
  */
 let schedulerInterval: NodeJS.Timeout | null = null;
+let learningSyncCounter = 0;
 
 export function startAgentScheduler(): void {
   if (schedulerInterval) {
@@ -397,6 +408,16 @@ export function startAgentScheduler(): void {
     try {
       await checkAndExecuteScheduledTasks();
       await processAutonomousTasks();
+
+      // Sync learning data every hour (60 minutes)
+      learningSyncCounter++;
+      if (learningSyncCounter >= 60) {
+        learningSyncCounter = 0;
+        const result = await syncAllUsersLearning();
+        if (result.synced > 0) {
+          console.log(`[AgentScheduler] Learning sync completed for ${result.synced} user(s)`);
+        }
+      }
     } catch (error) {
       console.error("[AgentScheduler] Error in scheduler:", error);
     }

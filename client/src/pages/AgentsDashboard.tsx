@@ -36,11 +36,13 @@ import {
   AlertCircle,
   Rocket,
   Save,
-  X
+  X,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import AgentScheduleModal from "@/components/AgentScheduleModal";
+import { isAgentAvailable, getAgentByBackendType } from "@/lib/agentsRoster";
 
 // Import types from shared
 import type { Agent as SharedAgent, AgentTask as SharedAgentTask, AgentConfig } from "@/../../shared/agentTypes";
@@ -562,14 +564,23 @@ function AgentCard({ agent, onToggle, onConfigure, onLaunchTask, onSchedule, isT
     ? Math.round((agent.tasksApproved / agent.tasksCompleted) * 100)
     : 0;
 
+  const rosterEntry = getAgentByBackendType(agent.type);
+  const available = isAgentAvailable(agent.type);
+  const displayName = rosterEntry?.name ?? agent.name;
+
   return (
-    <Card className="relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm hover:border-primary/30 transition-all">
-      <div className={`absolute top-0 left-0 w-1 h-full ${getStatusColor(agent.status)}`} />
+    <Card className={`relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all ${
+      available ? "hover:border-primary/30" : "opacity-70 border-dashed"
+    }`}>
+      {!available && (
+        <div className="absolute inset-0 bg-background/10 backdrop-blur-[1px] z-[1] pointer-events-none" />
+      )}
+      <div className={`absolute top-0 left-0 w-1 h-full ${available ? getStatusColor(agent.status) : "bg-amber-500/60"}`} />
       
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 relative z-[2]">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+            <div className={`p-2 rounded-lg bg-primary/10 text-primary ${!available ? "grayscale" : ""}`}>
               {agent.avatar ? (
                 <span className="text-2xl">{agent.avatar}</span>
               ) : (
@@ -577,26 +588,51 @@ function AgentCard({ agent, onToggle, onConfigure, onLaunchTask, onSchedule, isT
               )}
             </div>
             <div>
-              <CardTitle className="text-lg">{agent.name}</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                {displayName}
+                {!available && (
+                  <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-400 gap-1">
+                    <Lock className="w-3 h-3" />
+                    Arrive bientôt
+                  </Badge>
+                )}
+              </CardTitle>
               <CardDescription className="text-xs mt-0.5">
-                {agent.description || `Agent ${agent.type.replace(/_/g, " ")}`}
+                {rosterEntry?.role ?? agent.description ?? `Agent ${agent.type.replace(/_/g, " ")}`}
               </CardDescription>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">
-              {getStatusLabel(agent.status)}
-            </Badge>
-            <Switch 
-              checked={agent.status === "active"}
-              onCheckedChange={(checked) => onToggle(agent.id, checked)}
-              disabled={isToggling}
-            />
+            {available ? (
+              <>
+                <Badge variant="outline" className="text-xs">
+                  {getStatusLabel(agent.status)}
+                </Badge>
+                <Switch 
+                  checked={agent.status === "active"}
+                  onCheckedChange={(checked) => onToggle(agent.id, checked)}
+                  disabled={isToggling}
+                />
+              </>
+            ) : (
+              <Badge variant="secondary" className="text-xs text-muted-foreground">
+                <Clock className="w-3 h-3 mr-1" />
+                Bientôt
+              </Badge>
+            )}
           </div>
         </div>
       </CardHeader>
       
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 relative z-[2]">
+        {!available ? (
+          <div className="py-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              {rosterEntry?.description ?? "Cet agent sera disponible prochainement."}
+            </p>
+          </div>
+        ) : (
+          <>
         {/* Stats */}
         <div className="grid grid-cols-3 gap-2 text-center">
           <div className="p-2 rounded-lg bg-muted/50">
@@ -673,6 +709,8 @@ function AgentCard({ agent, onToggle, onConfigure, onLaunchTask, onSchedule, isT
             <Rocket className="h-4 w-4" />
           </Button>
         </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

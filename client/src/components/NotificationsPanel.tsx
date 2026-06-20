@@ -41,71 +41,7 @@ interface Notification {
 
 export function NotificationsPanel() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: "1",
-      type: "achievement",
-      title: "🏆 Nouveau badge débloqué !",
-      message: "Vous avez obtenu le badge '100K Club' - Félicitations pour vos 100 000 vues !",
-      icon: <Trophy className="w-5 h-5" />,
-      color: "text-yellow-400 bg-yellow-500/10",
-      timestamp: new Date(Date.now() - 5 * 60 * 1000),
-      read: false,
-      action: { label: "Voir mes badges", href: "/gamification" }
-    },
-    {
-      id: "2",
-      type: "streak",
-      title: "🔥 Streak de 12 jours !",
-      message: "Continuez comme ça ! Plus que 2 jours pour débloquer le badge 'Feu Éternel'",
-      icon: <Flame className="w-5 h-5" />,
-      color: "text-orange-400 bg-orange-500/10",
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      read: false
-    },
-    {
-      id: "3",
-      type: "challenge",
-      title: "✅ Défi complété !",
-      message: "Vous avez terminé le défi 'Créateur actif' - +300 XP gagnés !",
-      icon: <Target className="w-5 h-5" />,
-      color: "text-green-400 bg-green-500/10",
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      read: true
-    },
-    {
-      id: "4",
-      type: "engagement",
-      title: "📈 Post viral !",
-      message: "Votre post '5 astuces pour LinkedIn' a dépassé 25 000 vues !",
-      icon: <TrendingUp className="w-5 h-5" />,
-      color: "text-blue-400 bg-blue-500/10",
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-      read: true,
-      action: { label: "Voir les stats", href: "/live-analytics" }
-    },
-    {
-      id: "5",
-      type: "milestone",
-      title: "🎉 Nouveau niveau !",
-      message: "Félicitations ! Vous êtes maintenant niveau 4 'Expert'",
-      icon: <Star className="w-5 h-5" />,
-      color: "text-purple-400 bg-purple-500/10",
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      read: true
-    },
-    {
-      id: "6",
-      type: "tip",
-      title: "💡 Conseil du coach",
-      message: "Publiez aujourd'hui entre 8h et 9h pour maximiser votre portée !",
-      icon: <Zap className="w-5 h-5" />,
-      color: "text-cyan-400 bg-cyan-500/10",
-      timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000),
-      read: true,
-      action: { label: "Voir le coaching", href: "/coaching" }
-    }
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const [settings, setSettings] = useState({
     achievements: true,

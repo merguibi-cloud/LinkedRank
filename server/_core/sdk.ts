@@ -45,13 +45,14 @@ class OAuthService {
 
   async getTokenByCode(
     code: string,
-    state: string
+    state: string,
+    redirectUri?: string
   ): Promise<ExchangeTokenResponse> {
     const payload: ExchangeTokenRequest = {
       clientId: ENV.appId,
       grantType: "authorization_code",
       code,
-      redirectUri: this.decodeState(state),
+      redirectUri: redirectUri ?? this.decodeState(state),
     };
 
     const { data } = await this.client.post<ExchangeTokenResponse>(
@@ -120,9 +121,10 @@ class SDKServer {
    */
   async exchangeCodeForToken(
     code: string,
-    state: string
+    state: string,
+    redirectUri?: string
   ): Promise<ExchangeTokenResponse> {
-    return this.oauthService.getTokenByCode(code, state);
+    return this.oauthService.getTokenByCode(code, state, redirectUri);
   }
 
   /**
@@ -270,8 +272,7 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
-    if (!user) {
+    if (!user && ENV.oAuthServerUrl) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
         await db.upsertUser({

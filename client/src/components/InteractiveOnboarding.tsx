@@ -78,7 +78,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: "dashboard",
     title: "Suivez Vos Performances",
-    description: "Dashboard complet avec analytics, badges et récompenses. Progressez et débloquez des fonctionnalités premium.",
+    description: "Dashboard complet avec analytics, badges et récompenses. Progressez en utilisant la plateforme.",
     icon: <BarChart3 className="w-12 h-12" />,
     color: "from-green-500 to-emerald-500",
     tips: [
@@ -341,12 +341,13 @@ export function useOnboarding() {
     const isLoggedIn = localStorage.getItem("auth_token") || document.cookie.includes("auth");
     
     // Vérifier si l'utilisateur a déjà complété l'onboarding
-    const hasCompletedOnboarding = localStorage.getItem("linkedagents_onboarding_completed");
+    const hasCompletedOnboarding = localStorage.getItem("linkedagents_onboarding_completed")
+      || localStorage.getItem("linkedrank_voice_onboarding_completed");
     const savedProfile = localStorage.getItem("linkedagents_user_profile");
     
     // Afficher l'onboarding SEULEMENT si l'utilisateur est connecté ET n'a pas complété l'onboarding
-    // Pour les visiteurs non connectés, ne pas afficher l'onboarding
-    if (isLoggedIn && !hasCompletedOnboarding) {
+    // L'onboarding vocal principal se fait sur /onboarding
+    if (isLoggedIn && !hasCompletedOnboarding && window.location.pathname !== "/onboarding") {
       setShowOnboarding(true);
     } else {
       setShowOnboarding(false);

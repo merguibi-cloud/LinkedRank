@@ -1,5 +1,6 @@
 import { TrendingUp, Users, Heart, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
+import { CreatorAvatar } from "@/components/CreatorAvatar";
 
 interface CreatorCardProps {
   rank: number;
@@ -7,6 +8,7 @@ interface CreatorCardProps {
   name: string;
   headline: string;
   profileImage: string;
+  linkedinUsername?: string;
   followers: number;
   engagementRate: number;
   growthRate: number;
@@ -21,6 +23,7 @@ export default function CreatorCard({
   name,
   headline,
   profileImage,
+  linkedinUsername,
   followers,
   engagementRate,
   growthRate,
@@ -87,13 +90,12 @@ export default function CreatorCard({
         <div className="flex items-start gap-4">
           {/* Avatar */}
           <div className="relative">
-            <div className="rounded-full bg-gradient-to-br from-violet to-rose p-[2px]">
-              <img
-                src={profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a2e&color=fff&size=64`}
-                alt={name}
-                className="h-14 w-14 rounded-full object-cover"
-              />
-            </div>
+            <CreatorAvatar
+              name={name}
+              profilePicture={profileImage}
+              linkedinUsername={linkedinUsername || username}
+              size="md"
+            />
             <span className="absolute -bottom-1 -right-1 text-lg">{getCountryFlag(country)}</span>
           </div>
 

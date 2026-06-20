@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+import { getLoginUrl, getSignupUrl } from "@/const";
 import { Link } from "wouter";
 import Navbar from "@/components/Navbar";
 import {
@@ -16,21 +16,50 @@ import {
   Brain,
   MessageSquare,
   Layers,
-  Calendar,
   Rocket,
   Shield,
   Clock,
   Users,
+  Lock,
 } from "lucide-react";
-import { SocialProofStats, TestimonialsSection, LiveActivityFeed, UrgencyBanner } from "@/components/SocialProof";
-import { Testimonials } from "@/components/Testimonials";
+import { SocialProofStats } from "@/components/SocialProof";
 import { VideoPresentation } from "@/components/VideoPresentation";
+
+type AgentAvailability = "available" | "coming_soon";
+
+function AgentStatusBadge({ availability }: { availability: AgentAvailability }) {
+  if (availability === "available") {
+    return (
+      <div className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+        Disponible
+      </div>
+    );
+  }
+
+  return (
+    <div className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
+      <Clock className="w-3 h-3" />
+      Arrive bientôt
+    </div>
+  );
+}
 
 export default function Home() {
   const { user } = useAuth();
 
-  // Agents IA personnifiés avec noms, avatars et personnalités
-  const agents = [
+  const agents: Array<{
+    icon: typeof Sparkles;
+    name: string;
+    role: string;
+    emoji: string;
+    avatar: string;
+    color: string;
+    personality: string;
+    description: string;
+    quote: string;
+    availability: AgentAvailability;
+  }> = [
     {
       icon: Sparkles,
       name: "Léa",
@@ -41,8 +70,7 @@ export default function Home() {
       personality: "Créative & Inspirante",
       description: "Salut ! Je suis Léa, votre créatrice de contenu. Je transforme vos idées en posts captivants qui résonnent avec votre audience.",
       quote: "\"Chaque post est une opportunité de marquer les esprits\"",
-      stats: { posts: "2.4K", engagement: "+127%" },
-      status: "Actif",
+      availability: "available",
     },
     {
       icon: TrendingUp,
@@ -54,8 +82,7 @@ export default function Home() {
       personality: "Curieux & Analytique",
       description: "Hey ! Max ici. Je surveille les tendances 24/7 pour vous alerter des opportunités virales avant tout le monde.",
       quote: "\"Les tendances d'aujourd'hui sont les succès de demain\"",
-      stats: { trends: "847", alerts: "156" },
-      status: "Actif",
+      availability: "coming_soon",
     },
     {
       icon: MessageSquare,
@@ -67,8 +94,7 @@ export default function Home() {
       personality: "Empathique & Réactive",
       description: "Bonjour ! Emma à votre service. Je gère vos interactions et crée des connexions authentiques avec votre communauté.",
       quote: "\"L'engagement, c'est l'art de créer des conversations\"",
-      stats: { replies: "5.2K", connections: "+89%" },
-      status: "Actif",
+      availability: "coming_soon",
     },
     {
       icon: BarChart3,
@@ -80,34 +106,19 @@ export default function Home() {
       personality: "Stratégique & Data-driven",
       description: "Salut ! Je suis Alex, votre stratège de croissance. J'analyse vos données pour maximiser votre impact LinkedIn.",
       quote: "\"Les chiffres racontent une histoire, je la décode pour vous\"",
-      stats: { growth: "+234%", insights: "1.2K" },
-      status: "Bientôt",
+      availability: "coming_soon",
     },
     {
       icon: Users,
-      name: "Noah",
-      role: "Network Builder",
-      emoji: "🤝",
-      avatar: "🧑‍🤝‍🧑",
-      color: "from-amber-500 to-orange-500",
-      personality: "Social & Connecteur",
-      description: "Hello ! Noah ici. Je construis votre réseau stratégique en identifiant les connexions qui comptent vraiment.",
-      quote: "\"Votre réseau est votre valeur nette\"",
-      stats: { connections: "3.8K", intros: "456" },
-      status: "Bientôt",
-    },
-    {
-      icon: Calendar,
       name: "Sam",
-      role: "Schedule Master",
+      role: "Planificateur",
       emoji: "📅",
-      avatar: "🤖",
-      color: "from-indigo-500 to-blue-500",
+      avatar: "⏰",
+      color: "from-amber-500 to-orange-500",
       personality: "Organisé & Précis",
       description: "Yo ! Sam le planificateur. Je publie vos posts au moment parfait pour maximiser leur visibilité.",
       quote: "\"Le timing est tout, je m'en occupe\"",
-      stats: { scheduled: "892", optimal: "98%" },
-      status: "Actif",
+      availability: "coming_soon",
     },
   ];
 
@@ -144,22 +155,9 @@ export default function Home() {
     },
   ];
 
-  const stats = [
-    { value: "3", label: "Agents IA actifs" },
-    { value: "24/7", label: "Travail continu" },
-    { value: "10x", label: "Gain de temps" },
-    { value: "98%", label: "Satisfaction" },
-  ];
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Urgency Banner */}
-      <UrgencyBanner />
-      
       <Navbar />
-      
-      {/* Live Activity Feed */}
-      <LiveActivityFeed />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-24 pb-20">
@@ -186,13 +184,13 @@ export default function Home() {
             </h1>
             
             <p className="mt-4 text-2xl font-medium text-white/90 sm:text-3xl">
-              Vos Agents IA pour dominer LinkedIn
+              Vos agents IA pour LinkedIn
             </p>
 
             {/* Subtitle */}
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-              Une équipe d'agents IA qui travaille pour vous 24/7 : création de contenu, 
-              détection de tendances, gestion de l'engagement et optimisation de votre croissance.
+              Une équipe d'agents IA qui vous aide à créer du contenu, détecter les tendances,
+              gérer l'engagement et planifier vos publications — gratuitement, pour l'instant.
             </p>
 
             {/* CTA Buttons */}
@@ -214,16 +212,16 @@ export default function Home() {
                 </>
               ) : (
                 <>
-                  <a href={getLoginUrl()}>
+                  <a href={getSignupUrl("/onboarding")}>
                     <Button className="btn-gradient h-14 px-10 text-lg">
                       <Rocket className="mr-2 h-5 w-5" />
-                      Activer mes Agents
+                      Créer mon compte
                     </Button>
                   </a>
                   <Link href="/rankings/france">
                     <Button variant="outline" className="h-14 px-10 text-lg border-white/20 hover:bg-white/5">
-                      <Play className="mr-2 h-5 w-5" />
-                      Voir la démo
+                      <BarChart3 className="mr-2 h-5 w-5" />
+                      Explorer les classements
                     </Button>
                   </Link>
                 </>
@@ -234,7 +232,7 @@ export default function Home() {
             <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                3 agents IA inclus
+                1 agent disponible · {agents.filter(a => a.availability === "coming_soon").length} arrive bientôt
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-400" />
@@ -260,16 +258,16 @@ export default function Home() {
             <div>
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose/30 bg-rose/10 px-4 py-2 text-sm text-rose">
                 <Play className="h-4 w-4" />
-                Vidéo de présentation
+                Aperçu interactif
               </div>
               <h2 className="text-3xl font-bold text-white sm:text-4xl">
                 Découvrez LinkedAgents en{" "}
                 <span className="bg-gradient-to-r from-violet-light to-rose bg-clip-text text-transparent">
-                  60 secondes
+                  quelques étapes
                 </span>
               </h2>
               <p className="mt-4 text-lg text-muted-foreground">
-                Pas le temps de lire ? Regardez notre courte vidéo pour comprendre comment nos agents IA peuvent transformer votre présence LinkedIn.
+                Parcourez un aperçu guidé pour comprendre comment nos agents IA vous aident à créer et publier sur LinkedIn.
               </p>
               <ul className="mt-6 space-y-3">
                 <li className="flex items-center gap-3 text-muted-foreground">
@@ -278,7 +276,7 @@ export default function Home() {
                 </li>
                 <li className="flex items-center gap-3 text-muted-foreground">
                   <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
-                  <span>Découvrez comment générer du contenu viral</span>
+                  <span>Découvrez comment générer du contenu avec l'IA</span>
                 </li>
                 <li className="flex items-center gap-3 text-muted-foreground">
                   <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
@@ -310,28 +308,31 @@ export default function Home() {
               </span>
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-              Chaque agent est spécialisé dans une tâche précise pour optimiser votre présence LinkedIn
+              Commencez avec Léa, votre créatrice de contenu. Les autres agents arrivent progressivement.
             </p>
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {agents.map((agent) => (
+            {agents.map((agent) => {
+              const isComingSoon = agent.availability === "coming_soon";
+              return (
               <div
                 key={agent.name}
-                className="group relative rounded-2xl border border-white/10 bg-card/50 p-6 backdrop-blur-sm transition-all hover:border-violet/30 hover:bg-card/80 hover:scale-[1.02]"
+                className={[
+                  "group relative rounded-2xl border p-6 backdrop-blur-sm transition-all",
+                  isComingSoon
+                    ? "border-white/5 bg-card/30 opacity-80 hover:opacity-95 hover:border-white/10"
+                    : "border-violet/20 bg-card/50 hover:border-violet/40 hover:bg-card/80 hover:scale-[1.02] shadow-lg shadow-violet/5",
+                ].join(" ")}
               >
-                {/* Status Badge */}
-                <div className={`absolute top-4 right-4 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                  agent.status === "Actif" 
-                    ? "bg-emerald-500/20 text-emerald-400" 
-                    : "bg-yellow-500/20 text-yellow-400"
-                }`}>
-                  {agent.status === "Actif" && <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />}
-                  {agent.status}
-                </div>
+                <AgentStatusBadge availability={agent.availability} />
+
+                {isComingSoon && (
+                  <div className="absolute inset-0 rounded-2xl bg-background/10 pointer-events-none" />
+                )}
 
                 {/* Agent Avatar & Info */}
-                <div className="mb-4 flex items-center gap-4">
+                <div className={`relative mb-4 flex items-center gap-4 ${isComingSoon ? "grayscale-[35%]" : ""}`}>
                   <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${agent.color} text-3xl shadow-lg`}>
                     {agent.avatar}
                   </div>
@@ -343,45 +344,45 @@ export default function Home() {
                 </div>
 
                 {/* Description */}
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="relative text-sm text-muted-foreground mb-3">
                   {agent.description}
                 </p>
 
                 {/* Quote */}
-                <p className="text-xs italic text-white/60 mb-4">
+                <p className="relative text-xs italic text-white/60 mb-4">
                   {agent.quote}
                 </p>
 
-                {/* Stats */}
-                <div className="flex gap-4 pt-3 border-t border-white/10">
-                  {Object.entries(agent.stats).map(([key, value]) => (
-                    <div key={key} className="text-center">
-                      <p className="text-sm font-bold text-white">{value}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{key}</p>
-                    </div>
-                  ))}
-                </div>
+                {isComingSoon && (
+                  <div className="relative flex items-center gap-1.5 text-xs text-amber-300/80">
+                    <Lock className="w-3 h-3" />
+                    Bientôt disponible sur LinkedAgents
+                  </div>
+                )}
 
                 {/* Hover Effect */}
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-violet/5 to-rose/5 opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none" />
+                {!isComingSoon && (
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-violet/5 to-rose/5 opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none" />
+                )}
               </div>
-            ))}
+            );
+            })}
           </div>
 
           <div className="mt-10 text-center">
             {user ? (
-              <Link href="/agents">
+              <Link href="/generate">
                 <Button className="btn-gradient h-12 px-8">
-                  <Brain className="mr-2 h-5 w-5" />
-                  Gérer mes Agents
+                  <Sparkles className="mr-2 h-5 w-5" />
+                  Créer avec Léa
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
             ) : (
-              <a href={getLoginUrl()}>
+              <a href={getSignupUrl("/onboarding")}>
                 <Button className="btn-gradient h-12 px-8">
                   <Rocket className="mr-2 h-5 w-5" />
-                  Activer mes Agents
+                  Créer mon compte
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </a>
@@ -389,9 +390,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* Testimonials Section - Nouveaux témoignages clients */}
-      <Testimonials />
 
       {/* Features Section */}
       <section className="border-t border-white/10 bg-card/30 py-20">
@@ -449,7 +447,7 @@ export default function Home() {
               </h2>
               
               <p className="mx-auto mt-4 max-w-xl text-lg text-white/80">
-                Rejoignez les créateurs qui ont délégué leur stratégie LinkedIn à une équipe d'agents IA.
+                Créez un compte gratuit et configurez vos agents IA en quelques minutes.
               </p>
 
               <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -461,7 +459,7 @@ export default function Home() {
                     </Button>
                   </Link>
                 ) : (
-                  <a href={getLoginUrl()}>
+                  <a href={getSignupUrl("/onboarding")}>
                     <Button className="btn-gradient h-14 px-10 text-lg">
                       <Rocket className="mr-2 h-5 w-5" />
                       Commencer gratuitement
@@ -485,7 +483,7 @@ export default function Home() {
                 <span className="text-xl font-bold text-white">LinkedAgents</span>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Votre équipe d'agents IA pour dominer LinkedIn. Générez, planifiez et publiez du contenu viral automatiquement.
+                Votre équipe d'agents IA pour LinkedIn. Générez, planifiez et publiez du contenu avec l'aide de l'IA.
               </p>
               <div className="flex gap-3">
                 <a href="https://linkedin.com/company/linkedagents" target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
@@ -505,7 +503,6 @@ export default function Home() {
                 <li><Link href="/auto-publish" className="text-sm text-muted-foreground hover:text-white transition-colors">Auto-Publication</Link></li>
                 <li><Link href="/agents" className="text-sm text-muted-foreground hover:text-white transition-colors">Agents IA</Link></li>
                 <li><Link href="/analytics/advanced" className="text-sm text-muted-foreground hover:text-white transition-colors">Analytics</Link></li>
-                <li><Link href="/pricing" className="text-sm text-muted-foreground hover:text-white transition-colors">Tarifs</Link></li>
               </ul>
             </div>
 

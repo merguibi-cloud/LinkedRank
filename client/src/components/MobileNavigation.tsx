@@ -23,7 +23,9 @@ import {
   Flame,
   Crown,
   Target,
-  Gift
+  Gift,
+  FolderOpen,
+  Wrench,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -46,7 +48,7 @@ export function MobileNavigation() {
   // Navigation principale (bottom bar)
   const mainNavItems: NavItem[] = [
     { href: "/", label: "Accueil", icon: Home },
-    { href: "/agents", label: "Agents", icon: Bot },
+    { href: "/mes-outils", label: "Outils", icon: Wrench, badge: "🛠️" },
     { href: "/generate", label: "Créer", icon: PenTool, badge: "IA" },
     { href: "/dashboard", label: "Stats", icon: BarChart3 },
     { href: "#menu", label: "Menu", icon: Menu },
@@ -55,6 +57,8 @@ export function MobileNavigation() {
   // Menu complet (slide-in)
   const fullMenuItems: NavItem[] = [
     { href: "/", label: "Accueil", icon: Home },
+    { href: "/mes-outils", label: "Mes Outils", icon: Wrench, badge: "🛠️" },
+    { href: "/mes-outils?tab=mediatheque", label: "Médiathèque", icon: FolderOpen, badge: "📁" },
     { href: "/agents", label: "Mes Agents IA", icon: Bot },
     { href: "/agents/meet", label: "L'Équipe IA", icon: Sparkles, badge: "Nouveau" },
     { href: "/generate", label: "Générer du Contenu", icon: PenTool },

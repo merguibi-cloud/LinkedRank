@@ -1,8 +1,15 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+import { getLinkedInConnectUrl, getSignupUrl } from "@/const";
+import { trpc } from "@/lib/trpc";
+import { formatDateInput, getDefaultScheduleTime, combineDateAndTime } from "@/lib/scheduleUtils";
+import { AI_IMAGE_FORMATS, AI_IMAGE_STYLES } from "@/lib/aiImageStyles";
 import Navbar from "@/components/Navbar";
+import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
+import { CreatorAvatar } from "@/components/CreatorAvatar";
 import { toast } from "sonner";
 import {
   Zap,
@@ -38,7 +45,13 @@ import {
   RefreshCw,
   Layers,
   FileDown,
+  Linkedin,
+  Send,
+  Pencil,
+  FolderOpen,
 } from "lucide-react";
+import { Link } from "wouter";
+import { MediaLibraryPicker, MediaUploadZone } from "@/components/MediaLibraryPicker";
 
 // Days of the week
 const DAYS = [
@@ -144,10 +157,26 @@ const COLOR_PALETTES = [
   { id: "gold", name: "Or", primary: "#EAB308", secondary: "#CA8A04", bg: "from-yellow-500 to-amber-600" },
 ];
 
+function formatDisplayDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function getDayOfWeekFromDate(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
+
 interface ScheduleSlot {
   dayOfWeek: number;
   publishTime: string;
   isActive: boolean;
+  publishDate?: string | null;
 }
 
 interface Influencer {
@@ -155,6 +184,8 @@ interface Influencer {
   name: string;
   headline: string;
   profilePicture: string;
+  linkedinUsername?: string | null;
+  linkedinUrl?: string | null;
   followers: number;
   country: string;
 }
@@ -175,6 +206,9 @@ interface Settings {
   contentTypes: string[];
   inspiringCreators: number[];
   // Image settings
+  imageType: "ai" | "quote";
+  aiImageStyle: string;
+  aiImageFormat: string;
   imageStyle: string;
   colorPalette: string;
   includeImage: boolean;
@@ -208,6 +242,9 @@ export default function AutoPublish() {
     contentTypes: [],
     inspiringCreators: [],
     // Image settings
+    imageType: "ai",
+    aiImageStyle: "professional",
+    aiImageFormat: "1536x1024",
     imageStyle: "gradient",
     colorPalette: "violet",
     includeImage: true,
@@ -216,7 +253,9 @@ export default function AutoPublish() {
 
   // Schedule state
   const [schedule, setSchedule] = useState<ScheduleSlot[]>([]);
+  const [planningMode, setPlanningMode] = useState<"recurring" | "once">("once");
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState(getDefaultScheduleTime().date);
   const [selectedTime, setSelectedTime] = useState<string>("09:00");
 
   // Preview state
@@ -228,9 +267,56 @@ export default function AutoPublish() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [aiImageUrl, setAiImageUrl] = useState<string | null>(null);
+  const [aiImagePrompt, setAiImagePrompt] = useState<string | null>(null);
+  const [editedContent, setEditedContent] = useState("");
+  const [publishMode, setPublishMode] = useState<"now" | "schedule">("now");
+  const [scheduleDate, setScheduleDate] = useState(getDefaultScheduleTime().date);
+  const [scheduleTime, setScheduleTime] = useState(getDefaultScheduleTime().time);
+  const [isScheduling, setIsScheduling] = useState(false);
   const [extractedQuote, setExtractedQuote] = useState<string>("");
   const [generatedCarousel, setGeneratedCarousel] = useState<any>(null);
   const [isGeneratingCarousel, setIsGeneratingCarousel] = useState(false);
+  const [previewImageSource, setPreviewImageSource] = useState<"library" | "ai" | "quote">("library");
+  const [selectedMediaId, setSelectedMediaId] = useState<number | null>(null);
+  const [libraryImageUrl, setLibraryImageUrl] = useState<string | null>(null);
+  const [mediaSuggestionsApplied, setMediaSuggestionsApplied] = useState(false);
+
+  const generateAiImageMutation = trpc.generator.generatePostImage.useMutation({
+    onSuccess: (data) => {
+      setAiImageUrl(data.imageUrl);
+      setAiImagePrompt(data.prompt);
+      toast.success("Image IA générée avec succès !");
+    },
+    onError: (error) => toast.error(`Erreur image: ${error.message}`),
+  });
+
+  const { data: mediaSuggestions, isLoading: isLoadingSuggestions } =
+    trpc.mediaLibrary.suggestForPost.useQuery(
+      {
+        content: editedContent,
+        title: settings.sector || "Post LinkedIn",
+        limit: 6,
+      },
+      {
+        enabled: !!user && !!previewContent && editedContent.length >= 10,
+      }
+    );
+
+  useEffect(() => {
+    if (!mediaSuggestions || mediaSuggestionsApplied || !previewContent) return;
+
+    setMediaSuggestionsApplied(true);
+
+    if (mediaSuggestions.hasRelevantMatch && mediaSuggestions.suggestions[0]) {
+      const top = mediaSuggestions.suggestions[0];
+      setSelectedMediaId(top.id);
+      setLibraryImageUrl(top.fileUrl);
+      setPreviewImageSource("library");
+    } else if (mediaSuggestions.suggestions.length === 0) {
+      setPreviewImageSource("ai");
+    }
+  }, [mediaSuggestions, mediaSuggestionsApplied, previewContent]);
 
   // Load all influencers on mount (no sector filtering - show all top creators)
   useEffect(() => {
@@ -238,7 +324,9 @@ export default function AutoPublish() {
       setIsLoadingInfluencers(true);
       try {
         // Load all top influencers without sector filtering
-        const response = await fetch('/api/auto-publish/suggested-influencers');
+        const response = await fetch('/api/auto-publish/suggested-influencers', {
+          credentials: "include",
+        });
         if (response.ok) {
           const data = await response.json();
           setInfluencers(data.influencers || []);
@@ -260,7 +348,9 @@ export default function AutoPublish() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await fetch("/api/auto-publish/settings");
+        const response = await fetch("/api/auto-publish/settings", {
+          credentials: "include",
+        });
         if (response.ok) {
           const data = await response.json();
           if (data.settings) {
@@ -317,13 +407,33 @@ export default function AutoPublish() {
   };
 
   const handleAddScheduleSlot = () => {
-    if (selectedDay === null) {
-      toast.error("Sélectionnez un jour");
-      return;
+    if (planningMode === "recurring") {
+      if (selectedDay === null) {
+        toast.error("Sélectionnez un jour");
+        return;
+      }
+    } else {
+      if (!selectedDate) {
+        toast.error("Sélectionnez une date");
+        return;
+      }
+      const slotDate = combineDateAndTime(selectedDate, selectedTime);
+      if (slotDate.getTime() <= Date.now()) {
+        toast.error("La date doit être dans le futur");
+        return;
+      }
     }
 
-    const exists = schedule.some(
-      s => s.dayOfWeek === selectedDay && s.publishTime === selectedTime
+    const dayOfWeek = planningMode === "once"
+      ? getDayOfWeekFromDate(selectedDate)
+      : selectedDay!;
+
+    const publishDate = planningMode === "once" ? selectedDate : null;
+
+    const exists = schedule.some(s =>
+      s.dayOfWeek === dayOfWeek &&
+      s.publishTime === selectedTime &&
+      (s.publishDate ?? null) === publishDate
     );
     if (exists) {
       toast.error("Ce créneau existe déjà");
@@ -332,14 +442,22 @@ export default function AutoPublish() {
 
     setSchedule([
       ...schedule,
-      { dayOfWeek: selectedDay, publishTime: selectedTime, isActive: true },
+      { dayOfWeek, publishTime: selectedTime, isActive: true, publishDate },
     ]);
     toast.success("Créneau ajouté !");
   };
 
-  const handleRemoveScheduleSlot = (dayOfWeek: number, publishTime: string) => {
+  const handleRemoveScheduleSlot = (
+    dayOfWeek: number,
+    publishTime: string,
+    publishDate?: string | null
+  ) => {
     setSchedule(schedule.filter(
-      s => !(s.dayOfWeek === dayOfWeek && s.publishTime === publishTime)
+      s => !(
+        s.dayOfWeek === dayOfWeek &&
+        s.publishTime === publishTime &&
+        (s.publishDate ?? null) === (publishDate ?? null)
+      )
     ));
   };
 
@@ -370,6 +488,13 @@ export default function AutoPublish() {
     setPreviewContents([]);
     setSelectedPreviewIndex(0);
     setGeneratedImageUrl(null);
+    setAiImageUrl(null);
+    setAiImagePrompt(null);
+    setLibraryImageUrl(null);
+    setSelectedMediaId(null);
+    setPreviewImageSource("library");
+    setMediaSuggestionsApplied(false);
+    setEditedContent("");
     toast.info(`Génération de ${previewCount} aperçus en cours... Cela peut prendre quelques secondes.`);
     try {
       const response = await fetch("/api/auto-publish/preview", {
@@ -389,6 +514,7 @@ export default function AutoPublish() {
         const allPreviews = data.previews || [data.preview];
         setPreviewContents(allPreviews);
         setPreviewContent(allPreviews[0]);
+        setEditedContent(allPreviews[0]);
         
         // Extract a quote from the first generated content
         const lines = allPreviews[0].split('\n').filter((l: string) => l.trim().length > 20 && l.trim().length < 150);
@@ -412,7 +538,14 @@ export default function AutoPublish() {
   const handleSelectPreview = (index: number) => {
     setSelectedPreviewIndex(index);
     setPreviewContent(previewContents[index]);
-    setGeneratedImageUrl(null); // Reset image when switching previews
+    setEditedContent(previewContents[index]);
+    setGeneratedImageUrl(null);
+    setAiImageUrl(null);
+    setAiImagePrompt(null);
+    setLibraryImageUrl(null);
+    setSelectedMediaId(null);
+    setPreviewImageSource("library");
+    setMediaSuggestionsApplied(false);
     
     // Extract quote from selected preview
     const lines = previewContents[index].split('\n').filter((l: string) => l.trim().length > 20 && l.trim().length < 150);
@@ -421,6 +554,27 @@ export default function AutoPublish() {
       setExtractedQuote(quoteLine.replace(/["*«»]/g, '').trim());
     }
   };
+
+  const handleGenerateAiImage = () => {
+    if (!editedContent.trim()) {
+      toast.error("Générez d'abord un aperçu de post");
+      return;
+    }
+    const title = settings.sector || "Post LinkedIn";
+    generateAiImageMutation.mutate({
+      content: editedContent,
+      title,
+      visualStyle: settings.aiImageStyle,
+      imageSize: settings.aiImageFormat as "1024x1024" | "1536x1024" | "1024x1536",
+    });
+  };
+
+  const activeImageUrl =
+    previewImageSource === "library"
+      ? libraryImageUrl
+      : previewImageSource === "ai"
+        ? aiImageUrl
+        : generatedImageUrl;
 
   const handleGenerateImage = async () => {
     setIsGeneratingImage(true);
@@ -495,8 +649,8 @@ export default function AutoPublish() {
   };
 
   const handlePublishNow = async () => {
-    // Vérifier qu'on a un contenu à publier
-    if (!previewContent) {
+    const content = editedContent || previewContent;
+    if (!content) {
       toast.error("Veuillez d'abord générer un aperçu avant de publier");
       return;
     }
@@ -509,17 +663,17 @@ export default function AutoPublish() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          content: previewContent,
-          imageUrl: generatedImageUrl || undefined,
+          content,
+          imageUrl: activeImageUrl || undefined,
         }),
       });
 
       const data = await response.json();
       if (data.success) {
         toast.success("Post publié sur LinkedIn ! 🎉");
-        if (data.content) {
-          setPreviewContent(data.content);
-        }
+      } else if (data.message?.includes("LinkedIn not connected") || data.message?.includes("non connecté")) {
+        toast.info("Connectez LinkedIn pour publier");
+        window.location.href = getLinkedInConnectUrl("/auto-publish");
       } else {
         toast.error(data.message || "Erreur lors de la publication");
       }
@@ -527,6 +681,48 @@ export default function AutoPublish() {
       toast.error("Erreur de connexion");
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const handleSchedulePost = async () => {
+    const content = editedContent || previewContent;
+    if (!content) {
+      toast.error("Veuillez d'abord générer un aperçu avant de planifier");
+      return;
+    }
+
+    setIsScheduling(true);
+    try {
+      const response = await fetch("/api/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          content,
+          imageUrl: activeImageUrl || undefined,
+          date: scheduleDate,
+          time: scheduleTime,
+          source: "auto-publish",
+        }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success("Post planifié ! Il sera publié automatiquement.");
+      } else {
+        toast.error(data.error || "Erreur lors de la planification");
+      }
+    } catch {
+      toast.error("Erreur de connexion");
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
+  const handlePublishOrSchedule = () => {
+    if (publishMode === "now") {
+      handlePublishNow();
+    } else {
+      handleSchedulePost();
     }
   };
 
@@ -556,8 +752,8 @@ export default function AutoPublish() {
             <p className="text-muted-foreground mb-8">
               Connectez-vous pour configurer la publication automatique de vos posts LinkedIn.
             </p>
-            <a href={getLoginUrl()}>
-              <Button className="btn-gradient">Se connecter</Button>
+            <a href={getSignupUrl("/auto-publish")}>
+              <Button className="btn-gradient">Créer un compte</Button>
             </a>
           </div>
         </div>
@@ -570,6 +766,7 @@ export default function AutoPublish() {
       <Navbar />
 
       <div className="container py-8">
+        <LinkedInConnectBanner />
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -831,10 +1028,13 @@ export default function AutoPublish() {
                           key={creatorId}
                           className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet/20 border border-violet/30"
                         >
-                          <img
-                            src={creator.profilePicture || "/placeholder-avatar.png"}
-                            alt={creator.name}
-                            className="w-6 h-6 rounded-full object-cover"
+                          <CreatorAvatar
+                            name={creator.name}
+                            profilePicture={creator.profilePicture}
+                            linkedinUsername={creator.linkedinUsername}
+                            linkedinUrl={creator.linkedinUrl}
+                            size="sm"
+                            ring={false}
                           />
                           <span className="text-sm text-white">{creator.name}</span>
                           <button
@@ -868,10 +1068,14 @@ export default function AutoPublish() {
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <img
-                          src={influencer.profilePicture || "/placeholder-avatar.png"}
-                          alt={influencer.name}
-                          className="w-12 h-12 rounded-full object-cover"
+                        <CreatorAvatar
+                          name={influencer.name}
+                          profilePicture={influencer.profilePicture}
+                          linkedinUsername={influencer.linkedinUsername}
+                          linkedinUrl={influencer.linkedinUrl}
+                          size="md"
+                          ring={false}
+                          className="flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
@@ -1088,8 +1292,8 @@ export default function AutoPublish() {
                     <Image className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-semibold text-white">Image de citation</h3>
-                    <p className="text-muted-foreground">Générer automatiquement une image avec une citation inspirante</p>
+                    <h3 className="text-xl font-semibold text-white">Image pour le post</h3>
+                    <p className="text-muted-foreground">Ajouter une image à chaque publication automatique</p>
                   </div>
                 </div>
                 <button
@@ -1107,103 +1311,244 @@ export default function AutoPublish() {
 
             {settings.includeImage && (
               <>
-                {/* Image Style Selection */}
+                {/* Image Type Selection */}
                 <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
                   <h3 className="text-xl font-semibold text-white mb-2 flex items-center gap-2">
-                    <Palette className="w-5 h-5 text-violet-light" />
-                    Style d'image
-                  </h3>
-                  <p className="text-muted-foreground mb-6">Choisissez le style visuel de vos images de citation</p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {IMAGE_STYLES.map((style) => (
-                      <button
-                        key={style.id}
-                        onClick={() => setSettings({ ...settings, imageStyle: style.id })}
-                        className={`relative overflow-hidden rounded-xl border transition-all ${
-                          settings.imageStyle === style.id
-                            ? "border-violet ring-2 ring-violet/50"
-                            : "border-white/10 hover:border-white/20"
-                        }`}
-                      >
-                        <div className={`h-24 ${style.preview} flex items-center justify-center`}>
-                          <span className="text-white/80 text-sm font-medium px-3 text-center">"Votre citation ici"</span>
-                        </div>
-                        <div className="p-3 bg-card">
-                          <p className="font-medium text-white text-sm">{style.name}</p>
-                          <p className="text-xs text-muted-foreground">{style.description}</p>
-                        </div>
-                        {settings.imageStyle === style.id && (
-                          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-violet flex items-center justify-center">
-                            <Check className="w-4 h-4 text-white" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Color Palette Selection */}
-                <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
-                  <h3 className="text-xl font-semibold text-white mb-2 flex items-center gap-2">
-                    <Palette className="w-5 h-5 text-violet-light" />
-                    Palette de couleurs
-                  </h3>
-                  <p className="text-muted-foreground mb-6">Sélectionnez les couleurs de votre image</p>
-                  <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
-                    {COLOR_PALETTES.map((palette) => (
-                      <button
-                        key={palette.id}
-                        onClick={() => setSettings({ ...settings, colorPalette: palette.id })}
-                        className={`group relative flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
-                          settings.colorPalette === palette.id
-                            ? "border-violet bg-violet/10"
-                            : "border-white/10 hover:border-white/20"
-                        }`}
-                      >
-                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${palette.bg}`} />
-                        <span className="text-xs text-white/80">{palette.name}</span>
-                        {settings.colorPalette === palette.id && (
-                          <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-violet flex items-center justify-center">
-                            <Check className="w-3 h-3 text-white" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Preview */}
-                <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
-                  <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-violet-light" />
-                    Aperçu du style
+                    Type d'image
                   </h3>
-                  <div className="flex justify-center">
-                    <div className={`relative w-full max-w-md aspect-square rounded-2xl overflow-hidden bg-gradient-to-br ${
-                      COLOR_PALETTES.find(p => p.id === settings.colorPalette)?.bg || "from-violet-600 to-pink-500"
-                    }`}>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-                        <div className="text-5xl mb-4">“</div>
-                        <p className="text-white text-xl font-medium leading-relaxed mb-6">
-                          {settings.customQuote || "Le succès n'est pas la clé du bonheur. Le bonheur est la clé du succès."}
-                        </p>
-                        <div className="text-white/80 text-sm">
-                          — {user?.name || "Votre nom"}
+                  <p className="text-muted-foreground mb-6">Choisissez comment générer vos visuels</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setSettings({ ...settings, imageType: "ai" })}
+                      className={`p-5 rounded-xl border text-left transition-all ${
+                        settings.imageType === "ai"
+                          ? "border-violet bg-violet/10 ring-2 ring-violet/50"
+                          : "border-white/10 hover:border-white/20"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet to-rose flex items-center justify-center">
+                          <Sparkles className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-white">Image IA</p>
+                          <p className="text-xs text-violet-light">Recommandé</p>
+                        </div>
+                        {settings.imageType === "ai" && (
+                          <Check className="w-5 h-5 text-violet-light ml-auto" />
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        DALL-E analyse votre post et crée une illustration professionnelle unique
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSettings({ ...settings, imageType: "quote" })}
+                      className={`p-5 rounded-xl border text-left transition-all ${
+                        settings.imageType === "quote"
+                          ? "border-violet bg-violet/10 ring-2 ring-violet/50"
+                          : "border-white/10 hover:border-white/20"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
+                          <Palette className="w-5 h-5 text-white" />
+                        </div>
+                        <p className="font-semibold text-white">Citation graphique</p>
+                        {settings.imageType === "quote" && (
+                          <Check className="w-5 h-5 text-violet-light ml-auto" />
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Image avec citation inspirante sur fond coloré stylisé
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                {settings.imageType === "ai" ? (
+                  <>
+                    {/* AI Style Selection */}
+                    <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
+                      <h3 className="text-xl font-semibold text-white mb-2 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-violet-light" />
+                        Style visuel IA
+                      </h3>
+                      <p className="text-muted-foreground mb-6">
+                        L'IA adapte le style de l'illustration à votre secteur et contenu
+                      </p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {AI_IMAGE_STYLES.map((style) => (
+                          <button
+                            key={style.id}
+                            type="button"
+                            onClick={() => setSettings({ ...settings, aiImageStyle: style.id })}
+                            className={`relative overflow-hidden rounded-xl border transition-all ${
+                              settings.aiImageStyle === style.id
+                                ? "border-violet ring-2 ring-violet/50"
+                                : "border-white/10 hover:border-white/20"
+                            }`}
+                          >
+                            <div className={`h-24 ${style.preview} flex items-center justify-center`}>
+                              <span className="text-3xl">{style.icon}</span>
+                            </div>
+                            <div className="p-3 bg-card">
+                              <p className="font-medium text-white text-sm">{style.name}</p>
+                              <p className="text-xs text-muted-foreground">{style.description}</p>
+                            </div>
+                            {settings.aiImageStyle === style.id && (
+                              <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-violet flex items-center justify-center">
+                                <Check className="w-4 h-4 text-white" />
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
+                      <h3 className="text-xl font-semibold text-white mb-2">Format de l&apos;image</h3>
+                      <p className="text-muted-foreground mb-6">Choisissez le format adapté à LinkedIn</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        {AI_IMAGE_FORMATS.map(format => (
+                          <button
+                            key={format.id}
+                            type="button"
+                            onClick={() => setSettings({ ...settings, aiImageFormat: format.id })}
+                            className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
+                              settings.aiImageFormat === format.id
+                                ? "border-violet ring-2 ring-violet/50 bg-violet/5"
+                                : "border-white/10 hover:border-white/20"
+                            }`}
+                          >
+                            <div className={`w-14 shrink-0 rounded border border-white/20 bg-white/5 ${format.aspect}`} />
+                            <div className="text-left">
+                              <p className="font-medium text-white">{format.name}</p>
+                              <p className="text-xs text-muted-foreground">{format.description}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-6 rounded-2xl border border-violet/20 bg-violet/5 backdrop-blur-sm">
+                      <div className="flex items-start gap-3">
+                        <Sparkles className="w-5 h-5 text-violet-light mt-0.5 shrink-0" />
+                        <div>
+                          <p className="font-medium text-white mb-1">Comment ça marche ?</p>
+                          <p className="text-sm text-muted-foreground">
+                            À chaque publication, l'IA lit votre post, génère un prompt visuel adapté
+                            (style « {AI_IMAGE_STYLES.find(s => s.id === settings.aiImageStyle)?.name} »)
+                            puis crée une illustration via DALL-E. Testez le rendu à l'étape « Aperçu & Test ».
+                          </p>
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-4">
-                    <label className="block text-sm text-muted-foreground mb-2">Citation personnalisée (optionnel)</label>
-                    <textarea
-                      value={settings.customQuote}
-                      onChange={(e) => setSettings({ ...settings, customQuote: e.target.value })}
-                      placeholder="Laissez vide pour extraire automatiquement du post généré..."
-                      className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-muted-foreground focus:outline-none focus:border-violet/50 resize-none"
-                      rows={3}
-                    />
-                  </div>
-                </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Image Style Selection */}
+                    <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
+                      <h3 className="text-xl font-semibold text-white mb-2 flex items-center gap-2">
+                        <Palette className="w-5 h-5 text-violet-light" />
+                        Style de citation
+                      </h3>
+                      <p className="text-muted-foreground mb-6">Choisissez le style visuel de vos images de citation</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {IMAGE_STYLES.map((style) => (
+                          <button
+                            key={style.id}
+                            onClick={() => setSettings({ ...settings, imageStyle: style.id })}
+                            className={`relative overflow-hidden rounded-xl border transition-all ${
+                              settings.imageStyle === style.id
+                                ? "border-violet ring-2 ring-violet/50"
+                                : "border-white/10 hover:border-white/20"
+                            }`}
+                          >
+                            <div className={`h-24 ${style.preview} flex items-center justify-center`}>
+                              <span className="text-white/80 text-sm font-medium px-3 text-center">"Votre citation ici"</span>
+                            </div>
+                            <div className="p-3 bg-card">
+                              <p className="font-medium text-white text-sm">{style.name}</p>
+                              <p className="text-xs text-muted-foreground">{style.description}</p>
+                            </div>
+                            {settings.imageStyle === style.id && (
+                              <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-violet flex items-center justify-center">
+                                <Check className="w-4 h-4 text-white" />
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Color Palette Selection */}
+                    <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
+                      <h3 className="text-xl font-semibold text-white mb-2 flex items-center gap-2">
+                        <Palette className="w-5 h-5 text-violet-light" />
+                        Palette de couleurs
+                      </h3>
+                      <p className="text-muted-foreground mb-6">Sélectionnez les couleurs de votre image</p>
+                      <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
+                        {COLOR_PALETTES.map((palette) => (
+                          <button
+                            key={palette.id}
+                            onClick={() => setSettings({ ...settings, colorPalette: palette.id })}
+                            className={`group relative flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
+                              settings.colorPalette === palette.id
+                                ? "border-violet bg-violet/10"
+                                : "border-white/10 hover:border-white/20"
+                            }`}
+                          >
+                            <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${palette.bg}`} />
+                            <span className="text-xs text-white/80">{palette.name}</span>
+                            {settings.colorPalette === palette.id && (
+                              <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-violet flex items-center justify-center">
+                                <Check className="w-3 h-3 text-white" />
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Preview */}
+                    <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
+                      <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-violet-light" />
+                        Aperçu du style
+                      </h3>
+                      <div className="flex justify-center">
+                        <div className={`relative w-full max-w-md aspect-square rounded-2xl overflow-hidden bg-gradient-to-br ${
+                          COLOR_PALETTES.find(p => p.id === settings.colorPalette)?.bg || "from-violet-600 to-pink-500"
+                        }`}>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
+                            <div className="text-5xl mb-4">"</div>
+                            <p className="text-white text-xl font-medium leading-relaxed mb-6">
+                              {settings.customQuote || "Le succès n'est pas la clé du bonheur. Le bonheur est la clé du succès."}
+                            </p>
+                            <div className="text-white/80 text-sm">
+                              — {user?.name || "Votre nom"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <label className="block text-sm text-muted-foreground mb-2">Citation personnalisée (optionnel)</label>
+                        <textarea
+                          value={settings.customQuote}
+                          onChange={(e) => setSettings({ ...settings, customQuote: e.target.value })}
+                          placeholder="Laissez vide pour extraire automatiquement du post généré..."
+                          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-muted-foreground focus:outline-none focus:border-violet/50 resize-none"
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
             )}
 
@@ -1235,28 +1580,74 @@ export default function AutoPublish() {
                 Planning de publication
               </h3>
               <p className="text-muted-foreground mb-6">
-                Définissez les jours et heures auxquels l'IA publiera automatiquement
+                Choisissez une date précise ou un créneau récurrent chaque semaine
               </p>
 
-              {/* Day Selection */}
-              <div className="mb-6">
-                <p className="text-sm text-muted-foreground mb-3">Sélectionnez un jour</p>
-                <div className="flex gap-2 flex-wrap">
-                  {DAYS.map((day) => (
-                    <button
-                      key={day.id}
-                      onClick={() => setSelectedDay(day.id)}
-                      className={`px-4 py-2 rounded-lg border transition-all ${
-                        selectedDay === day.id
-                          ? "bg-violet text-white border-violet"
-                          : "bg-card border-white/10 text-muted-foreground hover:border-white/20 hover:text-white"
-                      }`}
-                    >
-                      {day.name}
-                    </button>
-                  ))}
-                </div>
+              {/* Planning mode */}
+              <div className="flex gap-2 p-1 rounded-lg bg-background/50 border border-white/10 mb-6 max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setPlanningMode("once")}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    planningMode === "once" ? "bg-violet text-white" : "text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  <Calendar className="w-4 h-4" />
+                  Date précise
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPlanningMode("recurring")}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    planningMode === "recurring" ? "bg-violet text-white" : "text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  Chaque semaine
+                </button>
               </div>
+
+              {planningMode === "once" ? (
+                <div className="mb-6">
+                  <p className="text-sm text-muted-foreground mb-3">Sélectionnez une date</p>
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    min={formatDateInput(new Date())}
+                    onChange={(e) => {
+                      setSelectedDate(e.target.value);
+                      if (e.target.value) {
+                        setSelectedDay(getDayOfWeekFromDate(e.target.value));
+                      }
+                    }}
+                    className="max-w-xs bg-card border-white/10 [color-scheme:dark]"
+                  />
+                  {selectedDate && (
+                    <p className="text-xs text-violet-light mt-2 capitalize">
+                      {formatDisplayDate(selectedDate)}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="mb-6">
+                  <p className="text-sm text-muted-foreground mb-3">Sélectionnez un jour (récurrent)</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {DAYS.map((day) => (
+                      <button
+                        key={day.id}
+                        onClick={() => setSelectedDay(day.id)}
+                        className={`px-4 py-2 rounded-lg border transition-all ${
+                          selectedDay === day.id
+                            ? "bg-violet text-white border-violet"
+                            : "bg-card border-white/10 text-muted-foreground hover:border-white/20 hover:text-white"
+                        }`}
+                      >
+                        {day.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Time Selection */}
               <div className="mb-6">
@@ -1298,7 +1689,12 @@ export default function AutoPublish() {
               ) : (
                 <div className="space-y-2">
                   {schedule
-                    .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.publishTime.localeCompare(b.publishTime))
+                    .sort((a, b) => {
+                      const dateA = a.publishDate ?? "";
+                      const dateB = b.publishDate ?? "";
+                      if (dateA !== dateB) return dateA.localeCompare(dateB);
+                      return a.dayOfWeek - b.dayOfWeek || a.publishTime.localeCompare(b.publishTime);
+                    })
                     .map((slot, index) => (
                       <div
                         key={index}
@@ -1309,16 +1705,19 @@ export default function AutoPublish() {
                             <Calendar className="w-5 h-5 text-violet-light" />
                           </div>
                           <div>
-                            <p className="font-medium text-white">
-                              {DAYS.find(d => d.id === slot.dayOfWeek)?.fullName}
+                            <p className="font-medium text-white capitalize">
+                              {slot.publishDate
+                                ? formatDisplayDate(slot.publishDate)
+                                : `Chaque ${DAYS.find(d => d.id === slot.dayOfWeek)?.fullName?.toLowerCase()}`}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {slot.publishTime}
+                              {!slot.publishDate && " · récurrent"}
                             </p>
                           </div>
                         </div>
                         <button
-                          onClick={() => handleRemoveScheduleSlot(slot.dayOfWeek, slot.publishTime)}
+                          onClick={() => handleRemoveScheduleSlot(slot.dayOfWeek, slot.publishTime, slot.publishDate)}
                           className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
                         >
                           <X className="w-5 h-5" />
@@ -1436,20 +1835,7 @@ export default function AutoPublish() {
                   ) : (
                     <Sparkles className="w-4 h-4 mr-2" />
                   )}
-                  Générer {previewCount} aperçu{previewCount > 1 ? "s" : ""}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
-                  onClick={handlePublishNow}
-                  disabled={isPublishing}
-                >
-                  {isPublishing ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Zap className="w-4 h-4 mr-2" />
-                  )}
-                  Publier maintenant
+                  Générer {previewCount} aperçu{previewCount > 1 ? "s" : ""} avec l'IA
                 </Button>
                 {settings.contentTypes.includes("carousel") && (
                   <Button
@@ -1502,15 +1888,145 @@ export default function AutoPublish() {
                   </div>
                 )}
 
-                {/* Generated Image */}
-                {settings.includeImage && (
-                  <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                        <Image className="w-5 h-5 text-violet-light" />
-                        Image de citation générée
-                      </h3>
-                      <div className="flex gap-2">
+                {/* Editable Post Content */}
+                <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet to-rose" />
+                    <div>
+                      <p className="font-semibold text-white">{user?.name || "Vous"}</p>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Pencil className="w-3 h-3" /> Éditez le texte généré par l'IA
+                      </p>
+                    </div>
+                  </div>
+                  <textarea
+                    value={editedContent}
+                    onChange={(e) => setEditedContent(e.target.value)}
+                    className="w-full min-h-[220px] px-4 py-3 rounded-xl bg-background border border-white/10 text-white placeholder:text-muted-foreground focus:border-violet/50 focus:outline-none resize-y font-mono text-sm leading-relaxed"
+                  />
+                </div>
+
+                {/* Image Generation */}
+                <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Image className="w-5 h-5 text-violet-light" />
+                      Visuel pour le post
+                    </h3>
+                    <div className="flex gap-2 p-1 rounded-lg bg-background/50 border border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImageSource("library")}
+                        className={`px-3 py-1.5 rounded-md text-sm transition-all ${
+                          previewImageSource === "library" ? "bg-violet text-white" : "text-muted-foreground hover:text-white"
+                        }`}
+                      >
+                        <FolderOpen className="w-3.5 h-3.5 inline mr-1" />
+                        Médiathèque
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImageSource("ai")}
+                        className={`px-3 py-1.5 rounded-md text-sm transition-all ${
+                          previewImageSource === "ai" ? "bg-violet text-white" : "text-muted-foreground hover:text-white"
+                        }`}
+                      >
+                        Image IA
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImageSource("quote")}
+                        className={`px-3 py-1.5 rounded-md text-sm transition-all ${
+                          previewImageSource === "quote" ? "bg-violet text-white" : "text-muted-foreground hover:text-white"
+                        }`}
+                      >
+                        Citation
+                      </button>
+                    </div>
+                  </div>
+
+                  {previewImageSource === "library" ? (
+                    <div className="space-y-4">
+                      {isLoadingSuggestions ? (
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                          <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                          Analyse de votre médiathèque...
+                        </div>
+                      ) : (
+                        <MediaLibraryPicker
+                          selectedId={selectedMediaId}
+                          suggestions={mediaSuggestions?.suggestions}
+                          hasRelevantMatch={mediaSuggestions?.hasRelevantMatch}
+                          onSwitchToAi={() => setPreviewImageSource("ai")}
+                          onSelect={item => {
+                            setSelectedMediaId(item.id);
+                            setLibraryImageUrl(item.fileUrl);
+                          }}
+                        />
+                      )}
+                      {libraryImageUrl && (
+                        <img
+                          src={libraryImageUrl}
+                          alt="Visuel sélectionné"
+                          className="w-full rounded-xl border border-white/10 max-h-72 object-contain"
+                        />
+                      )}
+                      <MediaUploadZone compact onUploaded={() => setMediaSuggestionsApplied(false)} />
+                      <Link href="/mes-outils?tab=mediatheque" className="text-xs text-violet-light hover:underline flex items-center gap-1">
+                        <FolderOpen className="w-3 h-3" /> Gérer ma médiathèque
+                      </Link>
+                    </div>
+                  ) : previewImageSource === "ai" ? (
+                    <div className="space-y-4">
+                      {aiImageUrl ? (
+                        <>
+                          <img src={aiImageUrl} alt="Image IA générée" className="w-full rounded-xl border border-white/10" />
+                          {aiImagePrompt && (
+                            <p className="text-xs text-muted-foreground italic">Prompt : {aiImagePrompt}</p>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleGenerateAiImage}
+                            disabled={generateAiImageMutation.isPending}
+                          >
+                            {generateAiImageMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                            )}
+                            Regénérer l'image IA
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="py-8 text-center border border-dashed border-violet/30 rounded-xl bg-violet/5">
+                          <Sparkles className="w-10 h-10 mx-auto mb-3 text-violet-light/50" />
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Aucun visuel adapté dans votre médiathèque ? L&apos;IA crée une illustration professionnelle
+                          </p>
+                          <Button
+                            onClick={handleGenerateAiImage}
+                            disabled={generateAiImageMutation.isPending}
+                            className="btn-gradient"
+                          >
+                            {generateAiImageMutation.isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Génération en cours (30-60s)...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Générer l&apos;image IA
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex gap-2 justify-end">
                         <Button
                           variant="outline"
                           size="sm"
@@ -1522,7 +2038,7 @@ export default function AutoPublish() {
                           ) : (
                             <RefreshCw className="w-4 h-4 mr-2" />
                           )}
-                          Regénérer
+                          {generatedImageUrl ? "Regénérer" : "Générer la citation"}
                         </Button>
                         {generatedImageUrl && (
                           <a
@@ -1535,37 +2051,103 @@ export default function AutoPublish() {
                           </a>
                         )}
                       </div>
-                    </div>
-                    <div className="flex justify-center">
-                      {generatedImageUrl ? (
-                        <img
-                          src={generatedImageUrl}
-                          alt="Citation générée"
-                          className="max-w-full rounded-xl shadow-2xl"
-                        />
-                      ) : (
-                        <div className={`relative w-full max-w-md aspect-square rounded-2xl overflow-hidden bg-gradient-to-br ${
-                          COLOR_PALETTES.find(p => p.id === settings.colorPalette)?.bg || "from-violet-600 to-pink-500"
-                        }`}>
-                          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-                            <div className="text-5xl mb-4">“</div>
-                            <p className="text-white text-lg font-medium leading-relaxed mb-6">
-                              {extractedQuote || settings.customQuote || "Citation extraite du post..."}
-                            </p>
-                            <div className="text-white/80 text-sm">
-                              — {user?.name || "Votre nom"}
+                      <div className="flex justify-center">
+                        {generatedImageUrl ? (
+                          <img src={generatedImageUrl} alt="Citation générée" className="max-w-full rounded-xl shadow-2xl" />
+                        ) : (
+                          <div className={`relative w-full max-w-md aspect-square rounded-2xl overflow-hidden bg-gradient-to-br ${
+                            COLOR_PALETTES.find(p => p.id === settings.colorPalette)?.bg || "from-violet-600 to-pink-500"
+                          }`}>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
+                              <div className="text-5xl mb-4">"</div>
+                              <p className="text-white text-lg font-medium leading-relaxed mb-6">
+                                {extractedQuote || settings.customQuote || "Citation extraite du post..."}
+                              </p>
+                              <div className="text-white/80 text-sm">— {user?.name || "Votre nom"}</div>
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                    {!generatedImageUrl && (
-                      <p className="text-center text-muted-foreground text-sm mt-4">
-                        Cliquez sur "Regénérer" pour créer une image avec l'IA
-                      </p>
-                    )}
+                  )}
+                </div>
+
+                {/* Publish or Schedule */}
+                <div className="p-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10">
+                  <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                    <Linkedin className="w-5 h-5 text-[#0077B5]" />
+                    Publier ou planifier
+                  </h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Publiez immédiatement sur LinkedIn ou programmez une date précise
+                  </p>
+
+                  <div className="flex gap-2 p-1 rounded-lg bg-background/50 border border-white/10 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => setPublishMode("now")}
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                        publishMode === "now" ? "bg-emerald-600 text-white" : "text-muted-foreground hover:text-white"
+                      }`}
+                    >
+                      <Send className="w-4 h-4" />
+                      Publier maintenant
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPublishMode("schedule")}
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                        publishMode === "schedule" ? "bg-violet text-white" : "text-muted-foreground hover:text-white"
+                      }`}
+                    >
+                      <Calendar className="w-4 h-4" />
+                      Planifier
+                    </button>
                   </div>
-                )}
+
+                  {publishMode === "schedule" && (
+                    <div className="grid sm:grid-cols-2 gap-4 p-4 rounded-xl border border-violet/30 bg-violet/5 mb-4">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1 text-white">
+                          <Calendar className="w-3 h-3" /> Date de diffusion
+                        </Label>
+                        <Input
+                          type="date"
+                          value={scheduleDate}
+                          min={formatDateInput(new Date())}
+                          onChange={(e) => setScheduleDate(e.target.value)}
+                          className="bg-background/50 border-white/10 [color-scheme:dark]"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1 text-white">
+                          <Clock className="w-3 h-3" /> Heure
+                        </Label>
+                        <Input
+                          type="time"
+                          value={scheduleTime}
+                          onChange={(e) => setScheduleTime(e.target.value)}
+                          className="bg-background/50 border-white/10 [color-scheme:dark]"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    className={publishMode === "now" ? "w-full bg-[#0077B5] hover:bg-[#006699]" : "w-full btn-gradient"}
+                    onClick={handlePublishOrSchedule}
+                    disabled={isPublishing || isScheduling}
+                  >
+                    {(isPublishing || isScheduling) ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : publishMode === "now" ? (
+                      <Linkedin className="w-4 h-4 mr-2" />
+                    ) : (
+                      <Calendar className="w-4 h-4 mr-2" />
+                    )}
+                    {publishMode === "now" ? "Publier sur LinkedIn" : "Planifier la publication"}
+                  </Button>
+                </div>
 
                 {/* Generated Carousel */}
                 {generatedCarousel && (
@@ -1609,24 +2191,6 @@ export default function AutoPublish() {
                   </div>
                 )}
 
-                {/* Post Content */}
-                <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet to-rose" />
-                    <div>
-                      <p className="font-semibold text-white">{user?.name || "Vous"}</p>
-                      <p className="text-sm text-muted-foreground">Aperçu du post</p>
-                    </div>
-                  </div>
-                  <div className="whitespace-pre-wrap text-white/90 leading-relaxed">
-                    {previewContent}
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-white/10 flex gap-4 text-muted-foreground text-sm">
-                    <span>👍 J'aime</span>
-                    <span>💬 Commenter</span>
-                    <span>🔁 Partager</span>
-                  </div>
-                </div>
               </div>
             )}
 

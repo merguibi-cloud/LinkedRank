@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Navbar from "@/components/Navbar";
-import CreatorCard from "@/components/CreatorCard";
+import { CreatorRankings } from "@/components/CreatorRankings";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { Search, Filter, Globe, TrendingUp, Users, Award, ArrowUpDown } from "lucide-react";
@@ -67,11 +67,27 @@ export default function RankingsWorld() {
     "Innovation",
   ];
 
+  const uniqueCountries = new Set(filteredCreators.map((c) => c.country).filter(Boolean));
+  const topFollowers = filteredCreators.reduce((max, c) => Math.max(max, c.followers ?? 0), 0);
+  const avgGrowth =
+    filteredCreators.length > 0
+      ? (
+          filteredCreators.reduce((sum, c) => sum + (c.followersGrowth30d ?? 0), 0) /
+          filteredCreators.length
+        ).toFixed(1)
+      : "—";
+
+  const formatFollowers = (n: number) => {
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+    if (n >= 1000) return `${Math.round(n / 1000)}K`;
+    return n.toString();
+  };
+
   const stats = [
-    { icon: Globe, value: "50+", label: "Pays" },
-    { icon: Users, value: "10K+", label: "Créateurs" },
-    { icon: TrendingUp, value: "15.2%", label: "Croissance moyenne" },
-    { icon: Award, value: "2.5M", label: "Top abonnés" },
+    { icon: Globe, value: uniqueCountries.size > 0 ? uniqueCountries.size.toString() : "—", label: "Pays représentés" },
+    { icon: Users, value: filteredCreators.length.toString(), label: "Créateurs listés" },
+    { icon: TrendingUp, value: avgGrowth === "—" ? "—" : `${avgGrowth}%`, label: "Croissance moy. (30j)" },
+    { icon: Award, value: topFollowers > 0 ? formatFollowers(topFollowers) : "—", label: "Plus grand profil" },
   ];
 
   return (
@@ -79,7 +95,7 @@ export default function RankingsWorld() {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden pt-24 pb-12">
+      <section className="relative overflow-hidden pt-8 pb-12">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute left-1/4 top-1/4 h-64 w-64 rounded-full bg-violet/20 blur-[100px]" />
           <div className="absolute right-1/4 bottom-1/4 h-64 w-64 rounded-full bg-rose/20 blur-[100px]" />
@@ -188,33 +204,23 @@ export default function RankingsWorld() {
       <section className="py-12">
         <div className="container">
           {isLoading ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {Array.from({ length: 12 }).map((_, i) => (
+            <div className="space-y-3">
+              {Array.from({ length: 10 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-72 animate-pulse rounded-2xl border border-white/10 bg-card/50"
-                />
+                  className="flex items-center gap-4 rounded-xl border border-white/10 bg-card/50 p-4 animate-pulse"
+                >
+                  <div className="h-10 w-10 rounded-full bg-muted" />
+                  <div className="h-14 w-14 rounded-full bg-muted" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-40 rounded bg-muted" />
+                    <div className="h-3 w-64 rounded bg-muted" />
+                  </div>
+                </div>
               ))}
             </div>
           ) : filteredCreators.length > 0 ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredCreators.map((creator, index) => (
-                <CreatorCard
-                  key={creator.id}
-                  rank={index + 1}
-                  username={creator.linkedinUsername || creator.name.toLowerCase().replace(/\s+/g, '')}
-                  name={creator.name}
-                  headline={creator.headline || ""}
-                  profileImage={creator.profilePicture || ""}
-                  followers={creator.followers || 0}
-                  engagementRate={Number(creator.engagementRate) || 0}
-                  growthRate={creator.followersGrowth30d ? (creator.followersGrowth30d / (creator.followers || 1)) * 100 : 0}
-                  country={creator.country || "World"}
-                  sector={creator.sector || "Business"}
-                  authorityScore={Math.min(100, Math.floor((creator.followers || 0) / 10000) + (Number(creator.engagementRate) || 0) * 10)}
-                />
-              ))}
-            </div>
+            <CreatorRankings creators={filteredCreators} />
           ) : (
             <div className="py-20 text-center">
               <p className="text-muted-foreground">Aucun créateur trouvé pour ces critères.</p>

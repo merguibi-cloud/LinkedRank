@@ -1,6 +1,4 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +15,7 @@ import {
   Clock,
   Filter,
   Globe,
-  Lock,
   Sparkles,
-  ArrowRight,
-  User,
   Calendar,
 } from "lucide-react";
 
@@ -44,7 +39,6 @@ interface TrendingPost {
 }
 
 export default function TrendingContent() {
-  const { user } = useAuth();
   const [timeFilter, setTimeFilter] = useState<"day" | "week" | "month">("week");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   
@@ -172,9 +166,6 @@ export default function TrendingContent() {
     return num.toString();
   };
 
-  // Si l'utilisateur n'est pas connecté ou n'a pas d'abonnement, afficher la version limitée
-  const isSubscribed = user?.subscriptionPlan && user.subscriptionPlan !== "starter";
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -184,15 +175,14 @@ export default function TrendingContent() {
         <div className="absolute inset-0 bg-gradient-to-b from-violet/10 via-transparent to-transparent" />
         <div className="container relative">
           <div className="text-center max-w-3xl mx-auto">
-            <Badge className="mb-4 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0">
-              <Flame className="w-3 h-3 mr-1" />
-              Contenus Tendance
+            <Badge className="mb-4 bg-white/10 text-muted-foreground border border-white/10">
+              Exemples illustratifs
             </Badge>
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Les <span className="gradient-text">meilleurs posts</span> LinkedIn de la semaine
+              Posts <span className="gradient-text">LinkedIn</span> inspirants
             </h1>
-            <p className="text-lg text-muted-foreground mb-8">
-              Découvrez les contenus qui ont le plus performé cette semaine. Inspirez-vous des meilleurs pour créer vos propres posts viraux.
+            <p className="text-lg text-muted-foreground mb-4">
+              Exemples de contenus pour vous inspirer. Les métriques affichées sont indicatives et ne proviennent pas de données en temps réel.
             </p>
           </div>
         </div>
@@ -251,7 +241,7 @@ export default function TrendingContent() {
       <section className="py-12">
         <div className="container">
           <div className="space-y-6">
-            {filteredPosts.slice(0, isSubscribed ? undefined : 3).map((post, index) => (
+            {filteredPosts.map((post, index) => (
               <div
                 key={post.id}
                 className={`relative p-6 rounded-2xl border transition-all ${
@@ -347,50 +337,6 @@ export default function TrendingContent() {
               </div>
             ))}
 
-            {/* Paywall for non-subscribers */}
-            {!isSubscribed && (
-              <div className="relative">
-                {/* Blurred preview */}
-                <div className="opacity-30 blur-sm pointer-events-none">
-                  {filteredPosts.slice(3, 5).map((post) => (
-                    <div
-                      key={post.id}
-                      className="p-6 rounded-2xl border border-white/10 bg-card/50 mb-6"
-                    >
-                      <div className="flex gap-4">
-                        <div className="w-14 h-14 rounded-full bg-gray-600" />
-                        <div className="flex-1">
-                          <div className="h-4 bg-gray-600 rounded w-1/3 mb-2" />
-                          <div className="h-3 bg-gray-600 rounded w-1/2" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Upgrade CTA */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center p-8 rounded-2xl border border-violet/30 bg-card/95 backdrop-blur-xl max-w-md">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-violet to-rose flex items-center justify-center">
-                      <Lock className="w-8 h-8 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-2">
-                      Accédez à tous les contenus tendance
-                    </h3>
-                    <p className="text-muted-foreground mb-6">
-                      Débloquez l'accès illimité aux meilleurs posts LinkedIn et inspirez-vous des top créateurs.
-                    </p>
-                    <Link href="/pricing">
-                      <Button className="btn-gradient gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        Passer à Pro
-                        <ArrowRight className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </section>

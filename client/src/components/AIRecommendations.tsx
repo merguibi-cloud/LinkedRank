@@ -29,58 +29,7 @@ interface Recommendation {
   icon: React.ElementType;
 }
 
-const recommendations: Recommendation[] = [
-  {
-    id: "1",
-    type: "content",
-    priority: "high",
-    title: "Publiez sur l'IA cette semaine",
-    description: "Les posts sur l'intelligence artificielle génèrent 3x plus d'engagement dans votre réseau cette semaine.",
-    action: "Générer un post IA",
-    impact: "+45% engagement estimé",
-    icon: Sparkles,
-  },
-  {
-    id: "2",
-    type: "timing",
-    priority: "high",
-    title: "Meilleur moment : demain 8h30",
-    description: "Votre audience est 2x plus active le mardi matin. Planifiez votre prochain post pour maximiser la portée.",
-    action: "Planifier un post",
-    impact: "+60% impressions estimées",
-    icon: Clock,
-  },
-  {
-    id: "3",
-    type: "engagement",
-    priority: "medium",
-    title: "Répondez à 5 commentaires",
-    description: "Vous avez des commentaires sans réponse. Répondre augmente votre visibilité et fidélise votre audience.",
-    action: "Voir les commentaires",
-    impact: "+25% engagement",
-    icon: MessageSquare,
-  },
-  {
-    id: "4",
-    type: "growth",
-    priority: "medium",
-    title: "Connectez-vous avec des créateurs",
-    description: "3 créateurs de votre niche ont interagi avec vos posts. Une connexion pourrait élargir votre audience.",
-    action: "Voir les profils",
-    impact: "+100 followers potentiels",
-    icon: Users,
-  },
-  {
-    id: "5",
-    type: "content",
-    priority: "low",
-    title: "Essayez le format carrousel",
-    description: "Vous n'avez pas publié de carrousel depuis 2 semaines. Ce format génère 2x plus de sauvegardes.",
-    action: "Créer un carrousel",
-    impact: "+80% sauvegardes",
-    icon: BarChart3,
-  },
-];
+const recommendations: Recommendation[] = [];
 
 const typeColors = {
   content: { bg: "bg-violet/10", text: "text-violet-light", border: "border-violet/20" },
@@ -144,25 +93,6 @@ export function AIRecommendations() {
           <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
           Actualiser
         </Button>
-      </div>
-
-      {/* Stats summary */}
-      <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-violet/10 to-rose/10 border border-violet/20">
-        <div className="p-3 rounded-xl bg-white/5">
-          <Target className="w-6 h-6 text-violet-light" />
-        </div>
-        <div className="flex-1">
-          <p className="text-sm text-white/70">
-            En suivant ces recommandations, vous pourriez augmenter votre engagement de
-          </p>
-          <p className="text-2xl font-bold text-white">+127% cette semaine</p>
-        </div>
-        <div className="text-right">
-          <div className="text-sm text-white/50">Complétées</div>
-          <div className="text-lg font-semibold text-emerald-400">
-            {completedIds.length}/{recommendations.length}
-          </div>
-        </div>
       </div>
 
       {/* Recommendations list */}
@@ -247,14 +177,14 @@ export function AIRecommendations() {
               <Check className="w-8 h-8 text-emerald-400" />
             </div>
             <h4 className="text-lg font-semibold text-white mb-2">
-              Toutes les recommandations traitées !
+              Pas encore de recommandations
             </h4>
             <p className="text-sm text-white/60 mb-4">
-              Vous êtes sur la bonne voie. Revenez demain pour de nouvelles suggestions.
+              Générez des posts et connectez LinkedIn pour recevoir des suggestions personnalisées basées sur votre activité.
             </p>
-            <Button variant="outline" onClick={handleRefresh}>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Voir les recommandations ignorées
+            <Button variant="outline" onClick={() => window.location.href = "/generate"}>
+              <Sparkles className="w-4 h-4 mr-2" />
+              Générer un post
             </Button>
           </motion.div>
         )}

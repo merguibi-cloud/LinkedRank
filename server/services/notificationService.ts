@@ -76,13 +76,18 @@ export async function getUserNotifications(
     conditions.push(eq(notifications.isRead, false));
   }
   
-  return db
+  const rows = await db
     .select()
     .from(notifications)
     .where(and(...conditions))
     .orderBy(desc(notifications.createdAt))
     .limit(limit)
     .offset(offset);
+
+  return rows.map((row) => ({
+    ...row,
+    metadata: row.metadata ? JSON.parse(row.metadata) : null,
+  }));
 }
 
 /**
@@ -253,23 +258,156 @@ export async function notifyTrendDetected(
 }
 
 /**
+ * Notify when posts are generated manually
+ */
+export async function notifyPostsGenerated(
+  userId: number,
+  count: number,
+  theme: string,
+  savedPostIds?: number[]
+): Promise<Notification | null> {
+  const title = count === 1 ? "Post généré !" : `${count} nouveaux posts générés`;
+  const message =
+    count === 1
+      ? `Nouveau contenu créé sur le thème « ${theme} »`
+      : `${count} nouveaux posts générés sur « ${theme} »`;
+
+  return createNotification({
+    userId,
+    type: "agent_task_completed",
+    title,
+    message,
+    postId: savedPostIds?.[0],
+    actionUrl: "/generate",
+    actionLabel: "Voir les posts",
+    priority: "medium",
+    metadata: { count, theme, postIds: savedPostIds },
+  });
+}
+
+/**
  * Notify when a post is published
  */
 export async function notifyPostPublished(
   userId: number,
-  postId: number,
-  postTitle: string
+  postTitle?: string,
+  postId?: number
 ): Promise<Notification | null> {
+  const message = postTitle
+    ? `« ${postTitle.slice(0, 80)}${postTitle.length > 80 ? "…" : ""} » est en ligne sur LinkedIn`
+    : "Votre post sur LinkedIn a été publié avec succès";
+
   return createNotification({
     userId,
     type: "post_published",
-    title: `Post publié avec succès`,
-    message: `Votre post "${postTitle}" a été publié sur LinkedIn.`,
+    title: "Post publié !",
+    message,
     postId,
     actionUrl: "/dashboard",
-    actionLabel: "Voir les performances",
-    priority: "low",
+    actionLabel: "Voir le dashboard",
+    priority: "medium",
   });
+}
+
+/**
+ * Contextual notification when an agent completes a task
+ */
+export async function sendTaskCompletionNotification(
+  userId: number,
+  agent: { id: number; name: string; avatar?: string | null },
+  task: { id: number; type: string; title: string },
+  outputData?: Record<string, unknown>
+): Promise<Notification | null> {
+  const agentMeta = { agentEmoji: agent.avatar, agentName: agent.name };
+
+  switch (task.type) {
+    case "generate_post": {
+      const theme =
+        (outputData?.metadata as { theme?: string } | undefined)?.theme ||
+        (outputData?.generatedPost as { title?: string } | undefined)?.title ||
+        task.title;
+      return createNotification({
+        userId,
+        type: "agent_task_completed",
+        title: `${agent.name} a terminé`,
+        message: `Nouveau post généré sur « ${theme} »`,
+        agentId: agent.id,
+        taskId: task.id,
+        actionUrl: "/agents",
+        actionLabel: "Voir le résultat",
+        priority: "medium",
+        metadata: { ...agentMeta, theme },
+      });
+    }
+    case "generate_carousel": {
+      const title =
+        (outputData?.carousel as { title?: string } | undefined)?.title || task.title;
+      return createNotification({
+        userId,
+        type: "agent_task_completed",
+        title: `${agent.name} a terminé`,
+        message: `Un nouveau carousel « ${title} » est prêt à publier`,
+        agentId: agent.id,
+        taskId: task.id,
+        actionUrl: "/agents",
+        actionLabel: "Voir le carousel",
+        priority: "medium",
+        metadata: agentMeta,
+      });
+    }
+    case "detect_trend":
+    case "analyze_trends": {
+      const trends = outputData?.trends as Array<{ topic: string; growth?: string }> | undefined;
+      const topTrend = trends?.[0];
+      if (topTrend) {
+        return createNotification({
+          userId,
+          type: "trend_detected",
+          title: `${agent.name} a détecté une tendance`,
+          message: `Le sujet « ${topTrend.topic} » explose sur LinkedIn (${topTrend.growth || "+15%"})`,
+          agentId: agent.id,
+          taskId: task.id,
+          actionUrl: "/trending",
+          actionLabel: "Explorer la tendance",
+          priority: "medium",
+          metadata: { ...agentMeta, trend: topTrend.topic, growth: topTrend.growth },
+        });
+      }
+      break;
+    }
+    case "suggest_response":
+      return createNotification({
+        userId,
+        type: "suggestion",
+        title: `${agent.name} suggère`,
+        message: "Des commentaires méritent une réponse pour booster l'engagement",
+        agentId: agent.id,
+        taskId: task.id,
+        actionUrl: "/agents",
+        actionLabel: "Voir les suggestions",
+        priority: "medium",
+        metadata: agentMeta,
+      });
+    case "analyze_performance": {
+      const insights = outputData?.insights as string | undefined;
+      return createNotification({
+        userId,
+        type: "post_performance",
+        title: "Nouveau record !",
+        message: insights || "Vos performances LinkedIn ont progressé — consultez les détails",
+        agentId: agent.id,
+        taskId: task.id,
+        actionUrl: "/dashboard",
+        actionLabel: "Voir les stats",
+        priority: "medium",
+        metadata: agentMeta,
+      });
+    }
+    default:
+      break;
+  }
+
+  return notifyTaskNeedsApproval(userId, agent.id, task.id, agent.name, task.title);
 }
 
 /**

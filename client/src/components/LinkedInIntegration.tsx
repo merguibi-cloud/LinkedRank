@@ -1,96 +1,80 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Linkedin, 
-  CheckCircle2, 
-  AlertCircle, 
-  RefreshCw, 
-  Shield, 
-  Zap,
+import {
+  Linkedin,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  Shield,
   Settings,
   ExternalLink,
   Clock,
   Users,
   FileText,
-  Send
+  Send,
 } from "lucide-react";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+import { getLinkedInConnectUrl } from "@/const";
+import { useLinkedInStatus } from "@/hooks/useLinkedInStatus";
 
-interface LinkedInStatus {
-  connected: boolean;
-  profileName?: string;
-  profileImage?: string;
-  lastSync?: string;
-  permissions: {
-    read: boolean;
-    write: boolean;
-    analytics: boolean;
-  };
-}
+export { LinkedInStatusBadge } from "@/components/LinkedInStatusBadge";
 
 export function LinkedInIntegration() {
-  const { user } = useAuth();
+  const { status, loading, syncing, sync } = useLinkedInStatus();
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  
-  // Simuler le statut de connexion LinkedIn
-  const [linkedInStatus] = useState<LinkedInStatus>({
-    connected: !!user,
-    profileName: user?.name || "Youssef Koutari",
-    profileImage: "",
-    lastSync: new Date().toLocaleString("fr-FR"),
-    permissions: {
-      read: true,
-      write: true,
-      analytics: true,
-    },
-  });
 
   const handleConnect = () => {
     setIsConnecting(true);
-    // Rediriger vers l'authentification LinkedIn
-    window.location.href = getLoginUrl();
+    window.location.href = getLinkedInConnectUrl("/dashboard");
   };
 
   const handleSync = async () => {
-    setIsSyncing(true);
-    // Simuler une synchronisation
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsSyncing(false);
+    await sync();
   };
+
+  const lastSyncLabel = status.lastSync
+    ? new Date(status.lastSync).toLocaleString("fr-FR")
+    : "—";
 
   const features = [
     {
       icon: FileText,
       title: "Publication directe",
       description: "Publiez vos posts directement sur LinkedIn depuis la plateforme",
-      available: linkedInStatus.permissions.write,
+      available: status.connected,
     },
     {
       icon: Users,
       title: "Analyse d'audience",
       description: "Accédez aux insights de votre audience LinkedIn",
-      available: linkedInStatus.permissions.analytics,
+      available: false,
     },
     {
       icon: Clock,
       title: "Planification",
       description: "Programmez vos publications à l'avance",
-      available: linkedInStatus.permissions.write,
+      available: status.connected,
     },
     {
       icon: Send,
       title: "Auto-publication",
       description: "Laissez vos agents publier automatiquement (mode supervisé)",
-      available: linkedInStatus.permissions.write,
+      available: status.connected,
     },
   ];
 
+  if (loading) {
+    return (
+      <Card className="border-white/10 bg-white/5">
+        <CardContent className="flex items-center justify-center p-8">
+          <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Connection Status Card */}
       <Card className="border-white/10 bg-gradient-to-br from-[#0077B5]/10 to-background">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -101,14 +85,14 @@ export function LinkedInIntegration() {
               <div>
                 <CardTitle className="text-white">Connexion LinkedIn</CardTitle>
                 <CardDescription>
-                  {linkedInStatus.connected
+                  {status.connected
                     ? "Votre compte LinkedIn est connecté"
                     : "Connectez votre compte pour activer toutes les fonctionnalités"}
                 </CardDescription>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {linkedInStatus.connected ? (
+              {status.connected ? (
                 <span className="flex items-center gap-2 rounded-full bg-emerald-500/20 px-3 py-1 text-sm text-emerald-400">
                   <CheckCircle2 className="h-4 w-4" />
                   Connecté
@@ -123,40 +107,44 @@ export function LinkedInIntegration() {
           </div>
         </CardHeader>
         <CardContent>
-          {linkedInStatus.connected ? (
+          {status.connected ? (
             <div className="space-y-4">
-              {/* Profile Info */}
               <div className="flex items-center gap-4 rounded-lg border border-white/10 bg-white/5 p-4">
-                <div className="h-14 w-14 rounded-full bg-gradient-to-br from-violet to-rose flex items-center justify-center text-2xl">
-                  {linkedInStatus.profileImage ? (
+                <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-violet to-rose flex items-center justify-center text-2xl">
+                  {status.profilePicture ? (
                     <img
-                      src={linkedInStatus.profileImage}
-                      alt={linkedInStatus.profileName}
-                      className="h-full w-full rounded-full object-cover"
+                      src={status.profilePicture}
+                      alt={status.profileName ?? "Profil LinkedIn"}
+                      className="h-full w-full object-cover"
+                      referrerPolicy="no-referrer"
                     />
                   ) : (
                     "👤"
                   )}
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-semibold text-white">{linkedInStatus.profileName}</h4>
+                  <h4 className="font-semibold text-white">
+                    {status.profileName ?? "Utilisateur LinkedIn"}
+                  </h4>
+                  {status.email && (
+                    <p className="text-sm text-muted-foreground">{status.email}</p>
+                  )}
                   <p className="text-sm text-muted-foreground">
-                    Dernière synchronisation : {linkedInStatus.lastSync}
+                    Dernière synchronisation : {lastSyncLabel}
                   </p>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleSync}
-                  disabled={isSyncing}
+                  disabled={syncing}
                   className="border-white/20"
                 >
-                  <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-                  {isSyncing ? "Sync..." : "Synchroniser"}
+                  <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+                  {syncing ? "Sync..." : "Synchroniser"}
                 </Button>
               </div>
 
-              {/* Permissions */}
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-3">
                   <CheckCircle2 className="h-5 w-5 text-emerald-400" />
@@ -168,7 +156,7 @@ export function LinkedInIntegration() {
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-3">
                   <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                  <span className="text-sm text-white">Analytics</span>
+                  <span className="text-sm text-white">Token enregistré</span>
                 </div>
               </div>
             </div>
@@ -201,14 +189,13 @@ export function LinkedInIntegration() {
                 </Button>
               </div>
 
-              {/* Security Note */}
               <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4">
                 <Shield className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
                   <h5 className="font-medium text-emerald-400">Connexion sécurisée</h5>
                   <p className="text-sm text-muted-foreground">
-                    Nous utilisons OAuth 2.0, le protocole officiel de LinkedIn. 
-                    Vos identifiants ne sont jamais stockés sur nos serveurs.
+                    Nous utilisons OAuth 2.0, le protocole officiel de LinkedIn.
+                    Votre mot de passe n'est jamais stocké — seul un token sécurisé est enregistré.
                   </p>
                 </div>
               </div>
@@ -217,7 +204,6 @@ export function LinkedInIntegration() {
         </CardContent>
       </Card>
 
-      {/* Features Grid */}
       <div className="grid gap-4 sm:grid-cols-2">
         {features.map((feature, index) => (
           <Card
@@ -260,7 +246,6 @@ export function LinkedInIntegration() {
         ))}
       </div>
 
-      {/* API Documentation Link */}
       <Card className="border-white/10 bg-white/5">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -284,21 +269,3 @@ export function LinkedInIntegration() {
   );
 }
 
-// Composant pour afficher le statut de connexion dans la sidebar ou navbar
-export function LinkedInStatusBadge() {
-  const { user } = useAuth();
-  const isConnected = !!user;
-
-  return (
-    <div className="flex items-center gap-2">
-      <div
-        className={`h-2 w-2 rounded-full ${
-          isConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
-        }`}
-      />
-      <span className="text-xs text-muted-foreground">
-        {isConnected ? "LinkedIn connecté" : "Non connecté"}
-      </span>
-    </div>
-  );
-}
