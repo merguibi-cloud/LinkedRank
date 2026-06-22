@@ -7,91 +7,71 @@ import { Link } from "wouter";
 import Navbar from "@/components/Navbar";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
 import { QuickActions } from "@/components/QuickActions";
-import { AgentStatusWidget } from "@/components/AgentStatusWidget";
-import { OnboardingWizard } from "@/components/OnboardingWizard";
-import { ContextualHelp } from "@/components/ContextualHelp";
-import { AIRecommendations } from "@/components/AIRecommendations";
-import { GamificationWidget } from "@/components/GamificationWidget";
-import { PersonalizedTips, WelcomeWidget } from "@/components/PersonalizedTips";
+import { PersonalizedTips } from "@/components/PersonalizedTips";
 import { toast } from "sonner";
 import {
   Sparkles,
-  TrendingUp,
   Eye,
   Heart,
   MessageSquare,
   Calendar,
-  Zap,
-  BookOpen,
-  BarChart3,
-  Clock,
-  Target,
-  Flame,
   ArrowRight,
   Copy,
-  Download,
   Send,
   Star,
-  Filter,
   Loader2,
   Check,
+  PenTool,
+  Linkedin,
+  ChevronRight,
 } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [selectedCategory, setSelectedCategory] = useState("all");
   const [publishingPostId, setPublishingPostId] = useState<number | null>(null);
   const [copiedPostId, setCopiedPostId] = useState<number | null>(null);
 
-  // Fetch user's generated posts
   const { data: postsData } = trpc.generator.myPosts.useQuery(
     { limit: 10, offset: 0 },
     { enabled: !!user }
   );
 
-  // Fetch top content for inspiration
   const { data: topContent } = trpc.posts.list.useQuery({
-    limit: 6,
+    limit: 4,
     language: "FR",
   });
 
-  // Handle copy to clipboard
   const handleCopy = async (content: string, postId: number) => {
     try {
       await navigator.clipboard.writeText(content);
       setCopiedPostId(postId);
-      toast.success("Contenu copié dans le presse-papiers !");
+      toast.success("Contenu copié");
       setTimeout(() => setCopiedPostId(null), 2000);
-    } catch (error) {
+    } catch {
       toast.error("Erreur lors de la copie");
     }
   };
 
-  // Handle publish to LinkedIn
   const handlePublish = async (content: string, postId: number) => {
     setPublishingPostId(postId);
     try {
       const response = await fetch("/api/linkedin/post", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ content }),
       });
-
       const data = await response.json();
 
       if (data.success) {
-        toast.success("Post publié sur LinkedIn avec succès !");
+        toast.success("Post publié sur LinkedIn");
       } else if (data.error === "LinkedIn not connected") {
-        // Redirect to LinkedIn auth with format=json
         const authResponse = await fetch("/api/linkedin/auth?format=json", {
           credentials: "include",
         });
         const authData = await authResponse.json();
         if (authData.authUrl) {
-          toast.info("Redirection vers LinkedIn pour autorisation...");
+          toast.info("Redirection vers LinkedIn...");
           window.location.href = authData.authUrl;
         } else {
           toast.error("Erreur de configuration LinkedIn");
@@ -102,17 +82,13 @@ export default function Dashboard() {
         });
         const authData = await authResponse.json();
         if (authData.authUrl) {
-          toast.info("Token expiré, reconnexion à LinkedIn...");
           window.location.href = authData.authUrl;
         }
-      } else if (data.error?.includes("DUPLICATE_POST") || data.error?.includes("duplicate")) {
-        toast.error("Ce post a déjà été publié sur LinkedIn");
       } else {
         toast.error(data.error || "Erreur lors de la publication");
       }
-    } catch (error) {
-      console.error("Erreur publication:", error);
-      toast.error("Erreur de connexion au serveur");
+    } catch {
+      toast.error("Erreur de connexion");
     } finally {
       setPublishingPostId(null);
     }
@@ -127,11 +103,9 @@ export default function Dashboard() {
             <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-violet to-rose flex items-center justify-center">
               <Sparkles className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-4">
-              Accédez à votre Dashboard
-            </h1>
+            <h1 className="text-2xl font-bold text-white mb-4">Votre espace de travail</h1>
             <p className="text-muted-foreground mb-8">
-              Connectez-vous pour accéder à tous vos outils de création de contenu, vos statistiques et vos posts générés.
+              Connectez-vous pour créer, publier et suivre vos contenus LinkedIn.
             </p>
             <a href={getSignupUrl("/dashboard")}>
               <Button className="btn-gradient">Créer un compte</Button>
@@ -143,186 +117,169 @@ export default function Dashboard() {
   }
 
   const postCount = postsData?.posts?.length ?? 0;
+  const firstName = user.name?.split(" ")[0] || "Créateur";
 
   const stats = [
     {
       label: "Posts générés",
       value: postCount.toString(),
       icon: Sparkles,
-      change: postCount > 0 ? "Depuis votre inscription" : "Générez votre premier post",
-      color: "violet",
+      hint: postCount > 0 ? "Depuis votre inscription" : "Commencez par créer un post",
     },
     {
       label: "Vues LinkedIn",
       value: "—",
       icon: Eye,
-      change: "Connectez LinkedIn pour suivre",
-      color: "rose",
+      hint: "Connectez LinkedIn pour suivre",
     },
     {
       label: "Engagement",
       value: "—",
       icon: Heart,
-      change: "Disponible après connexion LinkedIn",
-      color: "gold",
+      hint: "Disponible après connexion",
     },
     {
-      label: "Publications planifiées",
+      label: "Planifiés",
       value: "—",
       icon: Calendar,
-      change: "Planifiez depuis le calendrier",
-      color: "emerald",
+      hint: "Via le calendrier",
     },
   ];
 
-  const quickActions = [
+  const nextSteps = [
     {
-      title: "Générer un post",
-      description: "Créez du contenu avec l'IA",
-      icon: Sparkles,
-      href: "/generator",
-      color: "from-violet to-rose",
+      step: "1",
+      title: "Créer un post",
+      description: "Générez votre contenu avec l'IA en 4 étapes simples.",
+      href: "/generate",
+      icon: PenTool,
+      cta: "Ouvrir le générateur",
     },
     {
-      title: "Top contenus",
-      description: "Inspirez-vous des meilleurs",
-      icon: Flame,
-      href: "/top-content",
-      color: "from-orange-500 to-rose",
+      step: "2",
+      title: "Connecter LinkedIn",
+      description: "Liez votre compte pour publier directement depuis l'app.",
+      href: "/linkedin-settings",
+      icon: Linkedin,
+      cta: "Configurer LinkedIn",
     },
     {
-      title: "Planifier",
-      description: "Programmez vos publications",
-      icon: Calendar,
+      step: "3",
+      title: "Planifier vos publications",
+      description: "Programmez vos posts aux meilleurs créneaux.",
       href: "/schedule",
-      color: "from-emerald-500 to-teal-500",
+      icon: Calendar,
+      cta: "Voir le calendrier",
     },
-    {
-      title: "Analytics",
-      description: "Suivez vos performances",
-      icon: BarChart3,
-      href: "/analytics",
-      color: "from-blue-500 to-violet",
-    },
-  ];
-
-  const categories = [
-    { value: "all", label: "Tous" },
-    { value: "entrepreneuriat", label: "Entrepreneuriat" },
-    { value: "leadership", label: "Leadership" },
-    { value: "marketing", label: "Marketing" },
-    { value: "tech", label: "Tech / IA" },
-    { value: "personal-branding", label: "Personal Branding" },
   ];
 
   return (
     <div className="min-h-screen bg-background">
-      <OnboardingWizard />
       <Navbar />
 
-      <div className="container py-6 md:py-8">
-        {/* Welcome Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Bonjour, {user.name?.split(" ")[0] || "Créateur"} 👋
-          </h1>
-          <p className="text-muted-foreground">
-            Prêt à créer du contenu qui performe ? Voici votre tableau de bord.
-          </p>
+      <div className="container py-6 md:py-8 space-y-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Tableau de bord</p>
+            <h1 className="text-2xl font-bold text-white sm:text-3xl">
+              Bonjour, {firstName}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Créez, publiez et suivez votre contenu LinkedIn en un seul endroit.
+            </p>
+          </div>
+          <Link href="/generate">
+            <Button className="btn-gradient w-full sm:w-auto">
+              <PenTool className="w-4 h-4 mr-2" />
+              Créer un post
+            </Button>
+          </Link>
         </div>
 
         <LinkedInConnectBanner />
 
-        {/* Widget de bienvenue personnalisé */}
-        <div className="mb-6">
-          <WelcomeWidget />
-        </div>
+        <PersonalizedTips feature="dashboard" compact />
 
-        {/* Conseils personnalisés */}
-        <div className="mb-6">
-          <PersonalizedTips feature="dashboard" />
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {stats.map((stat) => (
             <div
               key={stat.label}
-              className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm"
+              className="p-4 md:p-5 rounded-xl border border-white/10 bg-card/50"
             >
-              <div className="flex items-start justify-between mb-4">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    stat.color === "violet"
-                      ? "bg-violet/20 text-violet-light"
-                      : stat.color === "rose"
-                      ? "bg-rose/20 text-rose"
-                      : stat.color === "gold"
-                      ? "bg-gold/20 text-gold"
-                      : "bg-emerald-500/20 text-emerald-400"
-                  }`}
-                >
-                  <stat.icon className="w-5 h-5" />
-                </div>
+              <div className="w-9 h-9 rounded-lg bg-violet/15 flex items-center justify-center mb-3">
+                <stat.icon className="w-4 h-4 text-violet-light" />
               </div>
-              <div className="text-2xl font-bold text-white mb-1">{stat.value}</div>
+              <div className="text-xl md:text-2xl font-bold text-white">{stat.value}</div>
               <div className="text-sm text-muted-foreground">{stat.label}</div>
-              <div className={`text-xs mt-2 flex items-center gap-1 ${
-                stat.value === "—" ? "text-muted-foreground" : "text-emerald-400"
-              }`}>
-                {stat.value !== "—" && <TrendingUp className="w-3 h-3" />}
-                {stat.change}
-              </div>
+              <p className="text-xs text-muted-foreground/80 mt-2 line-clamp-2">{stat.hint}</p>
             </div>
           ))}
         </div>
 
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <QuickActions />
-        </div>
+        <section>
+          <h2 className="text-lg font-semibold text-white mb-4">Par où commencer</h2>
+          <div className="grid gap-3 md:grid-cols-3">
+            {nextSteps.map((item) => (
+              <Link key={item.step} href={item.href}>
+                <div className="group h-full p-5 rounded-xl border border-white/10 bg-card/40 hover:border-violet/30 hover:bg-card/60 transition-all">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet/20 text-sm font-semibold text-violet-light">
+                      {item.step}
+                    </span>
+                    <item.icon className="w-5 h-5 text-violet-light" />
+                  </div>
+                  <h3 className="font-semibold text-white mb-1">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground mb-4">{item.description}</p>
+                  <span className="inline-flex items-center text-sm text-violet-light group-hover:gap-2 transition-all">
+                    {item.cta}
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <QuickActions />
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Recent Posts */}
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-white">Vos posts récents</h2>
-              <Link href="/my-posts">
+              <h2 className="text-lg font-semibold text-white">Posts récents</h2>
+              <Link href="/generate">
                 <Button variant="ghost" size="sm" className="text-violet-light">
-                  Voir tout
+                  Nouveau post
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>
             </div>
 
-            <div className="space-y-4">
-              {postsData?.posts?.slice(0, 4).map((post: any) => (
+            <div className="space-y-3">
+              {postsData?.posts?.slice(0, 4).map((post: { id: number; theme?: string; createdAt: string; content: string }) => (
                 <div
                   key={post.id}
-                  className="p-4 rounded-xl border border-white/10 bg-card/50 backdrop-blur-sm"
+                  className="p-4 rounded-xl border border-white/10 bg-card/50"
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-violet/20 text-violet-light">
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-violet/15 text-violet-light">
                       {post.theme || "Général"}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {new Date(post.createdAt).toLocaleDateString("fr-FR")}
                     </span>
                   </div>
-                  <p className="text-sm text-white/90 line-clamp-3 mb-3">
-                    {post.content}
-                  </p>
+                  <p className="text-sm text-white/90 line-clamp-3 mb-3">{post.content}</p>
                   <div className="flex items-center gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-muted-foreground hover:text-white"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-white h-8"
                       onClick={() => handleCopy(post.content, post.id)}
                     >
                       {copiedPostId === post.id ? (
                         <>
                           <Check className="w-4 h-4 mr-1 text-emerald-400" />
-                          <span className="text-emerald-400">Copié</span>
+                          Copié
                         </>
                       ) : (
                         <>
@@ -331,10 +288,10 @@ export default function Dashboard() {
                         </>
                       )}
                     </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-muted-foreground hover:text-[#0077B5]"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-[#0077B5] h-8"
                       onClick={() => handlePublish(post.content, post.id)}
                       disabled={publishingPostId === post.id}
                     >
@@ -355,16 +312,16 @@ export default function Dashboard() {
               ))}
 
               {(!postsData?.posts || postsData.posts.length === 0) && (
-                <div className="p-8 rounded-xl border border-dashed border-white/10 text-center">
-                  <Sparkles className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="font-semibold text-white mb-2">Aucun post généré</h3>
+                <div className="p-10 rounded-xl border border-dashed border-white/10 text-center">
+                  <Sparkles className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                  <h3 className="font-semibold text-white mb-1">Aucun post pour le moment</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Commencez à créer du contenu avec notre générateur IA.
+                    Le générateur vous guide étape par étape : texte, visuel, publication.
                   </p>
-                  <Link href="/generator">
+                  <Link href="/generate">
                     <Button className="btn-gradient">
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Générer mon premier post
+                      <PenTool className="w-4 h-4 mr-2" />
+                      Créer mon premier post
                     </Button>
                   </Link>
                 </div>
@@ -372,89 +329,52 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Inspiration Panel */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-white">Inspiration</h2>
-              <Link href="/top-content">
+              <h2 className="text-lg font-semibold text-white">Inspiration</h2>
+              <Link href="/top-posts">
                 <Button variant="ghost" size="sm" className="text-violet-light">
-                  Explorer
+                  Voir plus
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>
             </div>
 
-            {/* Category Filter */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {categories.slice(0, 4).map((cat) => (
-                <button
-                  key={cat.value}
-                  onClick={() => setSelectedCategory(cat.value)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                    selectedCategory === cat.value
-                      ? "bg-violet/20 text-violet-light border border-violet/30"
-                      : "bg-card/50 text-muted-foreground border border-white/10 hover:border-white/20"
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-
             <div className="space-y-3">
-              {topContent?.posts?.slice(0, 3).map((post: any) => (
-                <div
+              {topContent?.posts?.slice(0, 3).map((post: { id: number; content: string; likes?: number; comments?: number }) => (
+                <button
                   key={post.id}
-                  className="p-4 rounded-xl border border-white/10 bg-card/50 backdrop-blur-sm hover:border-violet/30 transition-all cursor-pointer"
+                  type="button"
+                  className="w-full text-left p-4 rounded-xl border border-white/10 bg-card/50 hover:border-violet/30 transition-all"
                   onClick={() => handleCopy(post.content, post.id)}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <Star className="w-4 h-4 text-gold" />
-                    <span className="text-xs text-gold">Top contenu</span>
+                    <span className="text-xs text-gold font-medium">Top contenu</span>
                   </div>
-                  <p className="text-sm text-white/90 line-clamp-3 mb-2">
-                    {post.content}
-                  </p>
-                  {(post.likes > 0 || post.comments > 0) && (
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      {post.likes > 0 && (
+                  <p className="text-sm text-white/90 line-clamp-3">{post.content}</p>
+                  {(post.likes || post.comments) ? (
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                      {post.likes ? (
                         <span className="flex items-center gap-1">
                           <Heart className="w-3 h-3" />
                           {post.likes}
                         </span>
-                      )}
-                      {post.comments > 0 && (
+                      ) : null}
+                      {post.comments ? (
                         <span className="flex items-center gap-1">
                           <MessageSquare className="w-3 h-3" />
                           {post.comments}
                         </span>
-                      )}
+                      ) : null}
                     </div>
-                  )}
-                </div>
+                  ) : null}
+                </button>
               ))}
-            </div>
-
-            {/* Gamification Widget */}
-            <div className="mt-6">
-              <GamificationWidget />
-            </div>
-
-            {/* Agent Status Widget */}
-            <div className="mt-6 p-4 rounded-xl border border-white/10 bg-card/50 backdrop-blur-sm">
-              <AgentStatusWidget />
             </div>
           </div>
         </div>
-
-        {/* AI Recommendations Section */}
-        <div className="mt-8 p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
-          <AIRecommendations />
-        </div>
       </div>
-
-      {/* Contextual Help */}
-      <ContextualHelp pageId="dashboard" />
     </div>
   );
 }

@@ -107,12 +107,10 @@ export default function Settings() {
             {profile ? (
               <div className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 border border-border/50">
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-xl bg-background/50 border border-border/50 flex items-center justify-center ${profile.color}`}>
-                    {profile.icon}
-                  </div>
                   <div>
                     <h3 className="font-semibold text-foreground">{profile.name}</h3>
                     <p className="text-sm text-muted-foreground">{profile.description}</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">{profile.focus}</p>
                   </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={changeProfile}>

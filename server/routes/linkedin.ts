@@ -221,7 +221,8 @@ async function publishForUser(
   userId: number,
   content: string,
   imageUrl?: string,
-  hashtags?: string[]
+  hashtags?: string[],
+  generatedPostId?: number
 ) {
   const settings = await getLinkedinSettings(userId);
 
@@ -255,6 +256,11 @@ async function publishForUser(
     const preview = content.slice(0, 80).replace(/\n/g, " ");
     await notifyPostPublished(userId, preview);
 
+    if (generatedPostId) {
+      const { markGeneratedPostPublished } = await import("../services/postAssetService");
+      await markGeneratedPostPublished(userId, generatedPostId, result.postId!);
+    }
+
     return {
       status: 200,
       body: {
@@ -282,13 +288,19 @@ async function publishForUser(
 router.post("/publish", requireAuth, async (req, res) => {
   try {
     const { userId } = req as AuthenticatedRequest;
-    const { content, hashtags, imageUrl } = req.body;
+    const { content, hashtags, imageUrl, generatedPostId } = req.body;
 
     if (!content) {
       return res.status(400).json({ error: "Content is required" });
     }
 
-    const result = await publishForUser(userId, content, imageUrl, hashtags);
+    const result = await publishForUser(
+      userId,
+      content,
+      imageUrl,
+      hashtags,
+      generatedPostId ? Number(generatedPostId) : undefined
+    );
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("LinkedIn publish error:", error);
@@ -301,13 +313,19 @@ router.post("/publish", requireAuth, async (req, res) => {
 router.post("/post", requireAuth, async (req, res) => {
   try {
     const { userId } = req as AuthenticatedRequest;
-    const { content, imageUrl } = req.body;
+    const { content, imageUrl, generatedPostId } = req.body;
 
     if (!content) {
       return res.status(400).json({ error: "Content is required" });
     }
 
-    const result = await publishForUser(userId, content, imageUrl);
+    const result = await publishForUser(
+      userId,
+      content,
+      imageUrl,
+      undefined,
+      generatedPostId ? Number(generatedPostId) : undefined
+    );
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("LinkedIn post error:", error);

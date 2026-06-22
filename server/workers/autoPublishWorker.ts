@@ -187,12 +187,12 @@ async function generatePostForUser(userId: number, settings: any): Promise<{ con
   // Generate image if enabled
   let imageUrl: string | null = null;
   const imageSettings = parseImageSettings(settings);
-  if (imageSettings.includeImage) {
+      if (imageSettings.includeImage) {
     try {
       const userName = "Auteur";
       if (imageSettings.imageType === "ai") {
         console.log("[AutoPublish] Generating AI image...");
-        const result = await generatePostImage({
+        const result = await generatePostImage(userId, {
           content,
           title: settings.sector || "Post LinkedIn",
           visualStyle: imageSettings.aiImageStyle,

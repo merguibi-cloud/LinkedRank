@@ -1,15 +1,18 @@
 import { eq, desc, asc, and, like, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { InsertUser, users, linkedinPosts, InsertLinkedinPost, LinkedinPost, postCategories, postImages, InsertPostImage, linkedinSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _client: ReturnType<typeof postgres> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _client = postgres(process.env.DATABASE_URL, { prepare: false });
+      _db = drizzle(_client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -68,7 +71,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -167,8 +171,8 @@ export async function createPost(post: InsertLinkedinPost) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(linkedinPosts).values(post);
-  return result[0].insertId;
+  const [row] = await db.insert(linkedinPosts).values(post).returning({ id: linkedinPosts.id });
+  return row.id;
 }
 
 export async function updatePost(id: number, post: Partial<InsertLinkedinPost>) {
@@ -215,8 +219,8 @@ export async function createPostImage(image: InsertPostImage) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(postImages).values(image);
-  return result[0].insertId;
+  const [row] = await db.insert(postImages).values(image).returning({ id: postImages.id });
+  return row.id;
 }
 
 export async function deletePostImage(id: number) {
@@ -239,8 +243,8 @@ export async function createCategory(category: { name: string; nameEn?: string; 
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(postCategories).values(category);
-  return result[0].insertId;
+  const [row] = await db.insert(postCategories).values(category).returning({ id: postCategories.id });
+  return row.id;
 }
 
 // ==================== LINKEDIN SETTINGS FUNCTIONS ====================

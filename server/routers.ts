@@ -231,12 +231,12 @@ export const appRouter = router({
           tone: input.tone,
           prompt: input.additionalInstructions || null,
           status: "generated",
-        });
+        }).returning({ id: generatedPosts.id });
 
-        await notifyPostsGenerated(userId, 1, input.theme, [result.insertId]);
+        await notifyPostsGenerated(userId, 1, input.theme, [result.id]);
 
         return {
-          id: result.insertId,
+          id: result.id,
           ...generated,
         };
       }),
@@ -311,9 +311,9 @@ export const appRouter = router({
             tone: input.tone,
             prompt: input.additionalInstructions || null,
             status: "generated",
-          });
-          savedIds.push(result.insertId);
-          savedPosts.push({ id: result.insertId, ...post });
+          }).returning({ id: generatedPosts.id });
+          savedIds.push(result.id);
+          savedPosts.push({ id: result.id, ...post });
         }
 
         await notifyPostsGenerated(userId, savedPosts.length, input.theme, savedIds);
@@ -364,6 +364,12 @@ export const appRouter = router({
         id: z.number(),
         content: z.string().optional(),
         status: z.enum(["generated", "saved", "scheduled", "published", "deleted"]).optional(),
+        imageUrl: z.string().optional(),
+        imageKey: z.string().optional(),
+        imagePrompt: z.string().optional(),
+        mediaLibraryId: z.number().optional(),
+        linkedinPostId: z.string().optional(),
+        publishedAt: z.date().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -387,6 +393,7 @@ export const appRouter = router({
         suggestedMedia: z.string().optional(),
         visualStyle: z.string().optional(),
         imageSize: z.enum(["1024x1024", "1536x1024", "1024x1536", "1792x1024", "1024x1792"]).optional(),
+        generatedPostId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const limitCheck = await canUserPerformAction(ctx.user.id, "image_generation");
@@ -394,7 +401,7 @@ export const appRouter = router({
           throw new Error(limitCheck.reason || "Génération d'image non disponible");
         }
 
-        return generatePostImage(input);
+        return generatePostImage(ctx.user.id, input);
       }),
   }),
 
@@ -923,10 +930,10 @@ export const appRouter = router({
           slides: JSON.stringify(result.slides),
           previewImages: JSON.stringify(result.imageUrls),
           status: "ready",
-        });
+        }).returning({ id: generatedCarousels.id });
 
         return {
-          id: saved.insertId,
+          id: saved.id,
           slides: result.slides,
           imageUrls: result.imageUrls,
         };

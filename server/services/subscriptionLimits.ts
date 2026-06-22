@@ -4,8 +4,8 @@
  */
 
 import { getDb } from "../db";
-import { users, userSubscriptions } from "../../drizzle/schema";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { users, userSubscriptions, autoPublishQueue } from "../../drizzle/schema";
+import { eq, and, gte, count } from "drizzle-orm";
 import { SUBSCRIPTION_PLANS, getPlan } from "../stripe/products";
 
 export interface UsageLimits {
@@ -71,14 +71,17 @@ export async function getUserUsageStats(userId: number): Promise<UsageStats> {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   // Count AI generations this month from the auto_publish_queue table
-  const [generationCount] = await db.execute(sql`
-    SELECT COUNT(*) as count 
-    FROM auto_publish_queue 
-    WHERE userId = ${userId} 
-    AND createdAt >= ${startOfMonth.toISOString().slice(0, 19).replace('T', ' ')}
-  `);
+  const [generationCount] = await db
+    .select({ count: count() })
+    .from(autoPublishQueue)
+    .where(
+      and(
+        eq(autoPublishQueue.userId, userId),
+        gte(autoPublishQueue.createdAt, startOfMonth)
+      )
+    );
 
-  const aiGenerationsThisMonth = (generationCount as any)?.[0]?.count || 0;
+  const aiGenerationsThisMonth = generationCount?.count ?? 0;
 
   return {
     aiGenerationsThisMonth: Number(aiGenerationsThisMonth),

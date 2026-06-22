@@ -63,11 +63,8 @@ const Confidentialite = lazy(() => import("./pages/legal/Confidentialite"));
 const CGV = lazy(() => import("./pages/legal/CGV"));
 const CGU = lazy(() => import("./pages/legal/CGU"));
 
-// Lazy load des composants non-critiques
-const ExitIntentPopup = lazy(() => import("./components/ExitIntentPopup").then(m => ({ default: m.ExitIntentPopup })));
+// Lazy load des composants non-critiques (widgets discrets uniquement)
 const LiveChatWidget = lazy(() => import("./components/LiveChatWidget").then(m => ({ default: m.LiveChatWidget })));
-const OnboardingProgress = lazy(() => import("./components/OnboardingProgress").then(m => ({ default: m.OnboardingProgress })));
-const StickyCTA = lazy(() => import("./components/StickyCTA").then(m => ({ default: m.StickyCTA })));
 const FeedbackWidget = lazy(() => import("./components/FeedbackWidget").then(m => ({ default: m.FeedbackWidget })));
 const MobileNavigation = lazy(() => import("./components/MobileNavigation").then(m => ({ default: m.MobileNavigation })));
 const CookieConsent = lazy(() => import("./components/CookieConsent"));
@@ -75,6 +72,7 @@ const CookieConsent = lazy(() => import("./components/CookieConsent"));
 // Import direct pour l'onboarding (nécessaire au démarrage)
 import { InteractiveOnboarding, useOnboarding } from "./components/InteractiveOnboarding";
 import { OnboardingRedirect } from "./components/OnboardingRedirect";
+import { useIsMobile } from "./hooks/useMobile";
 
 // Composant de chargement léger
 function PageLoader() {
@@ -177,10 +175,7 @@ function AppContent() {
       <Router />
       {/* Composants non-critiques chargés en lazy */}
       <Suspense fallback={null}>
-        <ExitIntentPopup />
         <LiveChatWidget />
-        <OnboardingProgress />
-        <StickyCTA />
         <FeedbackWidget />
         <MobileNavigation />
         <CookieConsent />
@@ -190,6 +185,8 @@ function AppContent() {
 }
 
 function App() {
+  const isMobile = useIsMobile();
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
@@ -197,7 +194,7 @@ function App() {
           <LinkedInStatusProvider>
           <TooltipProvider>
             <Toaster 
-              position="bottom-center"
+              position={isMobile ? "top-center" : "bottom-center"}
               toastOptions={{
                 style: {
                   background: 'oklch(0.14 0.02 280)',

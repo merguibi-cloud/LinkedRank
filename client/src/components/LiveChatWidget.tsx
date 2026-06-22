@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Bot, User, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { shouldShowMobileNav } from "@/lib/mobileNav";
 
 interface Message {
   id: number;
@@ -20,7 +22,7 @@ const quickReplies = [
 ];
 
 const botResponses: Record<string, string> = {
-  "essai": "LinkedAgents est entièrement gratuit pour l'instant ! Créez un compte et accédez à toutes les fonctionnalités sans carte bancaire. 🎉",
+  "essai": "LinkedAgents est entièrement gratuit pour l'instant. Créez un compte et accédez à toutes les fonctionnalités sans carte bancaire.",
   "plan": "Toutes les fonctionnalités sont actuellement gratuites : générations IA, publication automatique, analytics et plus encore.",
   "linkedin": "Pour connecter votre LinkedIn, utilisez le bouton « Connecter LinkedIn » dans le Dashboard ou les paramètres. La connexion est sécurisée via OAuth.",
   "generer": "Rendez-vous sur /generate pour créer un post avec l'IA. Choisissez un thème, un ton et laissez Léa rédiger pour vous.",
@@ -53,11 +55,13 @@ function getBotResponse(message: string): string {
 }
 
 export function LiveChatWidget() {
+  const [location] = useLocation();
+  const hasMobileNav = shouldShowMobileNav(location);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      text: "Bonjour ! 👋 Je suis l'assistant FAQ de LinkedAgents. Posez-moi une question sur l'utilisation de la plateforme.",
+      text: "Bonjour. Je suis l'assistant FAQ de LinkedAgents. Posez une question sur l'utilisation de la plateforme.",
       isBot: true,
       timestamp: new Date(),
     },
@@ -106,7 +110,8 @@ export function LiveChatWidget() {
         transition={{ delay: 2, type: "spring" }}
         onClick={() => setIsOpen(true)}
         className={cn(
-          "fixed bottom-6 right-6 z-50 p-4 rounded-full shadow-2xl transition-all",
+          "fixed right-4 z-50 rounded-full p-3.5 shadow-2xl transition-all md:bottom-6 md:right-6 md:p-4",
+          hasMobileNav ? "floating-above-mobile-nav" : "bottom-4",
           "bg-gradient-to-r from-violet to-violet-light hover:opacity-90",
           isOpen && "hidden"
         )}
@@ -121,7 +126,10 @@ export function LiveChatWidget() {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 right-6 z-50 w-[380px] max-w-[calc(100vw-48px)] rounded-2xl bg-card border border-white/10 shadow-2xl overflow-hidden"
+            className={cn(
+              "fixed right-4 z-50 w-[380px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white/10 bg-card shadow-2xl md:bottom-6 md:right-6",
+              hasMobileNav ? "floating-above-mobile-nav" : "bottom-4"
+            )}
           >
             {/* Header */}
             <div className="p-4 bg-gradient-to-r from-violet to-violet-light flex items-center justify-between">

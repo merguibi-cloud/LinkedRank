@@ -104,7 +104,7 @@ export function FeedbackWidget() {
       {/* Floating button */}
       <motion.button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 p-4 rounded-full bg-gradient-to-r from-violet to-rose shadow-lg shadow-violet/25 hover:shadow-violet/40 transition-shadow"
+        className="fixed right-4 z-40 hidden p-3.5 rounded-full bg-gradient-to-r from-violet to-rose shadow-lg shadow-violet/25 hover:shadow-violet/40 transition-shadow md:bottom-6 md:right-6 md:block md:p-4"
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
       >

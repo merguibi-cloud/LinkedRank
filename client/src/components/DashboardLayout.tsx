@@ -22,113 +22,24 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, Sparkles, Calendar, Zap, Bot, Layers, TrendingUp, FileText, Crown, MessageSquare, BarChart3, Megaphone, Linkedin, FlaskConical, GraduationCap, Activity, Trophy, Gamepad2, Gift, UserPlus, Target, Bell, Settings, ListTodo, Timer, CalendarDays, Users2, Mic, FolderOpen, Wrench } from "lucide-react";
+import { LogOut, PanelLeft } from "lucide-react";
+import { SIDEBAR_NAV, isNavLinkActive } from "@/lib/navigation";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
-// Menu organisé par catégories pour une navigation simplifiée
-interface MenuItem {
-  icon: any;
-  label: string;
-  path: string;
-  badge?: string;
-}
+const menuCategories = SIDEBAR_NAV.map((group) => ({
+  title: group.title,
+  items: group.items.map((item) => ({
+    icon: item.icon,
+    label: item.label,
+    path: item.href,
+    badge: item.badge,
+  })),
+}));
 
-interface MenuCategory {
-  title: string;
-  items: MenuItem[];
-}
-
-const menuCategories: MenuCategory[] = [
-  {
-    title: "Essentiel",
-    items: [
-      { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-      { icon: Wrench, label: "Mes Outils", path: "/mes-outils", badge: "🛠️" },
-      { icon: Sparkles, label: "Générateur", path: "/generate", badge: "IA" },
-      { icon: Bot, label: "Mes Agents", path: "/agents" },
-    ]
-  },
-  {
-    title: "Création",
-    items: [
-      { icon: FolderOpen, label: "Médiathèque", path: "/mes-outils?tab=mediatheque", badge: "📁" },
-      { icon: Layers, label: "Carrousels", path: "/carousels" },
-      { icon: FileText, label: "Templates", path: "/templates" },
-      { icon: Mic, label: "Dictée vocale", path: "/voice", badge: "🎙️" },
-      { icon: Zap, label: "Auto-Publish", path: "/auto-publish" },
-    ]
-  },
-  {
-    title: "Optimisation",
-    items: [
-      { icon: GraduationCap, label: "Coaching IA", path: "/coaching" },
-      { icon: FlaskConical, label: "A/B Testing", path: "/ab-testing" },
-      { icon: TrendingUp, label: "Tendances", path: "/trending" },
-    ]
-  },
-  {
-    title: "Analytics",
-    items: [
-      { icon: Activity, label: "Live Analytics", path: "/live-analytics", badge: "Live" },
-      { icon: BarChart3, label: "Analytics Templates", path: "/template-analytics", badge: "📊" },
-      { icon: Crown, label: "Classements", path: "/rankings/france" },
-    ]
-  },
-  {
-    title: "Engagement",
-    items: [
-      { icon: MessageSquare, label: "Engagement", path: "/engagement" },
-      { icon: Calendar, label: "Calendrier", path: "/schedule" },
-      { icon: Users2, label: "Collaboration", path: "/collaboration", badge: "Team" },
-      { icon: Users, label: "Collab Temps Réel", path: "/realtime-collab", badge: "🟢" },
-    ]
-  },
-  {
-    title: "Productivité",
-    items: [
-      { icon: ListTodo, label: "Missions", path: "/missions", badge: "🎯" },
-      { icon: Timer, label: "Focus", path: "/focus", badge: "🎯" },
-      { icon: CalendarDays, label: "Calendrier éditorial", path: "/editorial-calendar" },
-    ]
-  },
-  {
-    title: "Récompenses",
-    items: [
-      { icon: Gamepad2, label: "Gamification", path: "/gamification", badge: "🎮" },
-      { icon: Gift, label: "Boutique", path: "/rewards", badge: "🎁" },
-      { icon: Crown, label: "Packs Premium", path: "/premium-packs", badge: "💎" },
-      { icon: UserPlus, label: "Parrainage", path: "/referral", badge: "💰" },
-      { icon: Target, label: "Défis", path: "/challenges", badge: "🏆" },
-    ]
-  },
-  {
-    title: "Paramètres",
-    items: [
-      { icon: Bell, label: "Notifications", path: "/notifications" },
-      { icon: Settings, label: "Paramètres", path: "/settings" },
-      { icon: Linkedin, label: "LinkedIn", path: "/settings/linkedin" },
-    ]
-  }
-];
-
-// Flatten pour compatibilité
-const menuItems = menuCategories.flatMap(cat => cat.items);
-
-function isMenuItemActive(location: string, itemPath: string): boolean {
-  if (itemPath.includes("?")) {
-    const [path, query] = itemPath.split("?");
-    const tab = new URLSearchParams(query).get("tab");
-    const currentTab = new URLSearchParams(window.location.search).get("tab");
-    return location === path && currentTab === tab;
-  }
-  if (itemPath === "/mes-outils") {
-    return location === "/mes-outils" && !window.location.search.includes("tab=mediatheque");
-  }
-  return location === itemPath || location.startsWith(`${itemPath}/`);
-}
+const menuItems = menuCategories.flatMap((cat) => cat.items);
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 280;
@@ -160,10 +71,10 @@ export default function DashboardLayout({
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
           <div className="flex flex-col items-center gap-6">
             <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign in to continue
+              Connectez-vous pour continuer
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
+              Accédez à votre espace de travail LinkedAgents.
             </p>
           </div>
           <Button
@@ -173,7 +84,7 @@ export default function DashboardLayout({
             size="lg"
             className="w-full shadow-lg hover:shadow-xl transition-all"
           >
-            Sign in
+            Se connecter
           </Button>
         </div>
       </div>
@@ -290,7 +201,7 @@ function DashboardLayoutContent({
                 )}
                 <SidebarMenu className="px-2 py-0">
                   {category.items.map(item => {
-                    const isActive = isMenuItemActive(location, item.path);
+                    const isActive = isNavLinkActive(location, item.path);
                     return (
                       <SidebarMenuItem key={item.path}>
                         <SidebarMenuButton
@@ -349,7 +260,7 @@ function DashboardLayoutContent({
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
+                  <span>Se déconnecter</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -367,7 +278,7 @@ function DashboardLayoutContent({
 
       <SidebarInset>
         {isMobile && (
-          <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
+          <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur safe-area-top">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
               <div className="flex items-center gap-3">
@@ -380,7 +291,7 @@ function DashboardLayoutContent({
             </div>
           </div>
         )}
-        <main className="flex-1 p-4">{children}</main>
+        <main className="flex-1 p-3 sm:p-4 safe-area-bottom">{children}</main>
       </SidebarInset>
     </>
   );
