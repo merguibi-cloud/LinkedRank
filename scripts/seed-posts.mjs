@@ -3,8 +3,8 @@
  * Run: node scripts/seed-posts.mjs
  */
 
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import "dotenv/config";
+import postgres from "postgres";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -14,8 +14,7 @@ if (!DATABASE_URL) {
 }
 
 // Connexion à la base de données
-const connection = await mysql.createConnection(DATABASE_URL);
-const db = drizzle(connection);
+const sql = postgres(DATABASE_URL, { prepare: false });
 
 // Posts en français - Thématiques variées
 const frenchPosts = [
@@ -1424,32 +1423,34 @@ const allPosts = [
 
 console.log(`Inserting ${allPosts.length} posts into database...`);
 
+const postColumns = [
+  "title", "content", "language", "theme", "category",
+  "mediaType", "videoUrl", "mediaSource", "sortOrder", "status",
+];
+
 try {
   // Insérer les posts par batch de 10
   const batchSize = 10;
   for (let i = 0; i < allPosts.length; i += batchSize) {
-    const batch = allPosts.slice(i, i + batchSize);
-    await connection.query(
-      `INSERT INTO linkedin_posts (title, content, language, theme, category, mediaType, videoUrl, mediaSource, sortOrder, status) VALUES ?`,
-      [batch.map(post => [
-        post.title,
-        post.content,
-        post.language,
-        post.theme,
-        post.category || null,
-        post.mediaType,
-        post.videoUrl || null,
-        post.mediaSource || null,
-        post.sortOrder,
-        post.status
-      ])]
-    );
+    const batch = allPosts.slice(i, i + batchSize).map(post => ({
+      title: post.title,
+      content: post.content,
+      language: post.language,
+      theme: post.theme,
+      category: post.category || null,
+      mediaType: post.mediaType,
+      videoUrl: post.videoUrl || null,
+      mediaSource: post.mediaSource || null,
+      sortOrder: post.sortOrder,
+      status: post.status,
+    }));
+    await sql`INSERT INTO linkedin_posts ${sql(batch, ...postColumns)}`;
     console.log(`Inserted batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(allPosts.length / batchSize)}`);
   }
-  
+
   console.log(`✅ Successfully inserted ${allPosts.length} posts!`);
 } catch (error) {
   console.error("Error inserting posts:", error);
 } finally {
-  await connection.end();
+  await sql.end();
 }

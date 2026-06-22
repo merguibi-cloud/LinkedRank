@@ -1,4 +1,5 @@
-import mysql from 'mysql2/promise';
+import "dotenv/config";
+import postgres from "postgres";
 
 // Top LinkedIn Influencers data
 const influencers = [
@@ -515,47 +516,41 @@ const influencers = [
 ];
 
 async function seedInfluencers() {
-  const connection = await mysql.createConnection(process.env.DATABASE_URL);
-  
+  const sql = postgres(process.env.DATABASE_URL, { prepare: false });
+
   console.log("🚀 Starting influencers seed...");
-  
+
+  const columns = [
+    "name", "linkedinUrl", "headline", "profilePicture", "country", "industry",
+    "followers", "avgLikes", "avgComments", "engagementRate",
+    "followersGrowth30d", "isVerified", "topTopics",
+  ];
+
   for (const influencer of influencers) {
     try {
-      await connection.execute(
-        `INSERT INTO linkedin_influencers 
-         (name, linkedinUrl, headline, profilePicture, country, industry, 
-          followers, avgLikes, avgComments, engagementRate, 
-          followersGrowth30d, isVerified, topTopics)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-         followers = VALUES(followers),
-         avgLikes = VALUES(avgLikes),
-         engagementRate = VALUES(engagementRate),
-         followersGrowth30d = VALUES(followersGrowth30d),
-         updatedAt = NOW()`,
-        [
-          influencer.name,
-          influencer.linkedinUrl,
-          influencer.headline,
-          influencer.profilePicture,
-          influencer.country,
-          influencer.industry,
-          influencer.followers,
-          influencer.avgLikes,
-          influencer.avgComments,
-          String(influencer.engagementRate),
-          Math.round(influencer.followersGrowth30d * 1000),
-          influencer.isVerified,
-          influencer.topTopics,
-        ]
-      );
+      const row = {
+        name: influencer.name,
+        linkedinUrl: influencer.linkedinUrl,
+        headline: influencer.headline,
+        profilePicture: influencer.profilePicture,
+        country: influencer.country,
+        industry: influencer.industry,
+        followers: influencer.followers,
+        avgLikes: influencer.avgLikes,
+        avgComments: influencer.avgComments,
+        engagementRate: String(influencer.engagementRate),
+        followersGrowth30d: Math.round(influencer.followersGrowth30d * 1000),
+        isVerified: influencer.isVerified,
+        topTopics: influencer.topTopics,
+      };
+      await sql`INSERT INTO linkedin_influencers ${sql(row, ...columns)}`;
       console.log(`✅ Added: ${influencer.name} (${influencer.country})`);
     } catch (error) {
       console.error(`❌ Error adding ${influencer.name}:`, error.message);
     }
   }
-  
-  await connection.end();
+
+  await sql.end();
   console.log(`\n🎉 Seed complete! Added ${influencers.length} influencers.`);
 }
 

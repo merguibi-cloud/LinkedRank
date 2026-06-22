@@ -1,15 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request, Response } from "express";
+import WebSocket from "ws";
 import type { User } from "../../drizzle/schema";
 import { getUserByOpenId, upsertUser } from "../db";
 import { ENV } from "./env";
 import { sdk } from "./sdk";
-import { COOKIE_NAME } from "@shared/const";
 
 export function isSupabaseConfigured() {
   return Boolean(ENV.supabaseUrl && ENV.supabaseAnonKey);
 }
+
+// Node < 22 has no native WebSocket, which the Supabase Realtime client requires at construction time.
+const realtimeTransport = typeof globalThis.WebSocket === "undefined" ? WebSocket : undefined;
 
 export function createSupabaseServerClient(req: Request, res: Response) {
   if (!isSupabaseConfigured()) {
@@ -28,6 +31,7 @@ export function createSupabaseServerClient(req: Request, res: Response) {
         }
       },
     },
+    realtime: realtimeTransport ? { transport: realtimeTransport as never } : undefined,
   });
 }
 
@@ -44,27 +48,31 @@ export async function resolveAppUser(
   res: Response
 ): Promise<User | null> {
   if (isSupabaseConfigured()) {
-    const supabase = createSupabaseServerClient(req, res);
-    const {
-      data: { user: supabaseUser },
-    } = await supabase.auth.getUser();
+    try {
+      const supabase = createSupabaseServerClient(req, res);
+      const {
+        data: { user: supabaseUser },
+      } = await supabase.auth.getUser();
 
-    if (supabaseUser) {
-      const openId = `supabase:${supabaseUser.id}`;
-      const name =
-        (supabaseUser.user_metadata?.name as string | undefined) ??
-        (supabaseUser.user_metadata?.full_name as string | undefined) ??
-        null;
+      if (supabaseUser) {
+        const openId = `supabase:${supabaseUser.id}`;
+        const name =
+          (supabaseUser.user_metadata?.name as string | undefined) ??
+          (supabaseUser.user_metadata?.full_name as string | undefined) ??
+          null;
 
-      await upsertUser({
-        openId,
-        email: supabaseUser.email ?? null,
-        name,
-        loginMethod: "supabase",
-        lastSignedIn: new Date(),
-      });
+        await upsertUser({
+          openId,
+          email: supabaseUser.email ?? null,
+          name,
+          loginMethod: "supabase",
+          lastSignedIn: new Date(),
+        });
 
-      return (await getUserByOpenId(openId)) ?? null;
+        return (await getUserByOpenId(openId)) ?? null;
+      }
+    } catch (error) {
+      console.warn("[Supabase] resolveAppUser failed, falling back to legacy session:", error);
     }
   }
 
@@ -74,8 +82,10 @@ export async function resolveAppUser(
 export async function signOutSupabase(req: Request, res: Response) {
   if (!isSupabaseConfigured()) return;
 
-  const supabase = createSupabaseServerClient(req, res);
-  await supabase.auth.signOut();
-
-  res.clearCookie(COOKIE_NAME, { path: "/" });
+  try {
+    const supabase = createSupabaseServerClient(req, res);
+    await supabase.auth.signOut();
+  } catch (error) {
+    console.warn("[Supabase] signOut failed:", error);
+  }
 }
