@@ -36,8 +36,10 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [statusLabel, setStatusLabel] = useState("Connexion à votre agent...");
   const [extractedProfile, setExtractedProfile] = useState<Record<string, unknown> | null>(null);
+  const [noSpeechHint, setNoSpeechHint] = useState(false);
 
   const recognitionRef = useRef<any>(null);
+  const recognitionActiveRef = useRef(false);
   const isListeningRef = useRef(false);
   const currentAnswerRef = useRef("");
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -116,6 +118,11 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
     recognition.interimResults = true;
     recognition.lang = "fr-FR";
 
+    recognition.onstart = () => {
+      console.log("[VoiceOnboarding] SpeechRecognition started");
+      recognitionActiveRef.current = true;
+    };
+
     recognition.onresult = (event: any) => {
       let finalText = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -123,6 +130,7 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
           finalText += event.results[i][0].transcript;
         }
       }
+      console.log("[VoiceOnboarding] SpeechRecognition result:", finalText || "(interim only)");
       if (finalText) {
         setCurrentAnswer((prev) => {
           const next = (prev ? `${prev} ${finalText}` : finalText).trim();
@@ -133,14 +141,25 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
       }
     };
 
-    recognition.onerror = () => stopListening();
+    recognition.onerror = (event: any) => {
+      console.error("[VoiceOnboarding] SpeechRecognition error:", event.error);
+      recognitionActiveRef.current = false;
+      stopListening();
+    };
     recognition.onend = () => {
+      console.log("[VoiceOnboarding] SpeechRecognition ended, isListening:", isListeningRef.current);
+      recognitionActiveRef.current = false;
       if (isListeningRef.current) {
-        try {
-          recognition.start();
-        } catch {
-          /* already started */
-        }
+        // Restarting immediately after `onend` can throw/abort because the
+        // browser hasn't finished tearing down the previous session yet.
+        setTimeout(() => {
+          if (!isListeningRef.current || recognitionActiveRef.current) return;
+          try {
+            recognition.start();
+          } catch (err) {
+            console.error("[VoiceOnboarding] SpeechRecognition restart failed:", err);
+          }
+        }, 250);
       }
     };
 
@@ -159,10 +178,12 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
     isListeningRef.current = true;
     setAgentState("listening");
     setStatusLabel("Parlez maintenant, je vous écoute...");
+    setNoSpeechHint(false);
+    if (recognitionActiveRef.current) return;
     try {
       recognitionRef.current?.start();
-    } catch {
-      /* already started */
+    } catch (err) {
+      console.error("[VoiceOnboarding] SpeechRecognition start failed:", err);
     }
   }, []);
 
@@ -273,6 +294,12 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
 
   const toggleMic = () => {
     if (isListeningRef.current) {
+      if (!currentAnswerRef.current.trim()) {
+        setNoSpeechHint(true);
+        setTimeout(() => setNoSpeechHint(false), 3000);
+        return;
+      }
+      setNoSpeechHint(false);
       void submitAnswerRef.current();
     } else if (agentState !== "speaking" && agentState !== "thinking") {
       startListening();
@@ -368,6 +395,15 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
                       />
                     ))}
                   </div>
+                  {noSpeechHint && (
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-sm text-amber-400"
+                    >
+                      Je n'ai rien entendu, parlez puis cliquez à nouveau.
+                    </motion.p>
+                  )}
                   <Button
                     onClick={toggleMic}
                     size="lg"
