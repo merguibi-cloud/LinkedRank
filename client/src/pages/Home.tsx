@@ -21,6 +21,10 @@ import {
   Clock,
   Users,
   Lock,
+  PenTool,
+  Search,
+  CalendarDays,
+  LineChart,
 } from "lucide-react";
 import { SocialProofStats } from "@/components/SocialProof";
 import { VideoPresentation } from "@/components/VideoPresentation";
@@ -52,8 +56,6 @@ export default function Home() {
     icon: typeof Sparkles;
     name: string;
     role: string;
-    emoji: string;
-    avatar: string;
     color: string;
     personality: string;
     description: string;
@@ -61,63 +63,53 @@ export default function Home() {
     availability: AgentAvailability;
   }> = [
     {
-      icon: Sparkles,
+      icon: PenTool,
       name: "Léa",
       role: "Content Creator",
-      emoji: "✍️",
-      avatar: "👩‍🎨",
       color: "from-pink-500 to-rose-500",
-      personality: "Créative & Inspirante",
-      description: "Salut ! Je suis Léa, votre créatrice de contenu. Je transforme vos idées en posts captivants qui résonnent avec votre audience.",
-      quote: "\"Chaque post est une opportunité de marquer les esprits\"",
+      personality: "Créative et inspirante",
+      description: "Transforme vos idées en posts structurés, adaptés à votre audience LinkedIn.",
+      quote: "Chaque publication est une opportunité de marquer les esprits.",
       availability: "available",
     },
     {
-      icon: TrendingUp,
+      icon: Search,
       name: "Max",
       role: "Trend Hunter",
-      emoji: "🔍",
-      avatar: "🕵️‍♂️",
       color: "from-blue-500 to-cyan-500",
-      personality: "Curieux & Analytique",
-      description: "Hey ! Max ici. Je surveille les tendances 24/7 pour vous alerter des opportunités virales avant tout le monde.",
-      quote: "\"Les tendances d'aujourd'hui sont les succès de demain\"",
+      personality: "Curieux et analytique",
+      description: "Surveille les tendances pour repérer les sujets à fort potentiel.",
+      quote: "Les tendances d'aujourd'hui sont les succès de demain.",
       availability: "coming_soon",
     },
     {
       icon: MessageSquare,
       name: "Emma",
       role: "Engagement Manager",
-      emoji: "💬",
-      avatar: "👩‍💼",
       color: "from-emerald-500 to-teal-500",
-      personality: "Empathique & Réactive",
-      description: "Bonjour ! Emma à votre service. Je gère vos interactions et crée des connexions authentiques avec votre communauté.",
-      quote: "\"L'engagement, c'est l'art de créer des conversations\"",
+      personality: "Empathique et réactive",
+      description: "Aide à structurer vos réponses et à entretenir votre communauté.",
+      quote: "L'engagement, c'est l'art de créer des conversations.",
       availability: "coming_soon",
     },
     {
-      icon: BarChart3,
+      icon: LineChart,
       name: "Alex",
       role: "Growth Strategist",
-      emoji: "📈",
-      avatar: "🧑‍💻",
       color: "from-violet-500 to-purple-500",
-      personality: "Stratégique & Data-driven",
-      description: "Salut ! Je suis Alex, votre stratège de croissance. J'analyse vos données pour maximiser votre impact LinkedIn.",
-      quote: "\"Les chiffres racontent une histoire, je la décode pour vous\"",
+      personality: "Stratégique et orienté data",
+      description: "Analyse vos performances pour affiner votre stratégie de contenu.",
+      quote: "Les chiffres racontent une histoire — je la traduis en actions.",
       availability: "coming_soon",
     },
     {
-      icon: Users,
+      icon: CalendarDays,
       name: "Sam",
       role: "Planificateur",
-      emoji: "📅",
-      avatar: "⏰",
       color: "from-amber-500 to-orange-500",
-      personality: "Organisé & Précis",
-      description: "Yo ! Sam le planificateur. Je publie vos posts au moment parfait pour maximiser leur visibilité.",
-      quote: "\"Le timing est tout, je m'en occupe\"",
+      personality: "Organisé et précis",
+      description: "Programme vos publications aux créneaux les plus performants.",
+      quote: "Le timing fait la différence — je m'en occupe.",
       availability: "coming_soon",
     },
   ];
@@ -160,7 +152,7 @@ export default function Home() {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden pt-24 pb-20">
+      <section className="relative overflow-hidden pt-16 pb-12 sm:pt-24 sm:pb-20">
         {/* Background Effects */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-violet/20 blur-[100px]" />
@@ -177,34 +169,33 @@ export default function Home() {
             </div>
 
             {/* Title */}
-            <h1 className="text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl">
+            <h1 className="text-3xl font-bold leading-tight tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl">
               <span className="bg-gradient-to-r from-violet-light via-rose to-gold bg-clip-text text-transparent">
                 LinkedAgents
               </span>
             </h1>
             
-            <p className="mt-4 text-2xl font-medium text-white/90 sm:text-3xl">
+            <p className="mt-4 text-xl font-medium text-white/90 sm:text-3xl">
               Vos agents IA pour LinkedIn
             </p>
 
             {/* Subtitle */}
-            <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-              Une équipe d'agents IA qui vous aide à créer du contenu, détecter les tendances,
-              gérer l'engagement et planifier vos publications — gratuitement, pour l'instant.
+            <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:mt-6 sm:text-lg">
+              Créez du contenu LinkedIn avec l'IA, planifiez vos publications et suivez vos résultats — en quelques clics.
             </p>
 
             {/* CTA Buttons */}
-            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <div className="mt-8 flex w-full max-w-sm flex-col items-stretch justify-center gap-3 sm:mt-10 sm:max-w-none sm:flex-row sm:items-center">
               {user ? (
                 <>
                   <Link href="/agents">
-                    <Button className="btn-gradient h-14 px-10 text-lg">
+                    <Button className="btn-gradient h-12 w-full px-8 text-base sm:h-14 sm:w-auto sm:px-10 sm:text-lg">
                       <Brain className="mr-2 h-5 w-5" />
                       Mes Agents IA
                     </Button>
                   </Link>
                   <Link href="/dashboard">
-                    <Button variant="outline" className="h-14 px-10 text-lg border-white/20 hover:bg-white/5">
+                    <Button variant="outline" className="h-12 w-full border-white/20 px-8 text-base hover:bg-white/5 sm:h-14 sm:w-auto sm:px-10 sm:text-lg">
                       <BarChart3 className="mr-2 h-5 w-5" />
                       Dashboard
                     </Button>
@@ -213,13 +204,13 @@ export default function Home() {
               ) : (
                 <>
                   <a href={getSignupUrl("/onboarding")}>
-                    <Button className="btn-gradient h-14 px-10 text-lg">
+                    <Button className="btn-gradient h-12 w-full px-8 text-base sm:h-14 sm:w-auto sm:px-10 sm:text-lg">
                       <Rocket className="mr-2 h-5 w-5" />
                       Créer mon compte
                     </Button>
                   </a>
                   <Link href="/rankings/france">
-                    <Button variant="outline" className="h-14 px-10 text-lg border-white/20 hover:bg-white/5">
+                    <Button variant="outline" className="h-12 w-full border-white/20 px-8 text-base hover:bg-white/5 sm:h-14 sm:w-auto sm:px-10 sm:text-lg">
                       <BarChart3 className="mr-2 h-5 w-5" />
                       Explorer les classements
                     </Button>
@@ -294,7 +285,7 @@ export default function Home() {
       </section>
 
       {/* Agents Section */}
-      <section className="py-20">
+      <section className="py-12 sm:py-20">
         <div className="container">
           <div className="mb-12 text-center">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-400">
@@ -315,6 +306,7 @@ export default function Home() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {agents.map((agent) => {
               const isComingSoon = agent.availability === "coming_soon";
+              const AgentIcon = agent.icon;
               return (
               <div
                 key={agent.name}
@@ -322,7 +314,7 @@ export default function Home() {
                   "group relative rounded-2xl border p-6 backdrop-blur-sm transition-all",
                   isComingSoon
                     ? "border-white/5 bg-card/30 opacity-80 hover:opacity-95 hover:border-white/10"
-                    : "border-violet/20 bg-card/50 hover:border-violet/40 hover:bg-card/80 hover:scale-[1.02] shadow-lg shadow-violet/5",
+                    : "border-violet/20 bg-card/50 hover:border-violet/40 hover:bg-card/80 shadow-lg shadow-violet/5",
                 ].join(" ")}
               >
                 <AgentStatusBadge availability={agent.availability} />
@@ -331,10 +323,9 @@ export default function Home() {
                   <div className="absolute inset-0 rounded-2xl bg-background/10 pointer-events-none" />
                 )}
 
-                {/* Agent Avatar & Info */}
                 <div className={`relative mb-4 flex items-center gap-4 ${isComingSoon ? "grayscale-[35%]" : ""}`}>
-                  <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${agent.color} text-3xl shadow-lg`}>
-                    {agent.avatar}
+                  <div className={`flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${agent.color} shadow-lg`}>
+                    <AgentIcon className="h-7 w-7 text-white" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white">{agent.name}</h3>
@@ -343,13 +334,11 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Description */}
                 <p className="relative text-sm text-muted-foreground mb-3">
                   {agent.description}
                 </p>
 
-                {/* Quote */}
-                <p className="relative text-xs italic text-white/60 mb-4">
+                <p className="relative text-xs italic text-white/60 mb-4 border-l-2 border-violet/30 pl-3">
                   {agent.quote}
                 </p>
 
@@ -539,7 +528,7 @@ export default function Home() {
             <div className="flex items-center gap-6">
               <Link href="/legal/confidentialite" className="text-xs text-muted-foreground hover:text-white transition-colors">Confidentialité</Link>
               <Link href="/legal/cgu" className="text-xs text-muted-foreground hover:text-white transition-colors">Conditions</Link>
-              <span className="text-xs text-muted-foreground">Fait avec ❤️ en France</span>
+              <span className="text-xs text-muted-foreground">Conçu en France</span>
             </div>
           </div>
         </div>

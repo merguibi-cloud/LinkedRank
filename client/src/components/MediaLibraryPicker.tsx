@@ -6,6 +6,7 @@ import { trpc } from "@/lib/trpc";
 export type MediaPickerItem = {
   id: number;
   fileUrl: string;
+  fileKey: string;
   title: string | null;
   mediaType: string;
 };

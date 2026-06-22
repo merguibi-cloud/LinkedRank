@@ -70,12 +70,12 @@ export async function createAgent(
     tasksCompleted: 0,
     tasksApproved: 0,
     tasksRejected: 0,
-  });
+  }).returning({ id: agents.id });
   
-  const agent = await getAgentById(result.insertId);
+  const agent = await getAgentById(result.id);
   
   // Log agent creation
-  await logAgentActivity(result.insertId, userId, "agent_created", "info", `Agent "${data.name}" created`);
+  await logAgentActivity(result.id, userId, "agent_created", "info", `Agent "${data.name}" created`);
   
   return agent!;
 }
@@ -249,11 +249,11 @@ export async function createTask(
     inputData: data.inputData ? JSON.stringify(data.inputData) : null,
     requiresApproval: data.requiresApproval ?? agent.requiresApproval,
     retryCount: 0,
-  });
+  }).returning({ id: agentTasks.id });
   
-  await logAgentActivity(agentId, userId, "task_created", "info", `Task "${data.title}" created`, result.insertId);
+  await logAgentActivity(agentId, userId, "task_created", "info", `Task "${data.title}" created`, result.id);
   
-  return (await getTaskById(result.insertId))!;
+  return (await getTaskById(result.id))!;
 }
 
 /**

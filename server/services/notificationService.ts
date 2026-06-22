@@ -36,7 +36,7 @@ export async function createNotification(data: {
   const db = await getDb();
   if (!db) return null;
   
-  const result = await db.insert(notifications).values({
+  const [created] = await db.insert(notifications).values({
     userId: data.userId,
     type: data.type,
     title: data.title,
@@ -48,10 +48,8 @@ export async function createNotification(data: {
     actionLabel: data.actionLabel,
     priority: data.priority || "medium",
     metadata: data.metadata ? JSON.stringify(data.metadata) : null,
-  }).$returningId();
+  }).returning();
   
-  // Fetch the created notification
-  const [created] = await db.select().from(notifications).where(eq(notifications.id, result[0].id));
   return created;
 }
 

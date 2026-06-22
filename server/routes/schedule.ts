@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { getDb } from "../db";
-import { autoPublishQueue, generatedPosts } from "../../drizzle/schema";
+import { autoPublishQueue, generatedPosts, mediaLibrary } from "../../drizzle/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { requireAuth } from "../_core/authMiddleware";
 
@@ -94,9 +94,11 @@ router.get("/", async (req: Request, res: Response) => {
 
 router.post("/", async (req: Request, res: Response) => {
   const userId = (req as Request & { userId: number }).userId;
-  const { content, imageUrl, generatedPostId, source } = req.body as {
+  const { content, imageUrl, generatedPostId, mediaLibraryId, imageKey, source } = req.body as {
     content?: string;
     imageUrl?: string;
+    imageKey?: string;
+    mediaLibraryId?: number;
     generatedPostId?: number;
     scheduledAt?: string;
     date?: string;
@@ -124,6 +126,27 @@ router.post("/", async (req: Request, res: Response) => {
 
   try {
     const trimmedContent = content.trim();
+
+    let resolvedImageUrl = imageUrl || null;
+    let resolvedImageKey = imageKey || null;
+    let resolvedMediaId = mediaLibraryId ?? null;
+
+    if (resolvedMediaId && !resolvedImageKey) {
+      const [media] = await db
+        .select({
+          fileUrl: mediaLibrary.fileUrl,
+          fileKey: mediaLibrary.fileKey,
+        })
+        .from(mediaLibrary)
+        .where(
+          and(eq(mediaLibrary.id, resolvedMediaId), eq(mediaLibrary.userId, userId))
+        )
+        .limit(1);
+      if (media) {
+        resolvedImageUrl = resolvedImageUrl || media.fileUrl;
+        resolvedImageKey = media.fileKey;
+      }
+    }
 
     const existingPending = await db
       .select()
@@ -160,12 +183,15 @@ router.post("/", async (req: Request, res: Response) => {
       .values({
         userId,
         content: trimmedContent,
-        imageUrl: imageUrl || null,
+        imageUrl: resolvedImageUrl,
+        imageKey: resolvedImageKey,
+        mediaLibraryId: resolvedMediaId,
+        generatedPostId: generatedPostId ?? null,
         scheduledFor,
         status: "pending",
         generatedFrom,
       })
-      .$returningId();
+      .returning({ id: autoPublishQueue.id });
 
     if (generatedPostId) {
       await db
@@ -173,6 +199,9 @@ router.post("/", async (req: Request, res: Response) => {
         .set({
           status: "scheduled",
           scheduledAt: scheduledFor,
+          ...(resolvedImageUrl ? { imageUrl: resolvedImageUrl } : {}),
+          ...(resolvedImageKey ? { imageKey: resolvedImageKey } : {}),
+          ...(resolvedMediaId ? { mediaLibraryId: resolvedMediaId } : {}),
           updatedAt: new Date(),
         })
         .where(

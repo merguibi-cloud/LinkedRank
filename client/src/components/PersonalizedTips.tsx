@@ -165,22 +165,16 @@ export function WelcomeWidget() {
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-      <Card className="glass-card border-primary/30 overflow-hidden">
-        <div className={`absolute inset-0 bg-gradient-to-br ${profile.gradient} opacity-30`} />
+      <Card className="glass-card border-border/50 overflow-hidden">
         <CardContent className="relative p-6">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <div className={`w-16 h-16 rounded-2xl bg-background/50 border border-border/50 flex items-center justify-center ${profile.color}`}>
-                {profile.icon}
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-foreground">
-                  Bienvenue, {profile.name} ! 👋
-                </h3>
-                <p className="text-muted-foreground mt-1">
-                  Votre expérience LinkedAgents est personnalisée pour vous aider à atteindre vos objectifs.
-                </p>
-              </div>
+            <div>
+              <h3 className="text-xl font-bold text-foreground font-sans">
+                Bienvenue, {profile.name}
+              </h3>
+              <p className="text-muted-foreground mt-1">
+                Votre expérience est calibrée sur : {profile.focus.toLowerCase()}.
+              </p>
             </div>
             <Button 
               variant="ghost" 

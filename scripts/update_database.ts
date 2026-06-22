@@ -3,7 +3,8 @@
  * Exécuter avec: npx tsx scripts/update_database.ts
  */
 
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { linkedinInfluencers } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import * as fs from "fs";
@@ -49,7 +50,8 @@ async function main() {
   console.log(`\nLoaded ${creators.length} creators from enriched data file`);
 
   // Connect to database
-  const db = drizzle(process.env.DATABASE_URL!);
+  const client = postgres(process.env.DATABASE_URL!, { prepare: false });
+  const db = drizzle(client);
 
   // Clear existing influencers
   console.log("\nClearing existing influencers...");

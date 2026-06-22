@@ -10,7 +10,48 @@ export type GenerateImageOptions = {
 
 export type GenerateImageResponse = {
   url: string;
+  buffer: Buffer;
 };
+
+export async function generateImageBuffer(
+  options: GenerateImageOptions
+): Promise<Buffer> {
+  const apiKey = getOpenAiKey();
+  const primaryModel = ENV.openaiImageModel;
+  const size = normalizeImageSize(options.size);
+
+  try {
+    return await generateWithModel(apiKey, primaryModel, options.prompt, size);
+  } catch (primaryError) {
+    const message =
+      primaryError instanceof Error ? primaryError.message : String(primaryError);
+
+    if (
+      primaryModel !== FALLBACK_IMAGE_MODEL &&
+      (isTimeoutError(message) || /\((503|504|502)\)/.test(message))
+    ) {
+      console.warn(
+        `[imageGeneration] ${primaryModel} failed, fallback to ${FALLBACK_IMAGE_MODEL}`
+      );
+      return await generateWithModel(
+        apiKey,
+        FALLBACK_IMAGE_MODEL,
+        options.prompt,
+        size
+      );
+    }
+
+    throw primaryError;
+  }
+}
+
+export async function generateImage(
+  options: GenerateImageOptions
+): Promise<GenerateImageResponse> {
+  const buffer = await generateImageBuffer(options);
+  const url = await saveImageBuffer(buffer, `post-${Date.now()}.png`);
+  return { url, buffer };
+}
 
 const FALLBACK_IMAGE_MODEL = "dall-e-3";
 const MAX_ATTEMPTS = 3;
@@ -163,45 +204,4 @@ async function generateWithModel(
   }
 
   throw new Error(lastError);
-}
-
-export async function generateImage(
-  options: GenerateImageOptions
-): Promise<GenerateImageResponse> {
-  const apiKey = getOpenAiKey();
-  const primaryModel = ENV.openaiImageModel;
-  const size = normalizeImageSize(options.size);
-
-  try {
-    const buffer = await generateWithModel(
-      apiKey,
-      primaryModel,
-      options.prompt,
-      size
-    );
-    const url = await saveImageBuffer(buffer, `post-${Date.now()}.png`);
-    return { url };
-  } catch (primaryError) {
-    const message =
-      primaryError instanceof Error ? primaryError.message : String(primaryError);
-
-    if (
-      primaryModel !== FALLBACK_IMAGE_MODEL &&
-      (isTimeoutError(message) || /\((503|504|502)\)/.test(message))
-    ) {
-      console.warn(
-        `[imageGeneration] ${primaryModel} failed, fallback to ${FALLBACK_IMAGE_MODEL}`
-      );
-      const buffer = await generateWithModel(
-        apiKey,
-        FALLBACK_IMAGE_MODEL,
-        options.prompt,
-        size
-      );
-      const url = await saveImageBuffer(buffer, `post-${Date.now()}.png`);
-      return { url };
-    }
-
-    throw primaryError;
-  }
 }

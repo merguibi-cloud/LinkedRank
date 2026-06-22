@@ -25,6 +25,7 @@ export interface MediaItem {
   description: string | null;
   tags: string[];
   fileUrl: string;
+  fileKey: string;
   fileName: string;
   mimeType: string;
   fileSize: number | null;
@@ -53,10 +54,11 @@ function mapMediaRow(row: typeof mediaLibrary.$inferSelect): MediaItem {
     description: row.description,
     tags: parseTags(row.tags),
     fileUrl: row.fileUrl,
+    fileKey: row.fileKey,
     fileName: row.fileName,
     mimeType: row.mimeType,
     fileSize: row.fileSize,
-    mediaType: row.mediaType,
+    mediaType: row.mediaType as MediaItem["mediaType"],
     aiDescription: row.aiDescription,
     aiSuggestedTheme: row.aiSuggestedTheme,
     usageCount: row.usageCount,
@@ -200,10 +202,10 @@ export async function uploadMedia(
     mediaType,
     aiDescription: aiAnalysis.description,
     aiSuggestedTheme: aiAnalysis.suggestedTheme,
-  });
+  }).returning({ id: mediaLibrary.id });
 
   return mapMediaRow({
-    id: result.insertId,
+    id: result.id,
     userId,
     title: input.title || input.fileName.replace(/\.[^.]+$/, ""),
     description: input.description || null,
@@ -371,12 +373,15 @@ export async function generatePostForMedia(
     tone: options.tone ?? "inspirational",
     prompt: `Média #${mediaId}: ${media.aiDescription || media.title}`,
     status: "generated",
-  });
+    imageUrl: media.mediaType === "image" ? media.fileUrl : null,
+    imageKey: media.mediaType === "image" ? media.fileKey : null,
+    mediaLibraryId: media.id,
+  }).returning({ id: generatedPosts.id });
 
   await markMediaUsed(userId, mediaId);
 
   return {
-    id: result.insertId,
+    id: result.id,
     title: generated.title,
     content: generated.content,
     hashtags: generated.hashtags,

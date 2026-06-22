@@ -1,12 +1,13 @@
 import { invokeLLM } from "../_core/llm";
-import { generateImage, normalizeImageSize } from "../_core/imageGeneration";
+import { generateImageBuffer, normalizeImageSize } from "../_core/imageGeneration";
+import { persistAiGeneratedImage } from "./postAssetService";
 
 function extractText(
   content: string | Array<{ text?: string }> | undefined
 ): string {
   if (!content) return "";
   if (typeof content === "string") return content.trim();
-  return content.map(part => part.text ?? "").join("").trim();
+  return content.map((part) => part.text ?? "").join("").trim();
 }
 
 const VISUAL_STYLE_HINTS: Record<string, string> = {
@@ -63,17 +64,40 @@ ${options.suggestedMedia ? `\nDirection visuelle suggérée: ${options.suggested
   return prompt;
 }
 
-export async function generatePostImage(options: {
-  content: string;
-  title: string;
-  suggestedMedia?: string;
-  visualStyle?: string;
-  imageSize?: string;
-}): Promise<{ imageUrl: string; prompt: string }> {
+export async function generatePostImage(
+  userId: number,
+  options: {
+    content: string;
+    title: string;
+    suggestedMedia?: string;
+    visualStyle?: string;
+    imageSize?: string;
+    generatedPostId?: number;
+  }
+): Promise<{
+  imageUrl: string;
+  imageKey: string;
+  mediaLibraryId: number;
+  prompt: string;
+}> {
   const prompt = await buildImagePromptFromPost(options);
-  const { url } = await generateImage({
+  const buffer = await generateImageBuffer({
     prompt,
     size: normalizeImageSize(options.imageSize),
   });
-  return { imageUrl: url, prompt };
+
+  const asset = await persistAiGeneratedImage(userId, buffer, {
+    title: options.title,
+    prompt,
+  });
+
+  if (options.generatedPostId) {
+    const { linkImageToGeneratedPost } = await import("./postAssetService");
+    await linkImageToGeneratedPost(userId, options.generatedPostId, {
+      ...asset,
+      imagePrompt: prompt,
+    });
+  }
+
+  return { ...asset, prompt };
 }

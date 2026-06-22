@@ -76,6 +76,7 @@ export default function Generator() {
   const [editedContent, setEditedContent] = useState("");
   const [editedHashtags, setEditedHashtags] = useState<string[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageKey, setImageKey] = useState<string | null>(null);
   const [imagePrompt, setImagePrompt] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishMode, setPublishMode] = useState<"now" | "schedule">("now");
@@ -152,6 +153,7 @@ export default function Generator() {
     setEditedContent(post.content);
     setEditedHashtags(post.hashtags ?? []);
     setImageUrl(null);
+    setImageKey(null);
     setImagePrompt(null);
     setSelectedMediaId(null);
     setImageSource("library");
@@ -182,11 +184,29 @@ export default function Generator() {
     onError: (error) => toast.error(`Erreur: ${error.message}`),
   });
 
+  const syncPostAssets = (postId: number, status?: "saved" | "scheduled" | "published") => {
+    savePostMutation.mutate({
+      id: postId,
+      content: editedContent,
+      ...(status ? { status } : {}),
+      ...(imageUrl ? { imageUrl } : {}),
+      ...(imageKey ? { imageKey } : {}),
+      ...(imagePrompt ? { imagePrompt } : {}),
+      ...(selectedMediaId ? { mediaLibraryId: selectedMediaId } : {}),
+    });
+  };
+
   const generateImageMutation = trpc.generator.generatePostImage.useMutation({
     onSuccess: (data) => {
       setImageUrl(data.imageUrl);
+      setImageKey(data.imageKey);
       setImagePrompt(data.prompt);
-      toast.success("Image générée avec succès !");
+      setSelectedMediaId(data.mediaLibraryId);
+      setImageSource("ai");
+      if (activePost) {
+        syncPostAssets(activePost.id);
+      }
+      toast.success("Image générée et enregistrée dans votre médiathèque");
     },
     onError: (error) => toast.error(`Erreur image: ${error.message}`),
   });
@@ -221,6 +241,7 @@ export default function Generator() {
       suggestedMedia: activePost.suggestedMedia,
       visualStyle: aiImageStyle,
       imageSize: aiImageFormat,
+      generatedPostId: activePost.id,
     });
   };
 
@@ -236,13 +257,14 @@ export default function Generator() {
           content: editedContent,
           hashtags: editedHashtags,
           imageUrl: imageUrl ?? undefined,
+          generatedPostId: activePost?.id,
         }),
       });
       const data = await response.json();
       if (response.ok && data.success) {
         toast.success("Post publié sur LinkedIn !");
         if (activePost) {
-          savePostMutation.mutate({ id: activePost.id, content: editedContent, status: "published" });
+          syncPostAssets(activePost.id, "published");
         }
         setWorkflowStep("configure");
         setActivePost(null);
@@ -270,6 +292,8 @@ export default function Generator() {
         body: JSON.stringify({
           content: editedContent,
           imageUrl: imageUrl ?? undefined,
+          imageKey: imageKey ?? undefined,
+          mediaLibraryId: selectedMediaId ?? undefined,
           date: scheduleDate,
           time: scheduleTime,
           generatedPostId: activePost?.id,
@@ -279,7 +303,7 @@ export default function Generator() {
       if (response.ok && data.success) {
         toast.success("Post planifié ! Il sera publié automatiquement.");
         if (activePost) {
-          savePostMutation.mutate({ id: activePost.id, content: editedContent, status: "scheduled" });
+          syncPostAssets(activePost.id, "scheduled");
         }
         setWorkflowStep("configure");
         setActivePost(null);
@@ -299,7 +323,7 @@ export default function Generator() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-amber-900/20 bg-gradient-to-r from-amber-950/20 to-transparent">
+        <header className="border-b border-violet/20 bg-gradient-to-r from-violet/10 to-transparent">
           <div className="container py-4">
             <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="w-4 h-4" /> Retour
@@ -307,16 +331,16 @@ export default function Generator() {
           </div>
         </header>
         <div className="container py-20">
-          <Card className="max-w-md mx-auto bg-card/50 border-amber-900/30">
+          <Card className="max-w-md mx-auto bg-card/50 border-violet/30">
             <CardHeader className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-violet to-rose flex items-center justify-center">
                 <Sparkles className="w-8 h-8 text-white" />
               </div>
               <CardTitle className="text-2xl">Créer un post LinkedIn</CardTitle>
               <CardDescription>Connectez-vous pour générer du contenu avec l'IA</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={login} className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600">
+              <Button onClick={login} className="w-full bg-gradient-to-r from-violet to-rose hover:opacity-90">
                 Se connecter pour commencer
               </Button>
             </CardContent>
@@ -328,20 +352,20 @@ export default function Generator() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-amber-900/20 bg-gradient-to-r from-amber-950/20 to-transparent">
-        <div className="container py-4 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
+      <header className="border-b border-violet/20 bg-gradient-to-r from-violet/10 to-transparent safe-area-top">
+        <div className="container flex items-center justify-between gap-2 py-3 sm:py-4">
+          <Link href="/dashboard" className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground sm:text-base">
+            <ArrowLeft className="h-4 w-4" /> Dashboard
           </Link>
-          <Badge variant="outline" className="border-amber-700/50 text-amber-400">
+          <Badge variant="outline" className="max-w-[45vw] truncate border-violet/40 text-violet-light text-xs sm:max-w-none sm:text-sm">
             {user.name || user.email}
           </Badge>
         </div>
       </header>
 
-      <div className="container py-6 space-y-6">
+      <div className="container space-y-4 py-4 sm:space-y-6 sm:py-6">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-violet-light to-rose bg-clip-text text-transparent sm:text-3xl">
             Créer un post LinkedIn
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -351,8 +375,8 @@ export default function Generator() {
 
         <LinkedInConnectBanner />
 
-        {/* Stepper */}
-        <div className="flex flex-wrap gap-2">
+        {/* Stepper — défilement horizontal sur mobile */}
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide snap-x snap-mandatory sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
           {STEPS.map((step, i) => {
             const Icon = step.icon;
             const isActive = step.id === workflowStep;
@@ -365,16 +389,17 @@ export default function Generator() {
                   if (i === 0 || activePost) setWorkflowStep(step.id);
                 }}
                 disabled={i > 0 && !activePost}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
                   isActive
-                    ? "bg-amber-600 text-white"
+                    ? "bg-violet text-white"
                     : isDone
-                      ? "bg-amber-950/50 text-amber-400 border border-amber-700/50"
+                      ? "bg-violet/20 text-violet-light border border-violet/40"
                       : "bg-card/50 text-muted-foreground border border-border disabled:opacity-40"
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                {i + 1}. {step.label}
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="sm:hidden">{step.label}</span>
+                <span className="hidden sm:inline">{i + 1}. {step.label}</span>
                 {i < STEPS.length - 1 && <ChevronRight className="w-3 h-3 opacity-50 hidden sm:block" />}
               </button>
             );
@@ -391,10 +416,10 @@ export default function Generator() {
               </TabsList>
 
               <TabsContent value="generate" className="mt-4">
-                <Card className="bg-card/50 border-amber-900/30">
+                <Card className="bg-card/50 border-violet/30">
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Lightbulb className="w-5 h-5 text-amber-500" />
+                      <Lightbulb className="w-5 h-5 text-violet-light" />
                       Étape 1 — Configurer
                     </CardTitle>
                     <CardDescription>Choisissez le sujet et le style de votre post</CardDescription>
@@ -417,11 +442,11 @@ export default function Generator() {
                         <Select value={language} onValueChange={v => setLanguage(v as typeof language)}>
                           <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="FR">🇫🇷 FR</SelectItem>
-                            <SelectItem value="EN">🇬🇧 EN</SelectItem>
-                            <SelectItem value="AR">🇸🇦 AR</SelectItem>
-                            <SelectItem value="ES">🇪🇸 ES</SelectItem>
-                            <SelectItem value="DE">🇩🇪 DE</SelectItem>
+                            <SelectItem value="FR">Français</SelectItem>
+                            <SelectItem value="EN">Anglais</SelectItem>
+                            <SelectItem value="AR">Arabe</SelectItem>
+                            <SelectItem value="ES">Espagnol</SelectItem>
+                            <SelectItem value="DE">Allemand</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -430,11 +455,11 @@ export default function Generator() {
                         <Select value={tone} onValueChange={v => setTone(v as typeof tone)}>
                           <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="professional">💼 Pro</SelectItem>
-                            <SelectItem value="casual">😊 Casual</SelectItem>
-                            <SelectItem value="inspirational">✨ Inspirant</SelectItem>
-                            <SelectItem value="educational">📚 Éducatif</SelectItem>
-                            <SelectItem value="provocative">🔥 Provocateur</SelectItem>
+                            <SelectItem value="professional">Professionnel</SelectItem>
+                            <SelectItem value="casual">Décontracté</SelectItem>
+                            <SelectItem value="inspirational">Inspirant</SelectItem>
+                            <SelectItem value="educational">Éducatif</SelectItem>
+                            <SelectItem value="provocative">Provocateur</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -444,12 +469,12 @@ export default function Generator() {
                       <Select value={postType} onValueChange={v => setPostType(v as typeof postType)}>
                         <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="story">📖 Storytelling</SelectItem>
-                          <SelectItem value="tips">💡 Conseils</SelectItem>
-                          <SelectItem value="question">❓ Question</SelectItem>
-                          <SelectItem value="announcement">📢 Annonce</SelectItem>
-                          <SelectItem value="motivation">🚀 Motivation</SelectItem>
-                          <SelectItem value="insight">🎯 Insight</SelectItem>
+                          <SelectItem value="story">Storytelling</SelectItem>
+                          <SelectItem value="tips">Conseils</SelectItem>
+                          <SelectItem value="question">Question</SelectItem>
+                          <SelectItem value="announcement">Annonce</SelectItem>
+                          <SelectItem value="motivation">Motivation</SelectItem>
+                          <SelectItem value="insight">Insight</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -462,7 +487,7 @@ export default function Generator() {
                         className="bg-background/50 min-h-[80px]"
                       />
                     </div>
-                    <Button onClick={handleGenerate} disabled={isLoading || !theme} className="w-full bg-gradient-to-r from-amber-600 to-amber-700">
+                    <Button onClick={handleGenerate} disabled={isLoading || !theme} className="w-full bg-gradient-to-r from-violet to-rose">
                       {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
                       Générer 1 post
                     </Button>
@@ -473,7 +498,7 @@ export default function Generator() {
                           {[2, 3, 4, 5].map(n => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      <Button onClick={handleGenerateBatch} disabled={isLoading || !theme} variant="outline" className="flex-1 border-amber-700/50">
+                      <Button onClick={handleGenerateBatch} disabled={isLoading || !theme} variant="outline" className="flex-1 border-violet/40">
                         Générer {batchCount} variantes
                       </Button>
                     </div>
@@ -492,9 +517,9 @@ export default function Generator() {
             {workflowStep === "configure" && (
               <>
                 {generatedPosts.length === 0 ? (
-                  <Card className="bg-card/30 border-dashed border-amber-900/30">
+                  <Card className="bg-card/30 border-dashed border-violet/30">
                     <CardContent className="py-16 text-center">
-                      <Sparkles className="w-12 h-12 mx-auto mb-4 text-amber-500/50" />
+                      <Sparkles className="w-12 h-12 mx-auto mb-4 text-violet-light/50" />
                       <p className="text-muted-foreground mb-2">Commencez par configurer et générer un post</p>
                       <p className="text-xs text-muted-foreground">Le parcours vous guidera ensuite : édition → image → publication</p>
                     </CardContent>
@@ -503,13 +528,13 @@ export default function Generator() {
                   <div className="space-y-3">
                     <h2 className="text-sm font-medium text-muted-foreground">Posts récents — cliquez pour continuer</h2>
                     {generatedPosts.map(post => (
-                      <Card key={post.id} className="bg-card/50 border-amber-900/30 cursor-pointer hover:border-amber-600/50 transition-colors" onClick={() => startWorkflow(post)}>
+                      <Card key={post.id} className="bg-card/50 border-violet/30 cursor-pointer hover:border-violet/40 transition-colors" onClick={() => startWorkflow(post)}>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base">{post.title}</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <p className="text-sm text-muted-foreground line-clamp-3">{post.content}</p>
-                          <Button size="sm" variant="ghost" className="mt-2 text-amber-400" onClick={e => { e.stopPropagation(); startWorkflow(post); }}>
+                          <Button size="sm" variant="ghost" className="mt-2 text-violet-light" onClick={e => { e.stopPropagation(); startWorkflow(post); }}>
                             Continuer <ChevronRight className="w-3 h-3 ml-1" />
                           </Button>
                         </CardContent>
@@ -521,10 +546,10 @@ export default function Generator() {
             )}
 
             {workflowStep === "edit" && activePost && (
-              <Card className="bg-card/50 border-amber-900/30">
+              <Card className="bg-card/50 border-violet/30">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <Pencil className="w-5 h-5 text-amber-500" />
+                    <Pencil className="w-5 h-5 text-violet-light" />
                     Étape 2 — Éditer votre post
                   </CardTitle>
                   <CardDescription>Relisez et modifiez le texte avant de générer l'image</CardDescription>
@@ -543,8 +568,9 @@ export default function Generator() {
                     />
                   </div>
                   {activePost.suggestedMedia && (
-                    <p className="text-xs text-muted-foreground bg-background/30 p-2 rounded">
-                      💡 Idée visuelle : {activePost.suggestedMedia}
+                    <p className="text-xs text-muted-foreground bg-background/30 p-2 rounded flex items-start gap-2">
+                      <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5 text-violet-light" />
+                      Idée visuelle : {activePost.suggestedMedia}
                     </p>
                   )}
                   <div className="flex gap-2">
@@ -554,7 +580,7 @@ export default function Generator() {
                     <Button variant="outline" size="sm" onClick={handleSave} disabled={savePostMutation.isPending}>
                       <Save className="w-3 h-3 mr-1" /> Sauvegarder
                     </Button>
-                    <Button className="flex-1 bg-amber-600 hover:bg-amber-500" onClick={() => setWorkflowStep("image")}>
+                    <Button className="flex-1 bg-violet hover:bg-violet-light" onClick={() => setWorkflowStep("image")}>
                       Suivant : Image <ChevronRight className="w-4 h-4 ml-1" />
                     </Button>
                   </div>
@@ -563,7 +589,7 @@ export default function Generator() {
             )}
 
             {workflowStep === "image" && activePost && (
-              <Card className="bg-card/50 border-amber-900/30">
+              <Card className="bg-card/50 border-violet/30">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <ImageIcon className="w-5 h-5 text-purple-400" />
@@ -609,6 +635,17 @@ export default function Generator() {
                           onSelect={item => {
                             setSelectedMediaId(item.id);
                             setImageUrl(item.fileUrl);
+                            setImageKey(item.fileKey ?? null);
+                            setImageSource("library");
+                            if (activePost) {
+                              savePostMutation.mutate({
+                                id: activePost.id,
+                                content: editedContent,
+                                imageUrl: item.fileUrl,
+                                imageKey: item.fileKey,
+                                mediaLibraryId: item.id,
+                              });
+                            }
                           }}
                         />
                       )}
@@ -616,11 +653,11 @@ export default function Generator() {
                         <img
                           src={imageUrl}
                           alt="Média sélectionné"
-                          className="w-full rounded-lg border border-amber-900/30 max-h-64 object-contain"
+                          className="w-full rounded-lg border border-violet/30 max-h-64 object-contain"
                         />
                       )}
                       <MediaUploadZone compact onUploaded={() => setMediaSuggestionsApplied(false)} />
-                      <Link href="/mes-outils?tab=mediatheque" className="text-xs text-amber-500 hover:underline flex items-center gap-1">
+                      <Link href="/mes-outils?tab=mediatheque" className="text-xs text-violet-light hover:underline flex items-center gap-1">
                         <FolderOpen className="w-3 h-3" /> Gérer ma médiathèque
                       </Link>
                     </div>
@@ -683,7 +720,7 @@ export default function Generator() {
 
                       {imageUrl ? (
                         <div className="space-y-3">
-                          <img src={imageUrl} alt="Image générée pour le post" className="w-full rounded-lg border border-amber-900/30" />
+                          <img src={imageUrl} alt="Image générée pour le post" className="w-full rounded-lg border border-violet/30" />
                           {imagePrompt && (
                             <p className="text-xs text-muted-foreground italic">Prompt : {imagePrompt}</p>
                           )}
@@ -721,7 +758,7 @@ export default function Generator() {
             )}
 
             {workflowStep === "publish" && activePost && (
-              <Card className="bg-card/50 border-amber-900/30">
+              <Card className="bg-card/50 border-violet/30">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Linkedin className="w-5 h-5 text-[#0077B5]" />
@@ -863,10 +900,10 @@ function ProfileForm({ profile }: { profile: Record<string, string | null | unde
   });
 
   return (
-    <Card className="bg-card/50 border-amber-900/30">
+    <Card className="bg-card/50 border-violet/30">
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
-          <User className="w-5 h-5 text-amber-500" /> Mon Profil
+          <User className="w-5 h-5 text-violet-light" /> Mon Profil
         </CardTitle>
         <CardDescription>Ces infos personnalisent vos posts générés</CardDescription>
       </CardHeader>
@@ -894,7 +931,7 @@ function ProfileForm({ profile }: { profile: Record<string, string | null | unde
             <Label className="flex items-center gap-1"><Globe className="w-3 h-3" /> Objectifs business</Label>
             <Textarea value={formData.businessGoals} onChange={e => setFormData(p => ({ ...p, businessGoals: e.target.value }))} className="bg-background/50" />
           </div>
-          <Button type="submit" disabled={updateMutation.isPending} className="w-full bg-gradient-to-r from-amber-600 to-amber-700">
+          <Button type="submit" disabled={updateMutation.isPending} className="w-full bg-gradient-to-r from-violet to-rose">
             {updateMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             Sauvegarder le profil
           </Button>
