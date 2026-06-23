@@ -1090,9 +1090,9 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const profile = await extractProfileFromAnswers(input.answers);
+        const { profile, usedFallback } = await extractProfileFromAnswers(input.answers);
         const result = await saveOnboardingProfile(ctx.user.id, profile);
-        return { profile, schedule: result.schedule };
+        return { profile, schedule: result.schedule, usedFallback };
       }),
   }),
 });

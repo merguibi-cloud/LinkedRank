@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
-import { Mic, Bot, Loader2, ArrowRight, Radio } from "lucide-react";
+import { Mic, Bot, Loader2, ArrowRight, Radio, Keyboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
+
+const MAX_VOICE_ATTEMPTS = 3;
 
 type AgentState = "welcome" | "speaking" | "listening" | "thinking" | "done";
 
@@ -37,6 +41,8 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
   const [statusLabel, setStatusLabel] = useState("Connexion à votre agent...");
   const [extractedProfile, setExtractedProfile] = useState<Record<string, unknown> | null>(null);
   const [noSpeechHint, setNoSpeechHint] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualText, setManualText] = useState("");
 
   const recognitionRef = useRef<any>(null);
   const recognitionActiveRef = useRef(false);
@@ -48,6 +54,7 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
   const answersRef = useRef(answers);
   const currentIndexRef = useRef(currentIndex);
   const submitAnswerRef = useRef<(override?: string) => Promise<void>>(async () => {});
+  const failedAttemptsRef = useRef(0);
 
   const currentQuestion = questions[currentIndex];
   const progress = questions.length > 0 ? ((currentIndex + 1) / questions.length) * 100 : 0;
@@ -152,6 +159,7 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
       console.error("[VoiceOnboarding] SpeechRecognition error:", event.error);
       recognitionActiveRef.current = false;
       stopListening();
+      registerVoiceFailure();
     };
     recognition.onend = () => {
       console.log("[VoiceOnboarding] SpeechRecognition ended, isListening:", isListeningRef.current);
@@ -200,10 +208,27 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
     recognitionRef.current?.stop();
   }, []);
 
+  const enterManualMode = useCallback(() => {
+    stopListening();
+    setNoSpeechHint(false);
+    setManualMode(true);
+    toast.info("La reconnaissance vocale ne fonctionne pas. Répondez par écrit ci-dessous.");
+  }, [stopListening]);
+
+  const registerVoiceFailure = useCallback(() => {
+    failedAttemptsRef.current += 1;
+    if (failedAttemptsRef.current >= MAX_VOICE_ATTEMPTS) {
+      enterManualMode();
+    }
+  }, [enterManualMode]);
+
   const askQuestion = useCallback(
     async (index: number, prefix?: string) => {
       const q = questions[index];
       if (!q) return;
+      failedAttemptsRef.current = 0;
+      setManualMode(false);
+      setManualText("");
       const text = prefix ? `${prefix} ${q.question}` : q.question;
       await speak(text);
       startListening();
@@ -240,6 +265,11 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
       setStatusLabel("Je configure votre profil et l'automatisation...");
       try {
         const result = await finalizeMutation.mutateAsync({ answers: newAnswers });
+        if (result.usedFallback) {
+          toast.info(
+            "IA indisponible pour le moment — votre profil a été créé avec une analyse simplifiée de vos réponses."
+          );
+        }
         setExtractedProfile(result.profile as Record<string, unknown>);
         localStorage.setItem("linkedagents_onboarding_completed", "true");
         localStorage.setItem("linkedrank_voice_onboarding_completed", "true");
@@ -279,6 +309,9 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
     if (startedRef.current || questions.length === 0) return;
     startedRef.current = true;
     setAgentState("speaking");
+    failedAttemptsRef.current = 0;
+    setManualMode(false);
+    setManualText("");
 
     const intro =
       "Bonjour ! Je suis votre agent LinkedRank. Nous allons configurer vos publications ensemble, simplement en parlant. " +
@@ -304,6 +337,7 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
       if (!currentAnswerRef.current.trim()) {
         setNoSpeechHint(true);
         setTimeout(() => setNoSpeechHint(false), 3000);
+        registerVoiceFailure();
         return;
       }
       setNoSpeechHint(false);
@@ -311,6 +345,14 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
     } else if (agentState !== "speaking" && agentState !== "thinking") {
       startListening();
     }
+  };
+
+  const handleManualSubmit = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    stopListening();
+    setManualText("");
+    void submitAnswerRef.current(trimmed);
   };
 
   return (
@@ -386,7 +428,7 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
                 )}
               </div>
 
-              {agentState === "listening" && (
+              {agentState === "listening" && !manualMode && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -420,6 +462,61 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
                     <CheckIcon />
                     J'ai fini de parler
                   </Button>
+                  <Button
+                    onClick={enterManualMode}
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                  >
+                    <Keyboard className="w-4 h-4 mr-2" />
+                    Répondre par écrit
+                  </Button>
+                </motion.div>
+              )}
+
+              {agentState === "listening" && manualMode && currentQuestion && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center gap-4 w-full px-4 sm:px-0"
+                >
+                  {currentQuestion.options && currentQuestion.options.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                      {currentQuestion.options.map((option) => (
+                        <Button
+                          key={option}
+                          onClick={() => handleManualSubmit(option)}
+                          variant="outline"
+                          className="border-white/20 text-white hover:bg-white/10 h-auto py-3 whitespace-normal text-center"
+                        >
+                          {option}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleManualSubmit(manualText);
+                      }}
+                      className="flex flex-col sm:flex-row gap-2 w-full"
+                    >
+                      <Input
+                        value={manualText}
+                        onChange={(e) => setManualText(e.target.value)}
+                        placeholder="Écrivez votre réponse..."
+                        autoFocus
+                        className="bg-background/50 text-white"
+                      />
+                      <Button
+                        type="submit"
+                        disabled={!manualText.trim()}
+                        className="bg-gradient-to-r from-violet to-rose hover:opacity-90 text-white shrink-0"
+                      >
+                        Envoyer
+                      </Button>
+                    </form>
+                  )}
                 </motion.div>
               )}
 
