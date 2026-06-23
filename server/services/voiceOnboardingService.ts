@@ -13,51 +13,61 @@ export const ONBOARDING_QUESTIONS = [
     id: "intro",
     question:
       "Parlez-moi de vous : quel est votre métier et le nom de votre entreprise ou activité ?",
+    options: undefined as readonly string[] | undefined,
   },
   {
     id: "sector",
     question:
       "Dans quel secteur travaillez-vous ? Par exemple tech, BTP, conseil ou santé.",
+    options: undefined as readonly string[] | undefined,
   },
   {
     id: "audience",
     question:
       "Qui voulez-vous toucher sur LinkedIn ? Décrivez votre client ou lecteur idéal.",
+    options: undefined as readonly string[] | undefined,
   },
   {
     id: "goals",
     question:
       "Quels sont vos objectifs ? Trouver des clients, gagner en visibilité, recruter, ou devenir une référence ?",
+    options: ["Trouver des clients", "Gagner en visibilité", "Recruter", "Devenir une référence"],
   },
   {
     id: "topics",
     question:
       "Quels contenus aimez-vous publier ? Conseils, histoires, coulisses, témoignages clients ?",
+    options: ["Conseils", "Histoires", "Coulisses", "Témoignages clients"],
   },
   {
     id: "tone",
     question:
       "Quel ton préférez-vous ? Professionnel, décontracté, inspirant, pédagogique ou provocateur ?",
+    options: ["Professionnel", "Décontracté", "Inspirant", "Pédagogique", "Provocateur"],
   },
   {
     id: "frequency",
     question:
       "À quelle fréquence voulez-vous publier ? Tous les jours, plusieurs fois par semaine, ou une fois par semaine ?",
+    options: ["Tous les jours", "Plusieurs fois par semaine", "Une fois par semaine"],
   },
   {
     id: "language",
     question:
       "Dans quelle langue publier ? Français, anglais, arabe, espagnol ou allemand ?",
+    options: ["Français", "Anglais", "Arabe", "Espagnol", "Allemand"],
   },
   {
     id: "avoid",
     question:
       "Y a-t-il des sujets que vous préférez éviter ?",
+    options: undefined as readonly string[] | undefined,
   },
   {
     id: "unique",
     question:
       "Pour finir, qu'est-ce qui vous rend unique dans votre domaine ?",
+    options: undefined as readonly string[] | undefined,
   },
 ] as const;
 
@@ -187,7 +197,7 @@ function fallbackExtract(answers: OnboardingAnswer[]): ExtractedOnboardingProfil
 
 export async function extractProfileFromAnswers(
   answers: OnboardingAnswer[]
-): Promise<ExtractedOnboardingProfile> {
+): Promise<{ profile: ExtractedOnboardingProfile; usedFallback: boolean }> {
   const conversation = answers
     .map((a) => `Q: ${a.question}\nR: ${a.answer}`)
     .join("\n\n");
@@ -232,17 +242,20 @@ Réponds UNIQUEMENT en JSON valide avec cette structure:
 
     const parsed = JSON.parse(content) as ExtractedOnboardingProfile;
     return {
-      ...fallbackExtract(answers),
-      ...parsed,
-      preferredLanguages: parsed.preferredLanguages?.length
-        ? parsed.preferredLanguages
-        : ["FR"],
-      contentGoals: parsed.contentGoals?.length ? parsed.contentGoals : ["Développer mon activité"],
-      contentTopics: parsed.contentTopics?.length ? parsed.contentTopics : ["Expertise métier"],
+      profile: {
+        ...fallbackExtract(answers),
+        ...parsed,
+        preferredLanguages: parsed.preferredLanguages?.length
+          ? parsed.preferredLanguages
+          : ["FR"],
+        contentGoals: parsed.contentGoals?.length ? parsed.contentGoals : ["Développer mon activité"],
+        contentTopics: parsed.contentTopics?.length ? parsed.contentTopics : ["Expertise métier"],
+      },
+      usedFallback: false,
     };
   } catch (error) {
     console.error("[VoiceOnboarding] LLM extraction failed, using fallback:", error);
-    return fallbackExtract(answers);
+    return { profile: fallbackExtract(answers), usedFallback: true };
   }
 }
 
