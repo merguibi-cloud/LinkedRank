@@ -28,6 +28,11 @@ export const ENV = {
     process.env.OPENAI_MODEL ??
     (process.env.GEMINI_API_KEY ? "gemini-2.5-flash" : "gpt-4o"),
   openaiImageModel: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1",
+  geminiImageModel:
+    process.env.GEMINI_IMAGE_MODEL ?? "gemini-2.5-flash-image",
+  imageProvider:
+    process.env.IMAGE_PROVIDER ??
+    (process.env.GEMINI_API_KEY ? "gemini" : "openai"),
   /** @deprecated use llmModel */
   openaiModel:
     process.env.GEMINI_MODEL ??

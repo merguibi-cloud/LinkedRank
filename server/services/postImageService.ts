@@ -34,11 +34,12 @@ export async function buildImagePromptFromPost(options: {
     messages: [
       {
         role: "system",
-        content: `Tu crées des prompts pour DALL-E (images LinkedIn professionnelles).
+        content: `Tu crées des prompts pour Gemini Nano Banana (images LinkedIn premium).
 Règles:
 - Réponds UNIQUEMENT avec le prompt en anglais (max 800 caractères)
 - Style visuel demandé: ${styleHint}
-- Illustration professionnelle, moderne, adaptée à LinkedIn
+- Visuel WOW: composition cinématique, profondeur, éclairage dramatique, couleurs vibrantes mais élégantes
+- Illustration professionnelle haut de gamme, moderne, qui arrête le scroll sur LinkedIn
 - Pas de texte, logos ou watermark dans l'image
 - Évite les visages réalistes identifiables`,
       },
