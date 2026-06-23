@@ -73,6 +73,10 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
 
   const speak = useCallback((text: string): Promise<void> => {
     return new Promise((resolve) => {
+      // Stop listening before the agent talks so the mic can't pick up its own voice
+      // through speaker bleed and mistake it for the user's answer.
+      stopListening();
+
       if (!("speechSynthesis" in window)) {
         resolve();
         return;
@@ -88,8 +92,11 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
       utterance.pitch = 1.05;
       if (frenchVoiceRef.current) utterance.voice = frenchVoiceRef.current;
 
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
+      // Small buffer after the utterance ends so any residual audio (room echo,
+      // speaker tail) decays before the mic starts listening again.
+      const finish = () => setTimeout(resolve, 400);
+      utterance.onend = finish;
+      utterance.onerror = finish;
       window.speechSynthesis.speak(utterance);
     });
   }, []);
@@ -246,9 +253,9 @@ export function VoiceOnboarding({ autoStart = false, onComplete }: VoiceOnboardi
           "Bienvenue sur LinkedRank !",
         ].join(" ");
 
-        setAgentState("done");
         setStatusLabel("Configuration terminée !");
         await speak(summarySpeech);
+        setAgentState("done");
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
       } catch (error) {
         console.error("Onboarding finalize error:", error);
