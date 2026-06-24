@@ -4,7 +4,6 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLinkedInConnectUrl, getSignupUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
-import Navbar from "@/components/Navbar";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
 import { QuickActions } from "@/components/QuickActions";
 import { PersonalizedTips } from "@/components/PersonalizedTips";
@@ -83,7 +82,6 @@ export default function Dashboard() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
         <div className="container py-20 text-center">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-violet to-rose flex items-center justify-center">
@@ -161,7 +159,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       <div className="container py-6 md:py-8 space-y-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

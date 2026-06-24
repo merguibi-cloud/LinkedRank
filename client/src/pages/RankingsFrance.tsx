@@ -7,7 +7,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import Navbar from "@/components/Navbar";
 import { CreatorRankings } from "@/components/CreatorRankings";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
@@ -72,7 +71,6 @@ export default function RankingsFrance() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-8 pb-12">

@@ -6,6 +6,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { UserProfileProvider } from "./contexts/UserProfileContext";
 import { LinkedInStatusProvider } from "./contexts/LinkedInStatusContext";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { AppShell } from "./components/AppShell";
 import { LinkedInOAuthHandler } from "./components/LinkedInOAuthHandler";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { Toaster } from "@/components/ui/sonner";
@@ -174,7 +175,9 @@ function AppContent() {
           onSkip={skipOnboarding}
         />
       )}
-      <Router />
+      <AppShell>
+        <Router />
+      </AppShell>
       {/* Composants non-critiques chargés en lazy */}
       <Suspense fallback={null}>
         <LiveChatWidget />

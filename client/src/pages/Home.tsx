@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl, getSignupUrl } from "@/const";
 import { Link } from "wouter";
-import Navbar from "@/components/Navbar";
 import {
   Zap,
   BarChart3,
@@ -152,10 +151,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden pt-16 pb-12 sm:pt-24 sm:pb-20">
+      <section className="relative overflow-hidden pb-12 sm:pb-20 pt-8 sm:pt-12">
         {/* Background Effects */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-violet/20 blur-[100px]" />

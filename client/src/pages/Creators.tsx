@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
-import Navbar from "@/components/Navbar";
 import {
   Users,
   TrendingUp,
@@ -160,7 +159,6 @@ export default function Creators() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-24 pb-12">

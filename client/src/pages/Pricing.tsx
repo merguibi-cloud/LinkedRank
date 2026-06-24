@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import Navbar from "@/components/Navbar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl, getSignupUrl } from "@/const";
 import { toast } from "sonner";
@@ -228,7 +227,6 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       {/* Hero */}
       <section className="relative overflow-hidden pt-20 pb-16">

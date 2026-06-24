@@ -27,6 +27,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
+import { ToolsQuickNav } from "@/components/tools/ToolsQuickNav";
+import { useLocation } from "wouter";
 
 // Carousel styles
 const CAROUSEL_STYLES = [
@@ -50,6 +53,7 @@ interface GeneratedCarousel {
 }
 
 export default function Carousels() {
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<"create" | "library">("create");
   const [topic, setTopic] = useState("");
   const [slideCount, setSlideCount] = useState(7);
@@ -142,10 +146,29 @@ export default function Carousels() {
     toast.success("Téléchargement de toutes les slides en cours...");
   };
 
-  const handleCopyForLinkedIn = () => {
-    toast.info("Publication LinkedIn", {
-      description: "Téléchargez les images et uploadez-les sur LinkedIn comme document PDF ou images multiples",
-    });
+  const handlePublishToGenerator = () => {
+    if (!generatedCarousel?.slides?.length) return;
+
+    const caption = generatedCarousel.slides
+      .map(
+        (slide: { title?: string; content?: string }, index: number) =>
+          `${index + 1}. ${slide.title || "Slide"}\n${slide.content || ""}`
+      )
+      .join("\n\n")
+      .slice(0, 2800);
+
+    sessionStorage.setItem(
+      "linkedrank-draft-post",
+      JSON.stringify({
+        title: topic || "Carrousel LinkedIn",
+        content: caption,
+        hashtags: ["carrousel", "linkedin"],
+        imageUrl: generatedCarousel.imageUrls[0],
+      })
+    );
+
+    setLocation("/generate");
+    toast.success("Carrousel envoyé au générateur — finalisez et publiez");
   };
 
   const handleExportPDF = async () => {
@@ -215,6 +238,9 @@ export default function Carousels() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        <ToolsQuickNav />
+        <LinkedInConnectBanner />
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -466,7 +492,7 @@ export default function Carousels() {
                           <Button
                             variant="secondary"
                             size="sm"
-                            onClick={handleCopyForLinkedIn}
+                            onClick={handlePublishToGenerator}
                           >
                             <Share2 className="h-4 w-4 mr-1" />
                             Publier sur LinkedIn
