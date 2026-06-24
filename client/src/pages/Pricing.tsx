@@ -50,7 +50,7 @@ interface PricingPlan {
 
 export default function Pricing() {
   const { user } = useAuth();
-  
+
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("yearly");
   const [isLoading, setIsLoading] = useState<string | null>(null);
 
@@ -67,7 +67,8 @@ export default function Pricing() {
 
     // Business plan - contact sales
     if (planId === "business") {
-      window.location.href = "mailto:contact@linkedrank.fr?subject=Demande%20plan%20Business";
+      window.location.href =
+        "mailto:contact@linkedrank.fr?subject=Demande%20plan%20Business";
       return;
     }
 
@@ -86,12 +87,10 @@ export default function Pricing() {
       const response = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           planId,
           billingPeriod,
-          userId: user.id,
-          userEmail: user.email,
-          userName: user.name,
         }),
       });
 
@@ -100,12 +99,15 @@ export default function Pricing() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        throw new Error(data.error || "Erreur lors de la création de la session");
+        throw new Error(
+          data.error || "Erreur lors de la création de la session"
+        );
       }
     } catch (error) {
       console.error("Checkout error:", error);
       toast.error("Erreur", {
-        description: error instanceof Error ? error.message : "Une erreur est survenue",
+        description:
+          error instanceof Error ? error.message : "Une erreur est survenue",
       });
     } finally {
       setIsLoading(null);
@@ -169,7 +171,11 @@ export default function Pricing() {
       popular: false,
       features: [
         { text: "Tout du plan Pro", included: true },
-        { text: "Jusqu'à 10 comptes LinkedIn", included: true, highlight: true },
+        {
+          text: "Jusqu'à 10 comptes LinkedIn",
+          included: true,
+          highlight: true,
+        },
         { text: "Gestion d'équipe", included: true, highlight: true },
         { text: "API Access complet", included: true },
         { text: "Webhooks personnalisés", included: true },
@@ -189,21 +195,24 @@ export default function Pricing() {
       name: "Marie Dupont",
       role: "CEO @ TechStartup",
       avatar: "MD",
-      content: "LinkedRank a transformé ma présence LinkedIn. J'ai gagné 50K abonnés en 3 mois grâce à la publication automatique.",
+      content:
+        "LinkedRank a transformé ma présence LinkedIn. J'ai gagné 50K abonnés en 3 mois grâce à la publication automatique.",
       rating: 5,
     },
     {
       name: "Thomas Martin",
       role: "Consultant Marketing",
       avatar: "TM",
-      content: "Le générateur IA produit du contenu de qualité professionnelle. Je gagne 10h par semaine sur ma création de contenu.",
+      content:
+        "Le générateur IA produit du contenu de qualité professionnelle. Je gagne 10h par semaine sur ma création de contenu.",
       rating: 5,
     },
     {
       name: "Sophie Bernard",
       role: "Directrice RH",
       avatar: "SB",
-      content: "Parfait pour notre équipe de recrutement. Nous publions 3x plus de contenu avec la même équipe.",
+      content:
+        "Parfait pour notre équipe de recrutement. Nous publions 3x plus de contenu avec la même équipe.",
       rating: 5,
     },
   ];
@@ -211,23 +220,28 @@ export default function Pricing() {
   const faqs = [
     {
       question: "Puis-je annuler à tout moment ?",
-      answer: "Oui, vous pouvez annuler votre abonnement à tout moment. Vous conserverez l'accès jusqu'à la fin de votre période de facturation.",
+      answer:
+        "Oui, vous pouvez annuler votre abonnement à tout moment. Vous conserverez l'accès jusqu'à la fin de votre période de facturation.",
     },
     {
       question: "L'essai gratuit nécessite-t-il une carte bancaire ?",
-      answer: "Non, l'essai gratuit de 14 jours ne nécessite aucune carte bancaire. Vous ne serez facturé que si vous décidez de continuer après l'essai.",
+      answer:
+        "Non, l'essai gratuit de 14 jours ne nécessite aucune carte bancaire. Vous ne serez facturé que si vous décidez de continuer après l'essai.",
     },
     {
       question: "Puis-je changer de plan à tout moment ?",
-      answer: "Absolument ! Vous pouvez upgrader ou downgrader votre plan à tout moment. Les changements prennent effet immédiatement.",
+      answer:
+        "Absolument ! Vous pouvez upgrader ou downgrader votre plan à tout moment. Les changements prennent effet immédiatement.",
     },
     {
       question: "Mes données sont-elles sécurisées ?",
-      answer: "Oui, nous utilisons un chiffrement de bout en bout et respectons le RGPD. Vos données LinkedIn ne sont jamais partagées avec des tiers.",
+      answer:
+        "Oui, nous utilisons un chiffrement de bout en bout et respectons le RGPD. Vos données LinkedIn ne sont jamais partagées avec des tiers.",
     },
     {
       question: "Proposez-vous des remises pour les ONG ?",
-      answer: "Oui, nous offrons 50% de réduction pour les organisations à but non lucratif. Contactez-nous pour en bénéficier.",
+      answer:
+        "Oui, nous offrons 50% de réduction pour les organisations à but non lucratif. Contactez-nous pour en bénéficier.",
     },
   ];
 
@@ -237,7 +251,9 @@ export default function Pricing() {
 
   const getSavings = (plan: PricingPlan) => {
     if (plan.monthlyPrice === 0) return 0;
-    return Math.round(((plan.monthlyPrice - plan.yearlyPrice) / plan.monthlyPrice) * 100);
+    return Math.round(
+      ((plan.monthlyPrice - plan.yearlyPrice) / plan.monthlyPrice) * 100
+    );
   };
 
   return (
@@ -248,7 +264,7 @@ export default function Pricing() {
       <section className="py-20 relative overflow-hidden">
         {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-violet/5 via-transparent to-transparent" />
-        
+
         <div className="container relative">
           <div className="max-w-3xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gold/10 border border-gold/20 text-gold text-sm mb-6">
@@ -260,7 +276,8 @@ export default function Pricing() {
               <span className="gradient-text">booste votre LinkedIn</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Commencez gratuitement, puis passez à un plan payant quand vous êtes prêt à dominer LinkedIn.
+              Commencez gratuitement, puis passez à un plan payant quand vous
+              êtes prêt à dominer LinkedIn.
             </p>
 
             {/* Billing Toggle */}
@@ -297,11 +314,11 @@ export default function Pricing() {
       <section className="py-12 -mt-8">
         <div className="container">
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {plans.map((plan) => {
+            {plans.map(plan => {
               const Icon = plan.icon;
               const price = getPrice(plan);
               const savings = getSavings(plan);
-              
+
               return (
                 <div
                   key={plan.id}
@@ -322,16 +339,26 @@ export default function Pricing() {
                   <div className="p-8">
                     {/* Header */}
                     <div className="flex items-center gap-3 mb-4">
-                      <div className={`p-2.5 rounded-xl ${
-                        plan.popular ? "bg-violet/20" : "bg-white/5"
-                      }`}>
-                        <Icon className={`w-6 h-6 ${
-                          plan.popular ? "text-violet-light" : "text-muted-foreground"
-                        }`} />
+                      <div
+                        className={`p-2.5 rounded-xl ${
+                          plan.popular ? "bg-violet/20" : "bg-white/5"
+                        }`}
+                      >
+                        <Icon
+                          className={`w-6 h-6 ${
+                            plan.popular
+                              ? "text-violet-light"
+                              : "text-muted-foreground"
+                          }`}
+                        />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-white">{plan.name}</h3>
-                        <p className="text-sm text-muted-foreground">{plan.description}</p>
+                        <h3 className="text-xl font-bold text-white">
+                          {plan.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {plan.description}
+                        </p>
                       </div>
                     </div>
 
@@ -363,10 +390,12 @@ export default function Pricing() {
                         plan.ctaVariant === "default"
                           ? "bg-gradient-to-r from-violet to-violet-light hover:opacity-90"
                           : plan.ctaVariant === "premium"
-                          ? "bg-gradient-to-r from-gold to-gold-light text-background hover:opacity-90"
-                          : "border-white/20 hover:bg-white/5"
+                            ? "bg-gradient-to-r from-gold to-gold-light text-background hover:opacity-90"
+                            : "border-white/20 hover:bg-white/5"
                       }`}
-                      variant={plan.ctaVariant === "outline" ? "outline" : "default"}
+                      variant={
+                        plan.ctaVariant === "outline" ? "outline" : "default"
+                      }
                       onClick={() => handleSubscribe(plan.id)}
                       disabled={isLoading === plan.id}
                     >
@@ -389,17 +418,25 @@ export default function Pricing() {
                         <li
                           key={index}
                           className={`flex items-start gap-3 text-sm ${
-                            feature.included ? "text-white" : "text-muted-foreground/50"
+                            feature.included
+                              ? "text-white"
+                              : "text-muted-foreground/50"
                           }`}
                         >
                           {feature.included ? (
-                            <Check className={`w-5 h-5 flex-shrink-0 ${
-                              feature.highlight ? "text-gold" : "text-green-500"
-                            }`} />
+                            <Check
+                              className={`w-5 h-5 flex-shrink-0 ${
+                                feature.highlight
+                                  ? "text-gold"
+                                  : "text-green-500"
+                              }`}
+                            />
                           ) : (
                             <X className="w-5 h-5 flex-shrink-0 text-muted-foreground/30" />
                           )}
-                          <span className={feature.highlight ? "font-medium" : ""}>
+                          <span
+                            className={feature.highlight ? "font-medium" : ""}
+                          >
                             {feature.text}
                           </span>
                         </li>
@@ -422,7 +459,8 @@ export default function Pricing() {
               <span className="gradient-text">réussir sur LinkedIn</span>
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Des outils puissants pour créer, publier et analyser votre contenu LinkedIn
+              Des outils puissants pour créer, publier et analyser votre contenu
+              LinkedIn
             </p>
           </div>
 
@@ -431,42 +469,50 @@ export default function Pricing() {
               {
                 icon: Bot,
                 title: "IA Générative",
-                description: "Créez du contenu viral en quelques secondes avec notre IA entraînée sur les meilleurs posts",
+                description:
+                  "Créez du contenu viral en quelques secondes avec notre IA entraînée sur les meilleurs posts",
               },
               {
                 icon: Calendar,
                 title: "Publication Auto",
-                description: "Planifiez et publiez automatiquement aux meilleurs moments pour maximiser l'engagement",
+                description:
+                  "Planifiez et publiez automatiquement aux meilleurs moments pour maximiser l'engagement",
               },
               {
                 icon: Image,
                 title: "Images IA",
-                description: "Générez des visuels professionnels et des citations inspirantes en un clic",
+                description:
+                  "Générez des visuels professionnels et des citations inspirantes en un clic",
               },
               {
                 icon: BarChart3,
                 title: "Analytics",
-                description: "Suivez vos performances et optimisez votre stratégie avec des données précises",
+                description:
+                  "Suivez vos performances et optimisez votre stratégie avec des données précises",
               },
               {
                 icon: Users,
                 title: "Top Créateurs",
-                description: "Inspirez-vous des meilleurs créateurs LinkedIn classés par secteur et pays",
+                description:
+                  "Inspirez-vous des meilleurs créateurs LinkedIn classés par secteur et pays",
               },
               {
                 icon: TrendingUp,
                 title: "Tendances",
-                description: "Découvrez les sujets qui buzzent et surfez sur les tendances du moment",
+                description:
+                  "Découvrez les sujets qui buzzent et surfez sur les tendances du moment",
               },
               {
                 icon: Shield,
                 title: "Sécurité",
-                description: "Vos données sont protégées avec un chiffrement de bout en bout",
+                description:
+                  "Vos données sont protégées avec un chiffrement de bout en bout",
               },
               {
                 icon: HeadphonesIcon,
                 title: "Support",
-                description: "Une équipe dédiée pour vous accompagner dans votre croissance",
+                description:
+                  "Une équipe dédiée pour vous accompagner dans votre croissance",
               },
             ].map((feature, index) => (
               <div
@@ -476,8 +522,12 @@ export default function Pricing() {
                 <div className="p-3 rounded-xl bg-violet/10 w-fit mb-4">
                   <feature.icon className="w-6 h-6 text-violet-light" />
                 </div>
-                <h3 className="font-semibold text-white mb-2">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground">{feature.description}</p>
+                <h3 className="font-semibold text-white mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
@@ -514,7 +564,9 @@ export default function Pricing() {
                   </div>
                   <div>
                     <p className="font-medium text-white">{testimonial.name}</p>
-                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {testimonial.role}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -541,7 +593,9 @@ export default function Pricing() {
                 key={index}
                 className="p-6 rounded-2xl bg-card/30 border border-white/5"
               >
-                <h3 className="font-semibold text-white mb-2">{faq.question}</h3>
+                <h3 className="font-semibold text-white mb-2">
+                  {faq.question}
+                </h3>
                 <p className="text-muted-foreground">{faq.answer}</p>
               </div>
             ))}
@@ -563,7 +617,8 @@ export default function Pricing() {
               Prêt à dominer LinkedIn ?
             </h2>
             <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Rejoignez des milliers de créateurs qui utilisent LinkedRank pour développer leur audience et générer des opportunités.
+              Rejoignez des milliers de créateurs qui utilisent LinkedRank pour
+              développer leur audience et générer des opportunités.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
@@ -583,7 +638,8 @@ export default function Pricing() {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground mt-6">
-              14 jours d'essai gratuit • Aucune carte bancaire requise • Annulation à tout moment
+              14 jours d'essai gratuit • Aucune carte bancaire requise •
+              Annulation à tout moment
             </p>
           </div>
         </div>
@@ -597,13 +653,22 @@ export default function Pricing() {
               © 2024 LinkedRank. Tous droits réservés.
             </p>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <Link href="/terms" className="hover:text-white transition-colors">
+              <Link
+                href="/terms"
+                className="hover:text-white transition-colors"
+              >
                 Conditions d'utilisation
               </Link>
-              <Link href="/privacy" className="hover:text-white transition-colors">
+              <Link
+                href="/privacy"
+                className="hover:text-white transition-colors"
+              >
                 Politique de confidentialité
               </Link>
-              <Link href="/contact" className="hover:text-white transition-colors">
+              <Link
+                href="/contact"
+                className="hover:text-white transition-colors"
+              >
                 Contact
               </Link>
             </div>

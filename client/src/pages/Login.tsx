@@ -1,7 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getLinkedInConnectUrl, getSignupUrl } from "@/const";
+import {
+  getLinkedInConnectUrl,
+  getSignupUrl,
+  sanitizeInternalRedirect,
+} from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase";
 import { Bot, Linkedin, Loader2 } from "lucide-react";
@@ -12,13 +16,27 @@ import { toast } from "sonner";
 export default function Login() {
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
-  const [email, setEmail] = useState("");
+
+  const params = new URLSearchParams(window.location.search);
+  const redirect = sanitizeInternalRedirect(params.get("redirect"));
+  const connectLinkedIn = params.get("connectLinkedIn") === "1";
+  const confirmed = params.get("confirmed") === "1";
+  const confirmError = params.get("confirm_error");
+
+  const [email, setEmail] = useState(params.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const params = new URLSearchParams(window.location.search);
-  const redirect = params.get("redirect") || "/dashboard";
-  const connectLinkedIn = params.get("connectLinkedIn") === "1";
+  useEffect(() => {
+    if (confirmed) {
+      toast.success("Email confirmé ! Vous pouvez maintenant vous connecter.");
+    } else if (confirmError) {
+      toast.error(
+        "Le lien de confirmation est invalide ou a expiré. Veuillez réessayer de vous inscrire."
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!loading && user) {
@@ -102,14 +120,17 @@ export default function Login() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6"
+        >
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={e => setEmail(e.target.value)}
               placeholder="vous@exemple.com"
               required
               className="bg-background/50"
@@ -121,13 +142,17 @@ export default function Login() {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               required
               className="bg-background/50"
             />
           </div>
-          <Button type="submit" className="w-full btn-gradient" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            className="w-full btn-gradient"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -141,7 +166,10 @@ export default function Login() {
 
         <p className="text-center text-sm text-muted-foreground">
           Pas encore de compte ?{" "}
-          <Link href={getSignupUrl(redirect)} className="text-violet-light hover:underline">
+          <Link
+            href={getSignupUrl(redirect)}
+            className="text-violet-light hover:underline"
+          >
             Créer un compte
           </Link>
         </p>
