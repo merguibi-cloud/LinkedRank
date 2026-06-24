@@ -6,7 +6,10 @@ import {
   upsertLinkedinSettings,
   getLinkedinSettings,
 } from "../db";
-import { type AuthenticatedRequest, requireAuth } from "../_core/authMiddleware";
+import {
+  type AuthenticatedRequest,
+  requireAuth,
+} from "../_core/authMiddleware";
 import { getLinkedInRedirectUri } from "../_core/linkedinRedirect";
 import { resolveAppUser } from "../_core/supabase";
 import {
@@ -20,7 +23,10 @@ import {
   buildLinkedInSettingsPayload,
   formatLinkedInStatus,
 } from "../services/linkedinAuth";
-import { notifyPostPublished, notifySystem } from "../services/notificationService";
+import {
+  notifyPostPublished,
+  notifySystem,
+} from "../services/notificationService";
 
 const router = Router();
 
@@ -30,6 +36,26 @@ type OAuthState = {
 };
 
 const oauthStates = new Map<string, OAuthState>();
+
+function sanitizeRedirect(redirect: unknown, fallback = "/dashboard") {
+  if (typeof redirect !== "string") return fallback;
+
+  try {
+    const decoded = decodeURIComponent(redirect).trim();
+    if (!decoded.startsWith("/") || decoded.startsWith("//")) return fallback;
+    if (
+      decoded.includes("\\") ||
+      decoded.includes("\n") ||
+      decoded.includes("\r")
+    ) {
+      return fallback;
+    }
+
+    return decoded;
+  } catch {
+    return fallback;
+  }
+}
 
 async function resolveOptionalUserId(
   req: Request,
@@ -84,8 +110,13 @@ router.post("/sync", requireAuth, async (req, res) => {
       return res.status(401).json({ error: "LinkedIn not connected" });
     }
 
-    if (settings.tokenExpiresAt && new Date(settings.tokenExpiresAt) < new Date()) {
-      return res.status(401).json({ error: "LinkedIn token expired, please reconnect" });
+    if (
+      settings.tokenExpiresAt &&
+      new Date(settings.tokenExpiresAt) < new Date()
+    ) {
+      return res
+        .status(401)
+        .json({ error: "LinkedIn token expired, please reconnect" });
     }
 
     const profile = await getLinkedInProfile(settings.accessToken);
@@ -106,7 +137,10 @@ router.post("/sync", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("LinkedIn sync error:", error);
     res.status(500).json({
-      error: error instanceof Error ? error.message : "Failed to sync LinkedIn profile",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to sync LinkedIn profile",
     });
   }
 });
@@ -118,7 +152,7 @@ router.get("/auth", async (req, res) => {
   try {
     const userId = await resolveOptionalUserId(req, res);
     if (!userId) {
-      const redirect = (req.query.redirect as string) || "/dashboard";
+      const redirect = sanitizeRedirect(req.query.redirect);
       return res.redirect(
         `/login?redirect=${encodeURIComponent(redirect)}&connectLinkedIn=1`
       );
@@ -129,7 +163,7 @@ router.get("/auth", async (req, res) => {
 
     oauthStates.set(state, {
       userId,
-      redirectUrl: (req.query.redirect as string) || "/dashboard",
+      redirectUrl: sanitizeRedirect(req.query.redirect),
     });
 
     setTimeout(() => oauthStates.delete(state), 10 * 60 * 1000);
@@ -145,10 +179,15 @@ router.get("/auth", async (req, res) => {
     console.error("LinkedIn auth error:", error);
     if (req.query.format === "json") {
       res.status(500).json({
-        error: error instanceof Error ? error.message : "Failed to initiate LinkedIn auth",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to initiate LinkedIn auth",
       });
     } else {
-      res.redirect(`/?linkedin_error=${encodeURIComponent("auth_init_failed")}`);
+      res.redirect(
+        `/?linkedin_error=${encodeURIComponent("auth_init_failed")}`
+      );
     }
   }
 });
@@ -161,7 +200,9 @@ router.get("/callback", async (req, res) => {
     const { code, state, error } = req.query;
 
     if (error) {
-      return res.redirect(`/?linkedin_error=${encodeURIComponent(error as string)}`);
+      return res.redirect(
+        `/?linkedin_error=${encodeURIComponent(error as string)}`
+      );
     }
 
     if (!code || !state) {
@@ -230,13 +271,20 @@ async function publishForUser(
     return {
       status: 401,
       body: {
-        error: "LinkedIn not connected. Please connect your LinkedIn account first.",
+        error:
+          "LinkedIn not connected. Please connect your LinkedIn account first.",
       },
     };
   }
 
-  if (settings.tokenExpiresAt && new Date(settings.tokenExpiresAt) < new Date()) {
-    return { status: 401, body: { error: "LinkedIn token expired, please reconnect" } };
+  if (
+    settings.tokenExpiresAt &&
+    new Date(settings.tokenExpiresAt) < new Date()
+  ) {
+    return {
+      status: 401,
+      body: { error: "LinkedIn token expired, please reconnect" },
+    };
   }
 
   let fullContent = content;
@@ -257,7 +305,9 @@ async function publishForUser(
     await notifyPostPublished(userId, preview);
 
     if (generatedPostId) {
-      const { markGeneratedPostPublished } = await import("../services/postAssetService");
+      const { markGeneratedPostPublished } = await import(
+        "../services/postAssetService"
+      );
       await markGeneratedPostPublished(userId, generatedPostId, result.postId!);
     }
 
@@ -272,7 +322,8 @@ async function publishForUser(
   }
 
   const isDuplicate =
-    result.error?.includes("DUPLICATE_POST") || result.error?.includes("duplicate");
+    result.error?.includes("DUPLICATE_POST") ||
+    result.error?.includes("duplicate");
 
   return {
     status: isDuplicate ? 409 : 500,
@@ -305,7 +356,8 @@ router.post("/publish", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("LinkedIn publish error:", error);
     res.status(500).json({
-      error: error instanceof Error ? error.message : "Failed to post to LinkedIn",
+      error:
+        error instanceof Error ? error.message : "Failed to post to LinkedIn",
     });
   }
 });
@@ -330,7 +382,8 @@ router.post("/post", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("LinkedIn post error:", error);
     res.status(500).json({
-      error: error instanceof Error ? error.message : "Failed to post to LinkedIn",
+      error:
+        error instanceof Error ? error.message : "Failed to post to LinkedIn",
     });
   }
 });
