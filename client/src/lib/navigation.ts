@@ -162,3 +162,16 @@ export function isNavLinkActive(pathname: string, href: string): boolean {
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
+
+/** Hauteur du header fixe (h-16 = 4rem) */
+export const NAVBAR_HEIGHT_REM = 4;
+export const NAVBAR_OFFSET_CLASS = "pt-16";
+
+const NAVBAR_HIDDEN_PATHS = ["/login", "/signup", "/onboarding", "/linkedin/connect"] as const;
+
+/** Afficher la barre de navigation globale (masquée sur auth / onboarding). */
+export function shouldShowNavbar(pathname: string): boolean {
+  return !NAVBAR_HIDDEN_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  );
+}

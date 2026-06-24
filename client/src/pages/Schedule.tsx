@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import Navbar from "@/components/Navbar";
+import { Link } from "wouter";
+import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
+import { ToolsQuickNav } from "@/components/tools/ToolsQuickNav";
 import { toast } from "sonner";
 import {
   formatDateInput,
@@ -19,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Zap,
 } from "lucide-react";
 
 interface ScheduledPost {
@@ -221,7 +224,6 @@ export default function Schedule() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
         <div className="container py-20 text-center">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
@@ -250,9 +252,11 @@ export default function Schedule() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       <div className="container py-8">
+        <ToolsQuickNav />
+        <LinkedInConnectBanner />
+
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">
@@ -262,10 +266,18 @@ export default function Schedule() {
               Choisissez le jour, la date et l&apos;heure exacte de diffusion sur LinkedIn
             </p>
           </div>
-          <Button className="btn-gradient" onClick={openCreateModal}>
+          <div className="flex gap-2">
+            <Link href="/auto-publish">
+              <Button variant="outline" className="border-violet/30 text-violet-light">
+                <Zap className="w-4 h-4 mr-2" />
+                Auto-publication
+              </Button>
+            </Link>
+            <Button className="btn-gradient" onClick={openCreateModal}>
             <Plus className="w-4 h-4 mr-2" />
             Nouveau post
           </Button>
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">

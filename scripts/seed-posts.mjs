@@ -4,17 +4,9 @@
  */
 
 import "dotenv/config";
-import postgres from "postgres";
+import { createScriptClient } from "./postgres-client.mjs";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-
-if (!DATABASE_URL) {
-  console.error("DATABASE_URL is required");
-  process.exit(1);
-}
-
-// Connexion à la base de données
-const sql = postgres(DATABASE_URL, { prepare: false });
+const sql = createScriptClient();
 
 // Posts en français - Thématiques variées
 const frenchPosts = [

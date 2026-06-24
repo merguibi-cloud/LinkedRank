@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AuthLayout } from "@/components/auth/AuthLayout";
 import {
   getLinkedInConnectUrl,
   getSignupUrl,
@@ -8,15 +9,15 @@ import {
 } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase";
-import { Bot, Linkedin, Loader2 } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Linkedin, Loader2, Lock, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 
 export default function Login() {
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
-
   const params = new URLSearchParams(window.location.search);
   const redirect = sanitizeInternalRedirect(params.get("redirect"));
   const connectLinkedIn = params.get("connectLinkedIn") === "1";
@@ -25,14 +26,15 @@ export default function Login() {
 
   const [email, setEmail] = useState(params.get("email") ?? "");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (confirmed) {
-      toast.success("Email confirmÃ© ! Vous pouvez maintenant vous connecter.");
+      toast.success("Email confirmé ! Vous pouvez maintenant vous connecter.");
     } else if (confirmError) {
       toast.error(
-        "Le lien de confirmation est invalide ou a expirÃ©. Veuillez rÃ©essayer de vous inscrire."
+        "Le lien de confirmation est invalide ou a expiré. Veuillez réessayer de vous inscrire."
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -61,11 +63,11 @@ export default function Login() {
         });
 
         if (error) {
-          toast.error(error.message || "Connexion Ã©chouÃ©e");
+          toast.error(error.message || "Connexion échouée");
           return;
         }
 
-        toast.success("Connexion rÃ©ussie !");
+        toast.success("Connexion réussie !");
       } else {
         const response = await fetch("/api/auth/login", {
           method: "POST",
@@ -77,11 +79,11 @@ export default function Login() {
         const data = await response.json();
 
         if (!response.ok) {
-          toast.error(data.error || "Connexion Ã©chouÃ©e");
+          toast.error(data.error || "Connexion échouée");
           return;
         }
 
-        toast.success("Connexion rÃ©ussie !");
+        toast.success("Connexion réussie !");
       }
 
       if (connectLinkedIn) {
@@ -105,82 +107,95 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet to-rose">
-              <Bot className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-white">LinkedAgents</span>
-          </Link>
-          <h1 className="text-2xl font-bold text-white">Connexion</h1>
+    <AuthLayout mode="login">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <div className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Connexion</h1>
           <p className="text-muted-foreground mt-2">
-            AccÃ©dez Ã  votre espace pour publier sur LinkedIn
+            Accédez à votre espace et reprenez votre stratégie LinkedIn
           </p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6"
-        >
+        {connectLinkedIn && (
+          <div className="flex items-center gap-3 rounded-xl border border-[#0077B5]/30 bg-[#0077B5]/10 p-4 mb-6 text-sm">
+            <Linkedin className="h-5 w-5 text-[#0077B5] shrink-0" />
+            <p className="text-muted-foreground">
+              Connectez-vous d'abord, puis vous serez redirigé vers LinkedIn.
+            </p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="vous@exemple.com"
-              required
-              className="bg-background/50"
-            />
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="vous@exemple.com"
+                required
+                autoComplete="email"
+                className="bg-white/5 border-white/10 pl-10 h-12 focus:border-violet/50"
+              />
+            </div>
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="password">Mot de passe</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-              required
-              className="bg-background/50"
-            />
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="????????"
+                required
+                autoComplete="current-password"
+                className="bg-white/5 border-white/10 pl-10 pr-10 h-12 focus:border-violet/50"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
-          <Button
-            type="submit"
-            className="w-full btn-gradient"
-            disabled={isSubmitting}
-          >
+
+          <Button type="submit" className="w-full btn-gradient h-12 text-base" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Connexion...
               </>
             ) : (
-              "Se connecter"
+              <>
+                Accéder à mon espace
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
             )}
           </Button>
         </form>
 
-        <p className="text-center text-sm text-muted-foreground">
-          Pas encore de compte ?{" "}
-          <Link
-            href={getSignupUrl(redirect)}
-            className="text-violet-light hover:underline"
-          >
-            CrÃ©er un compte
-          </Link>
-        </p>
-
-        {connectLinkedIn && (
-          <div className="flex items-center gap-2 rounded-lg border border-[#0077B5]/30 bg-[#0077B5]/10 p-3 text-sm text-muted-foreground">
-            <Linkedin className="h-4 w-4 text-[#0077B5] shrink-0" />
-            Connectez-vous d'abord, puis vous serez redirigÃ© vers LinkedIn.
-          </div>
-        )}
-      </div>
-    </div>
+        <div className="mt-8 pt-6 border-t border-white/10">
+          <p className="text-center text-sm text-muted-foreground">
+            Pas encore de compte ?{" "}
+            <Link href={getSignupUrl(redirect)} className="text-violet-light hover:underline font-medium">
+              Créer un compte gratuit
+            </Link>
+          </p>
+        </div>
+      </motion.div>
+    </AuthLayout>
   );
 }

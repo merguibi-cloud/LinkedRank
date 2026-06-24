@@ -10,7 +10,15 @@ import { toast } from "sonner";
 
 const MAX_VOICE_ATTEMPTS = 3;
 
-type AgentState = "welcome" | "speaking" | "listening" | "thinking" | "done";
+type AgentState =
+  | "welcome"
+  | "preparing_mic"
+  | "speaking"
+  | "listening"
+  | "thinking"
+  | "done";
+
+type MicPromptPhase = "speaking" | "waiting" | "denied";
 
 interface VoiceOnboardingProps {
   autoStart?: boolean;
@@ -53,6 +61,8 @@ export function VoiceOnboarding({
   const [noSpeechHint, setNoSpeechHint] = useState(false);
   const [manualMode, setManualMode] = useState(false);
   const [manualText, setManualText] = useState("");
+  const [micPromptPhase, setMicPromptPhase] = useState<MicPromptPhase>("speaking");
+  const [micDenied, setMicDenied] = useState(false);
 
   const recognitionRef = useRef<any>(null);
   const recognitionActiveRef = useRef(false);
@@ -68,6 +78,8 @@ export function VoiceOnboarding({
   );
   const failedAttemptsRef = useRef(0);
   const manualFallbackRef = useRef(false);
+  const micGrantedRef = useRef(false);
+  const micPrepActiveRef = useRef(false);
 
   const currentQuestion = questions[currentIndex];
   const progress =
@@ -106,8 +118,12 @@ export function VoiceOnboarding({
       }
 
       window.speechSynthesis.cancel();
-      setAgentState("speaking");
-      setStatusLabel("Votre agent vous parle...");
+      setAgentState(prev =>
+        micPrepActiveRef.current ? "preparing_mic" : "speaking"
+      );
+      if (!micPrepActiveRef.current) {
+        setStatusLabel("Votre agent vous parle...");
+      }
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "fr-FR";
@@ -373,28 +389,110 @@ export function VoiceOnboarding({
     submitAnswerRef.current = submitAnswer;
   }, [submitAnswer]);
 
-  const beginConversation = useCallback(async () => {
-    if (startedRef.current || questions.length === 0) return;
+  const requestMicrophonePermission = useCallback(async (): Promise<boolean> => {
+    if (!navigator.mediaDevices?.getUserMedia) return true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      micGrantedRef.current = true;
+      setMicDenied(false);
+      return true;
+    } catch {
+      setMicDenied(true);
+      setMicPromptPhase("denied");
+      return false;
+    }
+  }, []);
+
+  const startQuestions = useCallback(async () => {
+    if (questions.length === 0) return;
     startedRef.current = true;
-    setAgentState("speaking");
+    micPrepActiveRef.current = false;
     failedAttemptsRef.current = 0;
     manualFallbackRef.current = false;
     setManualMode(false);
     setManualText("");
 
-    const intro =
-      "Bonjour ! Je suis votre agent LinkedRank. Nous allons configurer vos publications ensemble, simplement en parlant. " +
-      questions[0].question;
+    if (!micGrantedRef.current) {
+      await speak(
+        "Parfait, c'est noté ! Commençons la configuration de vos publications."
+      );
+    } else {
+      await speak("Parfait, je vous entends ! Commençons.");
+    }
 
-    await speak(intro);
+    await speak(questions[0].question);
     startListening();
   }, [questions, speak, startListening]);
 
+  const beginMicSetup = useCallback(async () => {
+    if (questions.length === 0) return;
+
+    if (micGrantedRef.current) {
+      void startQuestions();
+      return;
+    }
+
+    micPrepActiveRef.current = true;
+    setAgentState("preparing_mic");
+    setMicPromptPhase("speaking");
+    setMicDenied(false);
+    setStatusLabel("Votre agent vous explique la marche à suivre...");
+
+    const micIntro =
+      "Bonjour ! Je suis votre agent LinkedRank. " +
+      "Avant de configurer vos publications LinkedIn, j'ai besoin d'accéder à votre micro. " +
+      "Dans quelques instants, votre navigateur affichera une fenêtre : cliquez sur Autoriser. " +
+      "Ensuite, vous me répondez simplement en parlant — aucun formulaire, juste une conversation naturelle.";
+
+    await speak(micIntro);
+
+    setMicPromptPhase("waiting");
+    setStatusLabel("Cliquez sur Autoriser dans la fenêtre du navigateur");
+
+    const granted = await requestMicrophonePermission();
+    if (granted) {
+      micPrepActiveRef.current = false;
+      void startQuestions();
+    } else {
+      setStatusLabel("Micro non autorisé");
+      await speak(
+        "Je n'ai pas accès à votre micro. Cliquez sur Réessayer, ou répondez par écrit si vous préférez."
+      );
+    }
+  }, [questions, speak, requestMicrophonePermission, startQuestions]);
+
+  const retryMicPermission = useCallback(async () => {
+    setMicPromptPhase("waiting");
+    setStatusLabel("Cliquez sur Autoriser dans la fenêtre du navigateur");
+    const granted = await requestMicrophonePermission();
+    if (granted) {
+      micPrepActiveRef.current = false;
+      void startQuestions();
+    }
+  }, [requestMicrophonePermission, startQuestions]);
+
+  const startManualFromMicDenied = useCallback(async () => {
+    if (questions.length === 0) return;
+    startedRef.current = true;
+    micPrepActiveRef.current = false;
+    manualFallbackRef.current = true;
+    failedAttemptsRef.current = 0;
+    setManualMode(true);
+    setManualText("");
+    setMicDenied(false);
+    await speak(
+      "Pas de problème. Répondez par écrit à chaque question — voici la première."
+    );
+    setAgentState("listening");
+    setStatusLabel("Répondez par écrit ci-dessous.");
+  }, [questions, speak]);
+
   useEffect(() => {
     if (autoStart && questions.length > 0) {
-      void beginConversation();
+      void beginMicSetup();
     }
-  }, [autoStart, questions, beginConversation]);
+  }, [autoStart, questions, beginMicSetup]);
 
   const handleFinish = () => {
     onComplete?.();
@@ -462,12 +560,12 @@ export function VoiceOnboarding({
                   Parlez à votre agent
                 </h1>
                 <p className="text-muted-foreground text-lg">
-                  L'agent vous pose des questions à voix haute et vous répond à
-                  voix haute. Aucun formulaire — juste une conversation.
+                  L'agent vous pose des questions à voix haute et vous répondez
+                  en parlant. Aucun formulaire — juste une conversation.
                 </p>
               </div>
               <Button
-                onClick={() => void beginConversation()}
+                onClick={() => void beginMicSetup()}
                 size="lg"
                 className="bg-gradient-to-r from-violet to-rose hover:opacity-90 text-white px-10 h-14 text-lg"
                 disabled={questions.length === 0}
@@ -475,9 +573,73 @@ export function VoiceOnboarding({
                 <Mic className="w-6 h-6 mr-2" />
                 Démarrer la conversation
               </Button>
-              <p className="text-xs text-muted-foreground">
-                Autorisez le micro quand le navigateur le demande
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                Votre agent vous expliquera comment activer le micro avant de
+                commencer — cliquez sur Autoriser quand le navigateur le demande.
               </p>
+            </motion.div>
+          )}
+
+          {agentState === "preparing_mic" && (
+            <motion.div
+              key="preparing_mic"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center gap-8 w-full max-w-md"
+            >
+              <AgentOrb state="preparing_mic" />
+
+              <div className="text-center space-y-2">
+                <p className="text-white text-xl font-medium">{statusLabel}</p>
+                <p className="text-muted-foreground text-sm">
+                  {micPromptPhase === "speaking" &&
+                    "Écoutez votre agent — il vous guide pas à pas"}
+                  {micPromptPhase === "waiting" &&
+                    "Une fenêtre du navigateur devrait s'afficher en haut de la page"}
+                  {micPromptPhase === "denied" &&
+                    "Sans micro, vous pouvez répondre par écrit"}
+                </p>
+              </div>
+
+              {micPromptPhase !== "speaking" && <MicPermissionVisual />}
+
+              {micPromptPhase === "speaking" && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-sm text-muted-foreground text-center max-w-xs"
+                >
+                  Écoutez votre agent — la fenêtre d'autorisation apparaîtra
+                  juste après
+                </motion.p>
+              )}
+
+              {micDenied && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center gap-3 w-full"
+                >
+                  <Button
+                    onClick={() => void retryMicPermission()}
+                    size="lg"
+                    className="bg-gradient-to-r from-violet to-rose hover:opacity-90 text-white w-full"
+                  >
+                    <Mic className="w-5 h-5 mr-2" />
+                    Réessayer l'activation du micro
+                  </Button>
+                  <Button
+                    onClick={() => void startManualFromMicDenied()}
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                  >
+                    <Keyboard className="w-4 h-4 mr-2" />
+                    Répondre par écrit
+                  </Button>
+                </motion.div>
+              )}
             </motion.div>
           )}
 
@@ -659,14 +821,114 @@ export function VoiceOnboarding({
   );
 }
 
+function MicPermissionVisual() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col items-center gap-6 w-full"
+    >
+      <div className="relative flex items-center justify-center">
+        {[0, 1, 2].map(i => (
+          <motion.div
+            key={i}
+            className="absolute rounded-full border-2 border-amber-400/50"
+            style={{ width: 96, height: 96 }}
+            animate={{ scale: [1, 2.4], opacity: [0.5, 0] }}
+            transition={{
+              repeat: Infinity,
+              duration: 2.2,
+              delay: i * 0.65,
+              ease: "easeOut",
+            }}
+          />
+        ))}
+        <motion.div
+          animate={{ scale: [1, 1.08, 1] }}
+          transition={{ repeat: Infinity, duration: 1.8 }}
+          className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-xl shadow-amber-500/25"
+        >
+          <Mic className="w-12 h-12 text-white" />
+        </motion.div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.2 }}
+        className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5 w-full max-w-xs shadow-2xl"
+      >
+        <div className="flex items-start gap-3 mb-4">
+          <motion.div
+            animate={{ rotate: [0, -8, 8, 0] }}
+            transition={{ repeat: Infinity, duration: 2.5 }}
+            className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet to-rose flex items-center justify-center shrink-0"
+          >
+            <Mic className="w-5 h-5 text-white" />
+          </motion.div>
+          <div>
+            <p className="text-white text-sm font-semibold">linkedrank.com</p>
+            <p className="text-muted-foreground text-xs mt-0.5">
+              souhaite utiliser votre micro
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <div className="flex-1 py-2.5 rounded-xl bg-white/5 text-center text-xs text-muted-foreground border border-white/10">
+            Refuser
+          </div>
+          <motion.div
+            animate={{
+              scale: [1, 1.06, 1],
+              boxShadow: [
+                "0 0 0 0 rgba(16, 185, 129, 0.4)",
+                "0 0 0 8px rgba(16, 185, 129, 0)",
+                "0 0 0 0 rgba(16, 185, 129, 0)",
+              ],
+            }}
+            transition={{ repeat: Infinity, duration: 1.6 }}
+            className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-center text-xs text-white font-semibold"
+          >
+            Autoriser
+          </motion.div>
+        </div>
+      </motion.div>
+
+      <div className="flex items-center gap-6 text-xs text-muted-foreground">
+        {["Autoriser", "Parler", "Configurer"].map((step, i) => (
+          <div key={step} className="flex items-center gap-2">
+            <motion.div
+              animate={
+                i === 0
+                  ? { scale: [1, 1.15, 1], backgroundColor: ["#8b5cf6", "#f59e0b", "#8b5cf6"] }
+                  : {}
+              }
+              transition={{ repeat: Infinity, duration: 2 }}
+              className="w-6 h-6 rounded-full bg-violet/30 flex items-center justify-center text-[10px] font-bold text-white"
+            >
+              {i + 1}
+            </motion.div>
+            <span>{step}</span>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
 function AgentOrb({ state }: { state: AgentState | "idle" }) {
-  const isActive = state === "speaking" || state === "listening";
+  const isActive =
+    state === "speaking" ||
+    state === "listening" ||
+    state === "preparing_mic";
   const color =
-    state === "listening"
-      ? "from-emerald-500 to-teal-400"
-      : state === "done"
-        ? "from-emerald-500 to-emerald-400"
-        : "from-violet to-rose";
+    state === "preparing_mic"
+      ? "from-amber-400 to-orange-500"
+      : state === "listening"
+        ? "from-emerald-500 to-teal-400"
+        : state === "done"
+          ? "from-emerald-500 to-emerald-400"
+          : "from-violet to-rose";
 
   return (
     <div className="relative">
@@ -712,7 +974,7 @@ function AgentOrb({ state }: { state: AgentState | "idle" }) {
       >
         {state === "thinking" ? (
           <Loader2 className="w-14 h-14 text-white animate-spin" />
-        ) : state === "listening" ? (
+        ) : state === "listening" || state === "preparing_mic" ? (
           <Mic className="w-14 h-14 text-white" />
         ) : (
           <Bot className="w-14 h-14 text-white" />

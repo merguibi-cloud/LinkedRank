@@ -1,5 +1,5 @@
 import "dotenv/config";
-import postgres from "postgres";
+import { createScriptClient } from "./postgres-client.mjs";
 
 // Top LinkedIn Influencers data
 const influencers = [
@@ -516,7 +516,7 @@ const influencers = [
 ];
 
 async function seedInfluencers() {
-  const sql = postgres(process.env.DATABASE_URL, { prepare: false });
+  const sql = createScriptClient();
 
   console.log("🚀 Starting influencers seed...");
 

@@ -1,13 +1,8 @@
 import "dotenv/config";
-import postgres from "postgres";
+import { createScriptPostgresClient } from "../server/_core/database";
 
 async function main() {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error("DATABASE_URL manquant dans .env");
-  }
-
-  const sql = postgres(url, { prepare: false, max: 1 });
+  const sql = createScriptPostgresClient();
 
   try {
     const tables = await sql<{ tablename: string }[]>`

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "wouter";
-import Navbar from "@/components/Navbar";
 import {
   BookOpen,
   Lightbulb,
@@ -186,7 +185,6 @@ export default function Resources() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       {/* Hero Section */}
       <section className="py-16 border-b border-white/5">
