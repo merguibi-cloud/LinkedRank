@@ -1,5 +1,5 @@
 /** Routes où la barre de navigation mobile basse est masquée (layout sidebar ou écrans auth). */
-const MOBILE_NAV_HIDDEN_PATHS = ["/onboarding", "/login", "/signup"] as const;
+const MOBILE_NAV_HIDDEN_PATHS = ["/onboarding", "/login", "/signup", "/linkedin/connect"] as const;
 
 /** Routes utilisant DashboardLayout (sidebar) — pas de double navigation. */
 const DASHBOARD_LAYOUT_PATHS = [

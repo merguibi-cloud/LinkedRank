@@ -110,7 +110,7 @@ export default function Navbar() {
     submenuTimeoutRef.current = setTimeout(() => setActiveSubmenu(null), 150);
   };
 
-  const linkedinAuthUrl = "/login?redirect=/dashboard&connectLinkedIn=1";
+  const linkedinAuthUrl = "/linkedin/connect?redirect=/dashboard";
 
   return (
     <>

@@ -1,4 +1,3 @@
-import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import {
@@ -35,7 +34,6 @@ export default function GuideLinkedIn2025() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       {/* Hero Section */}
       <section className="py-12 border-b border-white/5">

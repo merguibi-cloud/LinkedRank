@@ -1,14 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLinkedInConnectUrl, getSignupUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { formatDateInput, getDefaultScheduleTime, combineDateAndTime } from "@/lib/scheduleUtils";
 import { AI_IMAGE_FORMATS, AI_IMAGE_STYLES } from "@/lib/aiImageStyles";
-import Navbar from "@/components/Navbar";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
+import { ToolsQuickNav } from "@/components/tools/ToolsQuickNav";
 import { CreatorAvatar } from "@/components/CreatorAvatar";
 import { toast } from "sonner";
 import {
@@ -49,9 +51,19 @@ import {
   Send,
   Pencil,
   FolderOpen,
+  List,
 } from "lucide-react";
 import { Link } from "wouter";
 import { MediaLibraryPicker, MediaUploadZone } from "@/components/MediaLibraryPicker";
+import { UpcomingPublicationsView } from "@/components/autopublish/UpcomingPublicationsView";
+import {
+  AutoPublishFlowAnimation,
+  type AutoPublishFlowPhase,
+} from "@/components/autopublish/AutoPublishFlowAnimation";
+import {
+  AutoPublishSuccessAnimation,
+  AutoPublishScheduledAnimation,
+} from "@/components/autopublish/AutoPublishSuccessAnimation";
 
 // Days of the week
 const DAYS = [
@@ -190,6 +202,42 @@ interface Influencer {
   country: string;
 }
 
+function asStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
+  return [];
+}
+
+function asNumberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is number => typeof v === "number");
+}
+
+function mapServerSettings(raw: Record<string, unknown>): Settings {
+  return {
+    isEnabled: Boolean(raw.isEnabled),
+    sector: String(raw.sector ?? ""),
+    targetAudience: String(raw.targetAudience ?? ""),
+    tone: String(raw.tone ?? "professional"),
+    language: String(raw.language ?? "FR"),
+    viralityLevel: String(raw.viralityLevel ?? "medium"),
+    contentLength: String(raw.contentLength ?? "medium"),
+    includeEmojis: raw.includeEmojis !== false,
+    includeHashtags: raw.includeHashtags !== false,
+    includeCallToAction: raw.includeCallToAction !== false,
+    personalContext: String(raw.personalContext ?? ""),
+    objectives: asStringArray(raw.objectives),
+    contentTypes: asStringArray(raw.contentTypes),
+    inspiringCreators: asNumberArray(raw.inspiringCreators),
+    imageType: raw.imageType === "quote" ? "quote" : "ai",
+    aiImageStyle: String(raw.aiImageStyle ?? "professional"),
+    aiImageFormat: String(raw.aiImageFormat ?? "1536x1024"),
+    imageStyle: String(raw.imageStyle ?? "gradient"),
+    colorPalette: String(raw.colorPalette ?? "violet"),
+    includeImage: raw.includeImage !== false,
+    customQuote: String(raw.customQuote ?? ""),
+  };
+}
+
 interface Settings {
   isEnabled: boolean;
   sector: string;
@@ -215,10 +263,27 @@ interface Settings {
   customQuote: string;
 }
 
+type AutoPublishTab =
+  | "upcoming"
+  | "objectives"
+  | "creators"
+  | "content"
+  | "visual"
+  | "schedule"
+  | "preview";
+
+type FlowOverlay =
+  | { type: "flow"; phase: AutoPublishFlowPhase; phaseIndex: number }
+  | { type: "success"; title?: string; message?: string }
+  | { type: "scheduled"; dateLabel: string; timeLabel: string }
+  | null;
+
 export default function AutoPublish() {
   const { user } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"objectives" | "creators" | "content" | "visual" | "schedule" | "preview">("objectives");
+  const [activeTab, setActiveTab] = useState<AutoPublishTab>("upcoming");
+  const [flowOverlay, setFlowOverlay] = useState<FlowOverlay>(null);
+  const [upcomingKey, setUpcomingKey] = useState(0);
   
   // Influencers from database
   const [influencers, setInfluencers] = useState<Influencer[]>([]);
@@ -281,6 +346,7 @@ export default function AutoPublish() {
   const [selectedMediaId, setSelectedMediaId] = useState<number | null>(null);
   const [libraryImageUrl, setLibraryImageUrl] = useState<string | null>(null);
   const [mediaSuggestionsApplied, setMediaSuggestionsApplied] = useState(false);
+  const settingsLoadedRef = useRef(false);
 
   const generateAiImageMutation = trpc.generator.generatePostImage.useMutation({
     onSuccess: (data) => {
@@ -344,8 +410,10 @@ export default function AutoPublish() {
     loadInfluencers();
   }, []);
 
-  // Load existing settings
+  // Load existing settings (once per session to avoid overwriting user edits)
   useEffect(() => {
+    if (!user?.id || settingsLoadedRef.current) return;
+
     const loadSettings = async () => {
       try {
         const response = await fetch("/api/auto-publish/settings", {
@@ -354,55 +422,80 @@ export default function AutoPublish() {
         if (response.ok) {
           const data = await response.json();
           if (data.settings) {
-            setSettings({
-              ...settings,
-              ...data.settings,
-              objectives: data.settings.objectives || [],
-              contentTypes: data.settings.contentTypes || [],
-              inspiringCreators: data.settings.inspiringCreators || [],
-            });
+            setSettings((prev) => ({
+              ...prev,
+              ...mapServerSettings(data.settings as Record<string, unknown>),
+            }));
           }
           if (data.schedule) {
-            setSchedule(data.schedule);
+            setSchedule(
+              data.schedule.map((s: ScheduleSlot) => ({
+                ...s,
+                isActive: s.isActive !== false,
+              }))
+            );
           }
+          settingsLoadedRef.current = true;
         }
       } catch (error) {
         console.error("Failed to load settings:", error);
       }
     };
-    if (user) {
-      loadSettings();
-    }
-  }, [user]);
+    void loadSettings();
+  }, [user?.id]);
 
-  const handleSaveSettings = async () => {
+  const persistSettings = async (
+    settingsToSave = settings,
+    scheduleToSave = schedule,
+    silent = false
+  ): Promise<boolean> => {
     setIsSaving(true);
     try {
       const response = await fetch("/api/auto-publish/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ settings, schedule }),
+        body: JSON.stringify({ settings: settingsToSave, schedule: scheduleToSave }),
       });
 
       if (response.ok) {
-        toast.success("Paramètres sauvegardés !");
-      } else {
-        toast.error("Erreur lors de la sauvegarde");
+        if (!silent) toast.success("Paramètres sauvegardés !");
+        return true;
       }
-    } catch (error) {
+      toast.error("Erreur lors de la sauvegarde");
+      return false;
+    } catch {
       toast.error("Erreur de connexion");
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleToggleEnabled = async () => {
-    const newEnabled = !settings.isEnabled;
-    setSettings({ ...settings, isEnabled: newEnabled });
-    
+  const handleSaveSettings = async () => {
+    const ok = await persistSettings();
+    if (ok) setUpcomingKey((k) => k + 1);
+  };
+
+  const handleToggleEnabled = async (enabled?: boolean) => {
+    const newEnabled = enabled ?? !settings.isEnabled;
+    const newSettings = { ...settings, isEnabled: newEnabled };
+    setSettings(newSettings);
+
     if (newEnabled && schedule.length === 0) {
-      toast.info("N'oubliez pas de configurer votre planning de publication !");
+      toast.info("Configurez votre planning pour activer l'auto-publication");
+    }
+
+    const saved = await persistSettings(newSettings, schedule, true);
+    if (saved) {
+      toast.success(
+        newEnabled
+          ? "Auto-publication activée — l'IA publiera selon votre config"
+          : "Auto-publication désactivée"
+      );
+      setUpcomingKey((k) => k + 1);
+    } else {
+      setSettings((prev) => ({ ...prev, isEnabled: !newEnabled }));
     }
   };
 
@@ -462,24 +555,49 @@ export default function AutoPublish() {
   };
 
   const toggleObjective = (objectiveId: string) => {
-    const newObjectives = settings.objectives.includes(objectiveId)
-      ? settings.objectives.filter(o => o !== objectiveId)
-      : [...settings.objectives, objectiveId];
-    setSettings({ ...settings, objectives: newObjectives });
+    setSettings((prev) => {
+      const objectives = asStringArray(prev.objectives);
+      const newObjectives = objectives.includes(objectiveId)
+        ? objectives.filter((o) => o !== objectiveId)
+        : [...objectives, objectiveId];
+      return { ...prev, objectives: newObjectives };
+    });
   };
 
   const toggleContentType = (typeId: string) => {
-    const newTypes = settings.contentTypes.includes(typeId)
-      ? settings.contentTypes.filter(t => t !== typeId)
-      : [...settings.contentTypes, typeId];
-    setSettings({ ...settings, contentTypes: newTypes });
+    setSettings((prev) => {
+      const contentTypes = asStringArray(prev.contentTypes);
+      const newTypes = contentTypes.includes(typeId)
+        ? contentTypes.filter((t) => t !== typeId)
+        : [...contentTypes, typeId];
+      return { ...prev, contentTypes: newTypes };
+    });
   };
 
   const toggleCreator = (creatorId: number) => {
-    const newCreators = settings.inspiringCreators.includes(creatorId)
-      ? settings.inspiringCreators.filter(c => c !== creatorId)
-      : [...settings.inspiringCreators, creatorId];
-    setSettings({ ...settings, inspiringCreators: newCreators });
+    setSettings((prev) => {
+      const inspiringCreators = asNumberArray(prev.inspiringCreators);
+      const newCreators = inspiringCreators.includes(creatorId)
+        ? inspiringCreators.filter((c) => c !== creatorId)
+        : [...inspiringCreators, creatorId];
+      return { ...prev, inspiringCreators: newCreators };
+    });
+  };
+
+  const toggleScheduleSlotActive = (
+    dayOfWeek: number,
+    publishTime: string,
+    publishDate?: string | null
+  ) => {
+    setSchedule((prev) =>
+      prev.map((s) =>
+        s.dayOfWeek === dayOfWeek &&
+        s.publishTime === publishTime &&
+        (s.publishDate ?? null) === (publishDate ?? null)
+          ? { ...s, isActive: !s.isActive }
+          : s
+      )
+    );
   };
 
   const handleGeneratePreview = async () => {
@@ -495,7 +613,14 @@ export default function AutoPublish() {
     setPreviewImageSource("library");
     setMediaSuggestionsApplied(false);
     setEditedContent("");
-    toast.info(`Génération de ${previewCount} aperçus en cours... Cela peut prendre quelques secondes.`);
+    setFlowOverlay({ type: "flow", phase: "generating", phaseIndex: 0 });
+    const phaseTimer = window.setInterval(() => {
+      setFlowOverlay((prev) =>
+        prev?.type === "flow" && prev.phase === "generating"
+          ? { ...prev, phaseIndex: Math.min(prev.phaseIndex + 1, 2) }
+          : prev
+      );
+    }, 1200);
     try {
       const response = await fetch("/api/auto-publish/preview", {
         method: "POST",
@@ -531,6 +656,8 @@ export default function AutoPublish() {
       console.error("Preview fetch error:", error);
       toast.error("Erreur de connexion au serveur");
     } finally {
+      window.clearInterval(phaseTimer);
+      setFlowOverlay(null);
       setIsGenerating(false);
     }
   };
@@ -654,9 +781,17 @@ export default function AutoPublish() {
       toast.error("Veuillez d'abord générer un aperçu avant de publier");
       return;
     }
-    
+
     setIsPublishing(true);
-    toast.info("Publication en cours sur LinkedIn...");
+    setFlowOverlay({ type: "flow", phase: "publishing", phaseIndex: 0 });
+    const phaseTimer = window.setInterval(() => {
+      setFlowOverlay((prev) =>
+        prev?.type === "flow" && prev.phase === "publishing"
+          ? { ...prev, phaseIndex: Math.min(prev.phaseIndex + 1, 2) }
+          : prev
+      );
+    }, 900);
+
     try {
       const response = await fetch("/api/auto-publish/publish-now", {
         method: "POST",
@@ -669,15 +804,25 @@ export default function AutoPublish() {
       });
 
       const data = await response.json();
+      window.clearInterval(phaseTimer);
+
       if (data.success) {
-        toast.success("Post publié sur LinkedIn ! 🎉");
-      } else if (data.message?.includes("LinkedIn not connected") || data.message?.includes("non connecté")) {
+        setFlowOverlay({ type: "success" });
+        setUpcomingKey((k) => k + 1);
+      } else if (
+        data.message?.includes("LinkedIn not connected") ||
+        data.message?.includes("non connecté")
+      ) {
+        setFlowOverlay(null);
         toast.info("Connectez LinkedIn pour publier");
         window.location.href = getLinkedInConnectUrl("/auto-publish");
       } else {
+        setFlowOverlay(null);
         toast.error(data.message || "Erreur lors de la publication");
       }
-    } catch (error) {
+    } catch {
+      window.clearInterval(phaseTimer);
+      setFlowOverlay(null);
       toast.error("Erreur de connexion");
     } finally {
       setIsPublishing(false);
@@ -692,6 +837,15 @@ export default function AutoPublish() {
     }
 
     setIsScheduling(true);
+    setFlowOverlay({ type: "flow", phase: "scheduling", phaseIndex: 0 });
+    const phaseTimer = window.setInterval(() => {
+      setFlowOverlay((prev) =>
+        prev?.type === "flow" && prev.phase === "scheduling"
+          ? { ...prev, phaseIndex: Math.min(prev.phaseIndex + 1, 2) }
+          : prev
+      );
+    }, 800);
+
     try {
       const response = await fetch("/api/schedule", {
         method: "POST",
@@ -706,12 +860,27 @@ export default function AutoPublish() {
         }),
       });
       const data = await response.json();
+      window.clearInterval(phaseTimer);
+
       if (response.ok && data.success) {
-        toast.success("Post planifié ! Il sera publié automatiquement.");
+        const scheduled = combineDateAndTime(scheduleDate, scheduleTime);
+        setFlowOverlay({
+          type: "scheduled",
+          dateLabel: scheduled.toLocaleDateString("fr-FR", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+          }),
+          timeLabel: scheduleTime,
+        });
+        setUpcomingKey((k) => k + 1);
       } else {
+        setFlowOverlay(null);
         toast.error(data.error || "Erreur lors de la planification");
       }
     } catch {
+      window.clearInterval(phaseTimer);
+      setFlowOverlay(null);
       toast.error("Erreur de connexion");
     } finally {
       setIsScheduling(false);
@@ -740,7 +909,6 @@ export default function AutoPublish() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
         <div className="container py-20 text-center">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-violet to-rose flex items-center justify-center">
@@ -763,10 +931,10 @@ export default function AutoPublish() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       <div className="container py-8">
         <LinkedInConnectBanner />
+        <ToolsQuickNav />
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -787,26 +955,29 @@ export default function AutoPublish() {
           
           {/* Enable/Disable Toggle */}
           <div className="flex items-center gap-4">
-            <button
-              onClick={handleToggleEnabled}
-              className={`flex items-center gap-3 px-6 py-3 rounded-xl border transition-all ${
+            <div
+              className={`flex items-center gap-3 px-5 py-3 rounded-xl border transition-all ${
                 settings.isEnabled
-                  ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
-                  : "bg-card border-white/10 text-muted-foreground hover:border-white/20"
+                  ? "bg-emerald-500/20 border-emerald-500/50"
+                  : "bg-card border-white/10"
               }`}
             >
-              {settings.isEnabled ? (
-                <>
-                  <Play className="w-5 h-5" />
-                  <span className="font-medium">Actif</span>
-                </>
-              ) : (
-                <>
-                  <Pause className="w-5 h-5" />
-                  <span className="font-medium">Inactif</span>
-                </>
-              )}
-            </button>
+              <div className="flex flex-col gap-0.5">
+                <Label htmlFor="auto-publish-toggle" className="text-sm font-medium text-white cursor-pointer">
+                  Auto-publication
+                </Label>
+                <span className={`text-xs ${settings.isEnabled ? "text-emerald-400" : "text-muted-foreground"}`}>
+                  {settings.isEnabled ? "Publications automatiques actives" : "Publications automatiques en pause"}
+                </span>
+              </div>
+              <Switch
+                id="auto-publish-toggle"
+                checked={settings.isEnabled}
+                onCheckedChange={(checked) => void handleToggleEnabled(checked)}
+                disabled={isSaving}
+                className="data-[state=checked]:bg-emerald-500"
+              />
+            </div>
             <Button
               className="btn-gradient"
               onClick={handleSaveSettings}
@@ -824,26 +995,42 @@ export default function AutoPublish() {
 
         {/* Status Banner */}
         {settings.isEnabled && schedule.length > 0 && (
-          <div className="mb-8 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                <Check className="w-5 h-5 text-emerald-400" />
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30"
+          >
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <Check className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-emerald-400">
+                    Publication automatique activée
+                  </p>
+                  <p className="text-sm text-emerald-400/70">
+                    {schedule.length} créneau(x) • L'IA publie selon vos objectifs et votre planning
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-emerald-400">
-                  Publication automatique activée
-                </p>
-                <p className="text-sm text-emerald-400/70">
-                  {schedule.length} créneau(x) configuré(s) • L'IA publiera automatiquement selon votre planning
-                </p>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                onClick={() => setActiveTab("upcoming")}
+              >
+                <List className="w-4 h-4 mr-2" />
+                Voir les publications à venir
+              </Button>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Tabs */}
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
           {[
+            { id: "upcoming", label: "À venir", icon: List },
             { id: "objectives", label: "1. Objectifs", icon: Target },
             { id: "creators", label: "2. Créateurs", icon: Users },
             { id: "content", label: "3. Contenu", icon: MessageSquare },
@@ -853,7 +1040,7 @@ export default function AutoPublish() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              onClick={() => setActiveTab(tab.id as AutoPublishTab)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.id
                   ? "bg-violet text-white"
@@ -868,9 +1055,51 @@ export default function AutoPublish() {
 
         {/* Tab Content */}
         
+        {activeTab === "upcoming" && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 sm:p-8">
+            <UpcomingPublicationsView
+              days={7}
+              refreshToken={upcomingKey}
+              isAutoEnabled={settings.isEnabled}
+              hasSchedule={schedule.length > 0}
+              onToggleAuto={(enabled) => void handleToggleEnabled(enabled)}
+              onGoToSchedule={() => setActiveTab("schedule")}
+              onGoToObjectives={() => setActiveTab("objectives")}
+              onGoToPreview={() => setActiveTab("preview")}
+            />
+          </div>
+        )}
+
         {/* Objectives Tab */}
         {activeTab === "objectives" && (
           <div className="space-y-8">
+            {/* Auto-publish toggle */}
+            <div className="flex items-center justify-between gap-4 p-5 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${settings.isEnabled ? "bg-emerald-500/20" : "bg-white/5"}`}>
+                  {settings.isEnabled ? (
+                    <Play className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <Pause className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium text-white">Publication automatique</p>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.isEnabled
+                      ? "L'IA publie selon votre planning configuré"
+                      : "Désactivée — aucune publication automatique ne partira"}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.isEnabled}
+                onCheckedChange={(checked) => void handleToggleEnabled(checked)}
+                disabled={isSaving}
+                className="data-[state=checked]:bg-emerald-500"
+              />
+            </div>
+
             {/* Objectives Selection */}
             <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
               <h3 className="text-xl font-semibold text-white mb-2 flex items-center gap-2">
@@ -884,6 +1113,7 @@ export default function AutoPublish() {
                 {OBJECTIVES.map((objective) => (
                   <button
                     key={objective.id}
+                    type="button"
                     onClick={() => toggleObjective(objective.id)}
                     className={`p-4 rounded-xl border text-left transition-all ${
                       settings.objectives.includes(objective.id)
@@ -1060,6 +1290,7 @@ export default function AutoPublish() {
                   {filteredInfluencers.map((influencer) => (
                     <button
                       key={influencer.id}
+                      type="button"
                       onClick={() => toggleCreator(influencer.id)}
                       className={`p-4 rounded-xl border text-left transition-all ${
                         settings.inspiringCreators.includes(influencer.id)
@@ -1135,6 +1366,7 @@ export default function AutoPublish() {
                 {CONTENT_TYPES.map((type) => (
                   <button
                     key={type.id}
+                    type="button"
                     onClick={() => toggleContentType(type.id)}
                     className={`p-4 rounded-xl border text-left transition-all ${
                       settings.contentTypes.includes(type.id)
@@ -1701,10 +1933,18 @@ export default function AutoPublish() {
                         className="flex items-center justify-between p-3 rounded-lg bg-background border border-white/10"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-violet/20 flex items-center justify-center">
-                            <Calendar className="w-5 h-5 text-violet-light" />
+                          <Switch
+                            checked={slot.isActive}
+                            onCheckedChange={() =>
+                              toggleScheduleSlotActive(slot.dayOfWeek, slot.publishTime, slot.publishDate)
+                            }
+                            className="data-[state=checked]:bg-emerald-500"
+                            aria-label={slot.isActive ? "Désactiver ce créneau" : "Activer ce créneau"}
+                          />
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${slot.isActive ? "bg-violet/20" : "bg-white/5 opacity-50"}`}>
+                            <Calendar className={`w-5 h-5 ${slot.isActive ? "text-violet-light" : "text-muted-foreground"}`} />
                           </div>
-                          <div>
+                          <div className={slot.isActive ? "" : "opacity-50"}>
                             <p className="font-medium text-white capitalize">
                               {slot.publishDate
                                 ? formatDisplayDate(slot.publishDate)
@@ -1713,10 +1953,12 @@ export default function AutoPublish() {
                             <p className="text-sm text-muted-foreground">
                               {slot.publishTime}
                               {!slot.publishDate && " · récurrent"}
+                              {!slot.isActive && " · en pause"}
                             </p>
                           </div>
                         </div>
                         <button
+                          type="button"
                           onClick={() => handleRemoveScheduleSlot(slot.dayOfWeek, slot.publishTime, slot.publishDate)}
                           className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
                         >
@@ -2218,6 +2460,27 @@ export default function AutoPublish() {
           </div>
         )}
       </div>
+
+      {flowOverlay?.type === "flow" && (
+        <AutoPublishFlowAnimation
+          phase={flowOverlay.phase}
+          phaseIndex={flowOverlay.phaseIndex}
+        />
+      )}
+      {flowOverlay?.type === "success" && (
+        <AutoPublishSuccessAnimation
+          title={flowOverlay.title}
+          message={flowOverlay.message}
+          onComplete={() => setFlowOverlay(null)}
+        />
+      )}
+      {flowOverlay?.type === "scheduled" && (
+        <AutoPublishScheduledAnimation
+          dateLabel={flowOverlay.dateLabel}
+          timeLabel={flowOverlay.timeLabel}
+          onComplete={() => setFlowOverlay(null)}
+        />
+      )}
     </div>
   );
 }

@@ -34,6 +34,9 @@ import {
   Info
 } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "wouter";
+import { ToolsQuickNav } from "@/components/tools/ToolsQuickNav";
+import { AnalyticsOverview } from "@/components/tools/AnalyticsOverview";
 
 // Types
 interface ViralityPrediction {
@@ -168,7 +171,7 @@ const generateHeatmapData = () => {
 const HEATMAP_DATA = generateHeatmapData();
 
 export default function Analytics() {
-  const [activeTab, setActiveTab] = useState<"virality" | "timing" | "competitors" | "content">("virality");
+  const [activeTab, setActiveTab] = useState<"overview" | "virality" | "timing" | "competitors" | "content">("overview");
   const [postContent, setPostContent] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [prediction, setPrediction] = useState<ViralityPrediction | null>(null);
@@ -258,114 +261,52 @@ export default function Analytics() {
               Analytics Avancés
             </h1>
             <p className="text-muted-foreground mt-1">
-              Prédictions de viralité, meilleurs horaires et analyse concurrentielle
+              Vos données réelles et outils d&apos;analyse pour optimiser LinkedIn
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-1" />
-              Exporter
-            </Button>
-            <Button variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Actualiser
-            </Button>
+            <Link href="/auto-publish">
+              <Button variant="outline" size="sm" className="border-violet/30 text-violet-light">
+                <Zap className="h-4 w-4 mr-1" />
+                Auto-publication
+              </Button>
+            </Link>
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Eye className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">24.5K</p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    Impressions
-                    <ArrowUp className="h-3 w-3 text-green-500" />
-                    <span className="text-green-500">+12%</span>
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-500/10">
-                  <TrendingUp className="h-5 w-5 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">6.8%</p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    Taux d'engagement
-                    <ArrowUp className="h-3 w-3 text-green-500" />
-                    <span className="text-green-500">+0.5%</span>
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-500/10">
-                  <Users className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">+847</p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    Nouveaux abonnés
-                    <ArrowUp className="h-3 w-3 text-green-500" />
-                    <span className="text-green-500">+23%</span>
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-500/10">
-                  <Flame className="h-5 w-5 text-orange-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">78</p>
-                  <p className="text-xs text-muted-foreground">
-                    Score viralité moyen
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <ToolsQuickNav />
 
-        {/* Main Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
-          <TabsList className="bg-muted/50">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="space-y-4">
+          <TabsList className="bg-muted/50 flex-wrap h-auto gap-1">
+            <TabsTrigger value="overview" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Vue d&apos;ensemble
+            </TabsTrigger>
             <TabsTrigger value="virality" className="gap-2">
               <Sparkles className="h-4 w-4" />
-              Score Viralité
+              Score viralité
+              <Badge variant="secondary" className="text-[10px] ml-1">IA</Badge>
             </TabsTrigger>
             <TabsTrigger value="timing" className="gap-2">
               <Clock className="h-4 w-4" />
-              Meilleurs Horaires
+              Horaires
+              <Badge variant="secondary" className="text-[10px] ml-1">Guide</Badge>
             </TabsTrigger>
             <TabsTrigger value="competitors" className="gap-2">
               <Users className="h-4 w-4" />
-              Concurrents
+              Benchmark
+              <Badge variant="secondary" className="text-[10px] ml-1">Exemple</Badge>
             </TabsTrigger>
             <TabsTrigger value="content" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Performance Contenu
+              <Target className="h-4 w-4" />
+              Contenu
+              <Badge variant="secondary" className="text-[10px] ml-1">Guide</Badge>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="overview">
+            <AnalyticsOverview />
+          </TabsContent>
 
           {/* Virality Score Tab */}
           <TabsContent value="virality" className="space-y-6">

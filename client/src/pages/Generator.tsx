@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
+import { ToolsQuickNav } from "@/components/tools/ToolsQuickNav";
 import {
   Sparkles,
   Copy,
@@ -112,6 +113,17 @@ export default function Generator() {
     } catch {
       sessionStorage.removeItem("linkedrank-draft-post");
     }
+  }, []);
+
+  // Charger un template depuis la bibliothèque
+  useEffect(() => {
+    const template = sessionStorage.getItem("selectedTemplate");
+    if (!template) return;
+    sessionStorage.removeItem("selectedTemplate");
+    setAdditionalInstructions(
+      `Adapte ce template à mon profil et génère un post LinkedIn complet:\n\n${template}`
+    );
+    toast.success("Template chargé — configurez puis générez votre post");
   }, []);
 
   const { data: options } = trpc.generator.options.useQuery();
@@ -374,6 +386,7 @@ export default function Generator() {
         </div>
 
         <LinkedInConnectBanner />
+        <ToolsQuickNav />
 
         {/* Stepper — défilement horizontal sur mobile */}
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide snap-x snap-mandatory sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">

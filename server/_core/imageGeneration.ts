@@ -71,13 +71,11 @@ function toApiSize(model: string, size: ImageSize): string {
 }
 
 function getImageApiUrl(): string {
-  const base = ENV.forgeApiUrl.replace(/\/$/, "");
-  if (base.includes("generativelanguage.googleapis.com")) {
-    throw new Error(
-      "La génération d'images nécessite OPENAI_API_KEY (Gemini ne supporte pas DALL-E)"
-    );
+  const customUrl = process.env.OPENAI_API_URL ?? process.env.BUILT_IN_FORGE_API_URL;
+  if (customUrl) {
+    return `${customUrl.replace(/\/$/, "")}/v1/images/generations`;
   }
-  return `${base}/v1/images/generations`;
+  return "https://api.openai.com/v1/images/generations";
 }
 
 function getOpenAiKey(): string {

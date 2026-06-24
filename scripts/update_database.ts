@@ -4,7 +4,7 @@
  */
 
 import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { createScriptPostgresClient } from "../server/_core/database";
 import { linkedinInfluencers } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import * as fs from "fs";
@@ -50,7 +50,7 @@ async function main() {
   console.log(`\nLoaded ${creators.length} creators from enriched data file`);
 
   // Connect to database
-  const client = postgres(process.env.DATABASE_URL!, { prepare: false });
+  const client = createScriptPostgresClient();
   const db = drizzle(client);
 
   // Clear existing influencers
@@ -104,6 +104,7 @@ async function main() {
   console.log("=".repeat(60));
   console.log(`Total creators inserted: ${creators.length}`);
 
+  await client.end();
   process.exit(0);
 }
 

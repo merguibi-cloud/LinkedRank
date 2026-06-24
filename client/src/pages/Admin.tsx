@@ -12,7 +12,6 @@ import {
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
-import Navbar from "@/components/Navbar";
 import {
   Users,
   FileText,
@@ -51,7 +50,6 @@ export default function Admin() {
   if (!user || !isAdmin) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
         <div className="container py-20 text-center">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-red-500/20 flex items-center justify-center">
@@ -111,8 +109,6 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-
       <div className="container py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

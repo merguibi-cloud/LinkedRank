@@ -1,17 +1,17 @@
 import { eq, desc, asc, and, like, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { InsertUser, users, linkedinPosts, InsertLinkedinPost, LinkedinPost, postCategories, postImages, InsertPostImage, linkedinSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { createPostgresClient } from "./_core/database";
 
 let _db: ReturnType<typeof drizzle> | null = null;
-let _client: ReturnType<typeof postgres> | null = null;
+let _client: ReturnType<typeof createPostgresClient> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _client = postgres(process.env.DATABASE_URL, { prepare: false });
+      _client = createPostgresClient();
       _db = drizzle(_client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
@@ -19,6 +19,14 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+export async function closeDb(): Promise<void> {
+  if (_client) {
+    await _client.end({ timeout: 5 });
+    _client = null;
+    _db = null;
+  }
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
