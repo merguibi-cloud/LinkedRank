@@ -59,6 +59,8 @@ const PremiumPacks = lazy(() => import("./pages/PremiumPacks"));
 const RealtimeCollab = lazy(() => import("./pages/RealtimeCollab"));
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const LinkedInConnect = lazy(() => import("./pages/LinkedInConnect"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
@@ -96,6 +98,8 @@ function Router() {
         <Route path={"/"} component={Home} />
         <Route path={"/login"} component={Login} />
         <Route path={"/signup"} component={Signup} />
+        <Route path={"/forgot-password"} component={ForgotPassword} />
+        <Route path={"/reset-password"} component={ResetPassword} />
         <Route path={"/linkedin/connect"} component={LinkedInConnect} />
         <Route path={"/generate"} component={Generator} />
         <Route path={"/generator"}><Redirect to="/generate" /></Route>
