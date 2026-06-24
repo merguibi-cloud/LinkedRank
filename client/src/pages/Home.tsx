@@ -25,6 +25,9 @@ import {
   Search,
   CalendarDays,
   LineChart,
+  Crown,
+  Check,
+  BadgeCheck,
 } from "lucide-react";
 import { SocialProofStats } from "@/components/SocialProof";
 import { VideoPresentation } from "@/components/VideoPresentation";
@@ -203,7 +206,7 @@ export default function Home() {
                 </>
               ) : (
                 <>
-                  <a href={getSignupUrl("/onboarding")}>
+                  <a href={getSignupUrl()}>
                     <Button className="btn-gradient h-12 w-full px-8 text-base sm:h-14 sm:w-auto sm:px-10 sm:text-lg">
                       <Rocket className="mr-2 h-5 w-5" />
                       Créer mon compte
@@ -368,7 +371,7 @@ export default function Home() {
                 </Button>
               </Link>
             ) : (
-              <a href={getSignupUrl("/onboarding")}>
+              <a href={getSignupUrl()}>
                 <Button className="btn-gradient h-12 px-8">
                   <Rocket className="mr-2 h-5 w-5" />
                   Créer mon compte
@@ -412,6 +415,126 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Pricing Preview Section */}
+      <section className="border-t border-white/10 py-20">
+        <div className="container">
+          <div className="mb-12 text-center">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-4 py-2 text-sm text-gold">
+              <Sparkles className="h-4 w-4" />
+              Tarifs simples et transparents
+            </div>
+            <h2 className="text-3xl font-bold text-white sm:text-4xl">
+              Un plan pour chaque{" "}
+              <span className="bg-gradient-to-r from-violet-light to-rose bg-clip-text text-transparent">
+                ambition LinkedIn
+              </span>
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
+              Commencez avec <strong className="text-white">14 jours gratuits</strong> sur le plan Starter — sans carte bancaire.
+            </p>
+          </div>
+
+          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
+            {[
+              {
+                id: "starter",
+                name: "Starter",
+                price: "19€",
+                tagline: "/mois",
+                color: "from-blue-500 to-cyan-500",
+                trial: "14 jours gratuits",
+                icon: Zap,
+                popular: false,
+                features: ["30 posts IA / mois", "Calendrier éditorial", "Programmation LinkedIn", "Analytics basiques"],
+              },
+              {
+                id: "pro",
+                name: "Pro",
+                price: "49€",
+                tagline: "/mois",
+                color: "from-violet-500 to-purple-600",
+                icon: Crown,
+                popular: true,
+                features: ["200 posts IA / mois", "Génération de carrousels", "Analytics avancées", "Bibliothèque d'idées", "Personnalisation du ton"],
+              },
+              {
+                id: "growth",
+                name: "Growth",
+                price: "99€",
+                tagline: "/mois",
+                color: "from-rose-500 to-orange-500",
+                icon: Rocket,
+                popular: false,
+                features: ["Posts illimités", "IA entraînée sur le profil", "Automatisation complète", "Multi-comptes", "Rapports avancés"],
+              },
+            ].map((plan) => {
+              const Icon = plan.icon;
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative flex flex-col rounded-3xl border p-7 backdrop-blur-sm transition-all ${
+                    plan.popular
+                      ? "border-violet/40 bg-gradient-to-b from-violet/10 to-card/80 shadow-2xl shadow-violet/20 scale-[1.02]"
+                      : "border-white/10 bg-card/50 hover:border-white/20"
+                  }`}
+                >
+                  {plan.popular && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                      <span className="rounded-full bg-gradient-to-r from-violet to-rose px-4 py-1.5 text-sm font-semibold text-white">
+                        Le plus populaire
+                      </span>
+                    </div>
+                  )}
+
+                  <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${plan.color} shadow-md`}>
+                    <Icon className="h-6 w-6 text-white" />
+                  </div>
+
+                  <h3 className="text-xl font-bold text-white">{plan.name}</h3>
+
+                  <div className="my-4 flex items-baseline gap-1">
+                    <span className="text-4xl font-bold text-white">{plan.price}</span>
+                    <span className="text-muted-foreground">{plan.tagline}</span>
+                  </div>
+
+                  {"trial" in plan && plan.trial && (
+                    <div className="mb-4 flex items-center gap-1.5 text-xs text-emerald-400">
+                      <BadgeCheck className="h-3.5 w-3.5" />
+                      {plan.trial} · Sans carte bancaire
+                    </div>
+                  )}
+
+                  <ul className="mb-6 flex-1 space-y-2">
+                    {plan.features.map((f, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm text-white/80">
+                        <Check className="h-4 w-4 flex-shrink-0 text-emerald-400" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Link href="/pricing">
+                    <div className={`flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 bg-gradient-to-r ${plan.color}`}>
+                      Voir ce plan
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-10 text-center">
+            <Link href="/pricing">
+              <Button variant="outline" className="border-white/20 hover:bg-white/5">
+                Voir tous les détails et comparer
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20">
         <div className="container">
@@ -448,7 +571,7 @@ export default function Home() {
                     </Button>
                   </Link>
                 ) : (
-                  <a href={getSignupUrl("/onboarding")}>
+                  <a href={getSignupUrl()}>
                     <Button className="btn-gradient h-14 px-10 text-lg">
                       <Rocket className="mr-2 h-5 w-5" />
                       Commencer gratuitement

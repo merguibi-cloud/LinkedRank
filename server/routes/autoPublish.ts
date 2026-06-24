@@ -4,6 +4,10 @@ import { autoPublishSettings, autoPublishSchedule, autoPublishQueue, linkedinInf
 import { eq, desc, like, or, and, sql } from "drizzle-orm";
 import { generateLinkedInPost } from "../services/ai";
 import { type AuthenticatedRequest, requireAuth } from "../_core/authMiddleware";
+import {
+  buildLinkedInPostParams,
+  getInfluencersForSettings,
+} from "../services/autoPublishGeneration";
 
 type ScheduleSlot = {
   dayOfWeek: number;
@@ -337,9 +341,8 @@ router.post("/preview", async (req: Request, res: Response) => {
   try {
     const settings = req.body as Record<string, unknown>;
     const selectedCreatorIds = settings.selectedCreators as number[] || [];
-    const count = Math.min(Math.max(1, Number(settings.count) || 1), 5); // 1-5 posts
+    const count = Math.min(Math.max(1, Number(settings.count) || 1), 5);
 
-    // Get selected influencers or top ones
     let influencers;
     if (selectedCreatorIds.length > 0) {
       influencers = await db
@@ -348,39 +351,58 @@ router.post("/preview", async (req: Request, res: Response) => {
         .where(sql`${linkedinInfluencers.id} IN (${sql.join(selectedCreatorIds.map(id => sql`${id}`), sql`, `)})`)
         .limit(5);
     } else {
-      influencers = await db
+      const [dbSettings] = await db
         .select()
-        .from(linkedinInfluencers)
-        .orderBy(desc(linkedinInfluencers.followers))
-        .limit(5);
+        .from(autoPublishSettings)
+        .where(eq(autoPublishSettings.userId, userId))
+        .limit(1);
+
+      if (dbSettings) {
+        influencers = await getInfluencersForSettings(db, dbSettings);
+      } else {
+        influencers = await db
+          .select()
+          .from(linkedinInfluencers)
+          .orderBy(desc(linkedinInfluencers.followers))
+          .limit(5);
+      }
     }
 
-    const baseParams = {
-      sector: settings.sector as string,
-      targetAudience: settings.targetAudience as string,
-      tone: settings.tone as string,
-      language: settings.language as string,
-      viralityLevel: settings.viralityLevel as string,
-      contentLength: settings.contentLength as string,
-      includeEmojis: settings.includeEmojis as boolean,
-      includeHashtags: settings.includeHashtags as boolean,
-      includeCallToAction: settings.includeCallToAction as boolean,
-      personalContext: settings.personalContext as string,
-      inspirationFrom: influencers.map((i) => i.name).join(", "),
-    };
+    const [dbSettings] = await db
+      .select()
+      .from(autoPublishSettings)
+      .where(eq(autoPublishSettings.userId, userId))
+      .limit(1);
+
+    const baseParams = dbSettings
+      ? buildLinkedInPostParams(dbSettings, influencers)
+      : {
+          sector: settings.sector as string,
+          targetAudience: settings.targetAudience as string,
+          tone: settings.tone as string,
+          language: settings.language as string,
+          viralityLevel: settings.viralityLevel as string,
+          contentLength: settings.contentLength as string,
+          includeEmojis: settings.includeEmojis as boolean,
+          includeHashtags: settings.includeHashtags as boolean,
+          includeCallToAction: settings.includeCallToAction as boolean,
+          personalContext: settings.personalContext as string,
+          inspirationFrom: influencers.map((i) => i.name).join(", "),
+          contentFormat: "",
+          topic: "",
+        };
 
     // Generate multiple posts in parallel if count > 1
     const posts: string[] = [];
     const generatePromises = [];
     
     for (let i = 0; i < count; i++) {
-      generatePromises.push(
-        generateLinkedInPost({
-          ...baseParams,
-          // Add variation by changing the topic hint
-          topic: i === 0 ? "" : `Variation ${i + 1} - contenu unique et différent`,
-        })
-      );
+      const params =
+        dbSettings && i > 0
+          ? buildLinkedInPostParams(dbSettings, influencers, i)
+          : { ...baseParams, topic: i === 0 ? baseParams.topic : `Variation ${i + 1} — contenu unique et différent` };
+
+      generatePromises.push(generateLinkedInPost(params));
     }
 
     const results = await Promise.allSettled(generatePromises);
@@ -429,6 +451,62 @@ router.post("/publish-now", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error publishing now:", error);
     return res.status(500).json({ success: false, message: "Failed to publish: " + (error instanceof Error ? error.message : "Unknown error") });
+  }
+});
+
+// Upcoming publications (queued + projected recurring slots)
+router.get("/upcoming", async (req: Request, res: Response) => {
+  const userId = (req as AuthenticatedRequest).userId;
+
+  const db = await getDb();
+  if (!db) {
+    return res.status(500).json({ error: "Database not available" });
+  }
+
+  try {
+    const days = Math.min(Math.max(1, parseInt(req.query.days as string) || 7), 30);
+
+    const [settings] = await db
+      .select()
+      .from(autoPublishSettings)
+      .where(eq(autoPublishSettings.userId, userId))
+      .limit(1);
+
+    const schedule = await db
+      .select()
+      .from(autoPublishSchedule)
+      .where(eq(autoPublishSchedule.userId, userId));
+
+    const queue = await db
+      .select()
+      .from(autoPublishQueue)
+      .where(eq(autoPublishQueue.userId, userId));
+
+    const { projectUpcomingPublications, groupPublicationsByDay } = await import(
+      "../services/upcomingPublications"
+    );
+
+    const publications = projectUpcomingPublications({
+      settings: settings ?? null,
+      schedule,
+      queue,
+      days,
+    });
+
+    return res.json({
+      publications,
+      grouped: groupPublicationsByDay(publications),
+      meta: {
+        isEnabled: settings?.isEnabled ?? false,
+        scheduleCount: schedule.filter((s) => s.isActive).length,
+        pendingCount: publications.filter((p) => p.status === "pending").length,
+        projectedCount: publications.filter((p) => p.status === "projected").length,
+        days,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching upcoming publications:", error);
+    return res.status(500).json({ error: "Failed to fetch upcoming publications" });
   }
 });
 

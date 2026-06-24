@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,9 +50,19 @@ import {
   Send,
   Pencil,
   FolderOpen,
+  List,
 } from "lucide-react";
 import { Link } from "wouter";
 import { MediaLibraryPicker, MediaUploadZone } from "@/components/MediaLibraryPicker";
+import { UpcomingPublicationsView } from "@/components/autopublish/UpcomingPublicationsView";
+import {
+  AutoPublishFlowAnimation,
+  type AutoPublishFlowPhase,
+} from "@/components/autopublish/AutoPublishFlowAnimation";
+import {
+  AutoPublishSuccessAnimation,
+  AutoPublishScheduledAnimation,
+} from "@/components/autopublish/AutoPublishSuccessAnimation";
 
 // Days of the week
 const DAYS = [
@@ -215,10 +226,27 @@ interface Settings {
   customQuote: string;
 }
 
+type AutoPublishTab =
+  | "upcoming"
+  | "objectives"
+  | "creators"
+  | "content"
+  | "visual"
+  | "schedule"
+  | "preview";
+
+type FlowOverlay =
+  | { type: "flow"; phase: AutoPublishFlowPhase; phaseIndex: number }
+  | { type: "success"; title?: string; message?: string }
+  | { type: "scheduled"; dateLabel: string; timeLabel: string }
+  | null;
+
 export default function AutoPublish() {
   const { user } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"objectives" | "creators" | "content" | "visual" | "schedule" | "preview">("objectives");
+  const [activeTab, setActiveTab] = useState<AutoPublishTab>("upcoming");
+  const [flowOverlay, setFlowOverlay] = useState<FlowOverlay>(null);
+  const [upcomingKey, setUpcomingKey] = useState(0);
   
   // Influencers from database
   const [influencers, setInfluencers] = useState<Influencer[]>([]);
@@ -375,34 +403,56 @@ export default function AutoPublish() {
     }
   }, [user]);
 
-  const handleSaveSettings = async () => {
+  const persistSettings = async (
+    settingsToSave = settings,
+    scheduleToSave = schedule,
+    silent = false
+  ): Promise<boolean> => {
     setIsSaving(true);
     try {
       const response = await fetch("/api/auto-publish/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ settings, schedule }),
+        body: JSON.stringify({ settings: settingsToSave, schedule: scheduleToSave }),
       });
 
       if (response.ok) {
-        toast.success("Paramètres sauvegardés !");
-      } else {
-        toast.error("Erreur lors de la sauvegarde");
+        if (!silent) toast.success("Paramètres sauvegardés !");
+        return true;
       }
-    } catch (error) {
+      toast.error("Erreur lors de la sauvegarde");
+      return false;
+    } catch {
       toast.error("Erreur de connexion");
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleSaveSettings = async () => {
+    const ok = await persistSettings();
+    if (ok) setUpcomingKey((k) => k + 1);
+  };
+
   const handleToggleEnabled = async () => {
     const newEnabled = !settings.isEnabled;
-    setSettings({ ...settings, isEnabled: newEnabled });
-    
+    const newSettings = { ...settings, isEnabled: newEnabled };
+    setSettings(newSettings);
+
     if (newEnabled && schedule.length === 0) {
-      toast.info("N'oubliez pas de configurer votre planning de publication !");
+      toast.info("Configurez votre planning pour activer l'auto-publication");
+    }
+
+    const saved = await persistSettings(newSettings, schedule, true);
+    if (saved) {
+      toast.success(
+        newEnabled
+          ? "Auto-publication activée — l'IA publiera selon votre config"
+          : "Auto-publication désactivée"
+      );
+      setUpcomingKey((k) => k + 1);
     }
   };
 
@@ -495,7 +545,14 @@ export default function AutoPublish() {
     setPreviewImageSource("library");
     setMediaSuggestionsApplied(false);
     setEditedContent("");
-    toast.info(`Génération de ${previewCount} aperçus en cours... Cela peut prendre quelques secondes.`);
+    setFlowOverlay({ type: "flow", phase: "generating", phaseIndex: 0 });
+    const phaseTimer = window.setInterval(() => {
+      setFlowOverlay((prev) =>
+        prev?.type === "flow" && prev.phase === "generating"
+          ? { ...prev, phaseIndex: Math.min(prev.phaseIndex + 1, 2) }
+          : prev
+      );
+    }, 1200);
     try {
       const response = await fetch("/api/auto-publish/preview", {
         method: "POST",
@@ -531,6 +588,8 @@ export default function AutoPublish() {
       console.error("Preview fetch error:", error);
       toast.error("Erreur de connexion au serveur");
     } finally {
+      window.clearInterval(phaseTimer);
+      setFlowOverlay(null);
       setIsGenerating(false);
     }
   };
@@ -654,9 +713,17 @@ export default function AutoPublish() {
       toast.error("Veuillez d'abord générer un aperçu avant de publier");
       return;
     }
-    
+
     setIsPublishing(true);
-    toast.info("Publication en cours sur LinkedIn...");
+    setFlowOverlay({ type: "flow", phase: "publishing", phaseIndex: 0 });
+    const phaseTimer = window.setInterval(() => {
+      setFlowOverlay((prev) =>
+        prev?.type === "flow" && prev.phase === "publishing"
+          ? { ...prev, phaseIndex: Math.min(prev.phaseIndex + 1, 2) }
+          : prev
+      );
+    }, 900);
+
     try {
       const response = await fetch("/api/auto-publish/publish-now", {
         method: "POST",
@@ -669,15 +736,25 @@ export default function AutoPublish() {
       });
 
       const data = await response.json();
+      window.clearInterval(phaseTimer);
+
       if (data.success) {
-        toast.success("Post publié sur LinkedIn ! 🎉");
-      } else if (data.message?.includes("LinkedIn not connected") || data.message?.includes("non connecté")) {
+        setFlowOverlay({ type: "success" });
+        setUpcomingKey((k) => k + 1);
+      } else if (
+        data.message?.includes("LinkedIn not connected") ||
+        data.message?.includes("non connecté")
+      ) {
+        setFlowOverlay(null);
         toast.info("Connectez LinkedIn pour publier");
         window.location.href = getLinkedInConnectUrl("/auto-publish");
       } else {
+        setFlowOverlay(null);
         toast.error(data.message || "Erreur lors de la publication");
       }
-    } catch (error) {
+    } catch {
+      window.clearInterval(phaseTimer);
+      setFlowOverlay(null);
       toast.error("Erreur de connexion");
     } finally {
       setIsPublishing(false);
@@ -692,6 +769,15 @@ export default function AutoPublish() {
     }
 
     setIsScheduling(true);
+    setFlowOverlay({ type: "flow", phase: "scheduling", phaseIndex: 0 });
+    const phaseTimer = window.setInterval(() => {
+      setFlowOverlay((prev) =>
+        prev?.type === "flow" && prev.phase === "scheduling"
+          ? { ...prev, phaseIndex: Math.min(prev.phaseIndex + 1, 2) }
+          : prev
+      );
+    }, 800);
+
     try {
       const response = await fetch("/api/schedule", {
         method: "POST",
@@ -706,12 +792,27 @@ export default function AutoPublish() {
         }),
       });
       const data = await response.json();
+      window.clearInterval(phaseTimer);
+
       if (response.ok && data.success) {
-        toast.success("Post planifié ! Il sera publié automatiquement.");
+        const scheduled = combineDateAndTime(scheduleDate, scheduleTime);
+        setFlowOverlay({
+          type: "scheduled",
+          dateLabel: scheduled.toLocaleDateString("fr-FR", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+          }),
+          timeLabel: scheduleTime,
+        });
+        setUpcomingKey((k) => k + 1);
       } else {
+        setFlowOverlay(null);
         toast.error(data.error || "Erreur lors de la planification");
       }
     } catch {
+      window.clearInterval(phaseTimer);
+      setFlowOverlay(null);
       toast.error("Erreur de connexion");
     } finally {
       setIsScheduling(false);
@@ -824,26 +925,42 @@ export default function AutoPublish() {
 
         {/* Status Banner */}
         {settings.isEnabled && schedule.length > 0 && (
-          <div className="mb-8 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                <Check className="w-5 h-5 text-emerald-400" />
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30"
+          >
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <Check className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-emerald-400">
+                    Publication automatique activée
+                  </p>
+                  <p className="text-sm text-emerald-400/70">
+                    {schedule.length} créneau(x) • L'IA publie selon vos objectifs et votre planning
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-emerald-400">
-                  Publication automatique activée
-                </p>
-                <p className="text-sm text-emerald-400/70">
-                  {schedule.length} créneau(x) configuré(s) • L'IA publiera automatiquement selon votre planning
-                </p>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                onClick={() => setActiveTab("upcoming")}
+              >
+                <List className="w-4 h-4 mr-2" />
+                Voir les publications à venir
+              </Button>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Tabs */}
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
           {[
+            { id: "upcoming", label: "À venir", icon: List },
             { id: "objectives", label: "1. Objectifs", icon: Target },
             { id: "creators", label: "2. Créateurs", icon: Users },
             { id: "content", label: "3. Contenu", icon: MessageSquare },
@@ -853,7 +970,7 @@ export default function AutoPublish() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              onClick={() => setActiveTab(tab.id as AutoPublishTab)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.id
                   ? "bg-violet text-white"
@@ -868,6 +985,16 @@ export default function AutoPublish() {
 
         {/* Tab Content */}
         
+        {activeTab === "upcoming" && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 sm:p-8">
+            <UpcomingPublicationsView
+              key={upcomingKey}
+              days={7}
+              onRefresh={() => setUpcomingKey((k) => k + 1)}
+            />
+          </div>
+        )}
+
         {/* Objectives Tab */}
         {activeTab === "objectives" && (
           <div className="space-y-8">
@@ -2218,6 +2345,27 @@ export default function AutoPublish() {
           </div>
         )}
       </div>
+
+      {flowOverlay?.type === "flow" && (
+        <AutoPublishFlowAnimation
+          phase={flowOverlay.phase}
+          phaseIndex={flowOverlay.phaseIndex}
+        />
+      )}
+      {flowOverlay?.type === "success" && (
+        <AutoPublishSuccessAnimation
+          title={flowOverlay.title}
+          message={flowOverlay.message}
+          onComplete={() => setFlowOverlay(null)}
+        />
+      )}
+      {flowOverlay?.type === "scheduled" && (
+        <AutoPublishScheduledAnimation
+          dateLabel={flowOverlay.dateLabel}
+          timeLabel={flowOverlay.timeLabel}
+          onComplete={() => setFlowOverlay(null)}
+        />
+      )}
     </div>
   );
 }

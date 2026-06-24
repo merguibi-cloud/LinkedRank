@@ -350,17 +350,51 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetch(resolveApiUrl(), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  const callApi = async (apiUrl: string, apiKey: string, model: string) => {
+    const p = { ...payload, model };
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(p),
+    });
+    return res;
+  };
+
+  const response = await callApi(resolveApiUrl(), ENV.forgeApiKey, ENV.llmModel);
 
   if (!response.ok) {
     const errorText = await response.text();
+
+    const isGeminiOverloaded =
+      ENV.llmProvider === "gemini" &&
+      (response.status === 503 || response.status === 502) &&
+      /UNAVAILABLE|high demand|overloaded/i.test(errorText);
+
+    if (isGeminiOverloaded) {
+      const openaiKey =
+        process.env.OPENAI_API_KEY ?? process.env.BUILT_IN_FORGE_API_KEY ?? "";
+      const openaiModel = process.env.OPENAI_MODEL ?? "gpt-4o";
+      if (openaiKey) {
+        console.warn(
+          "[LLM] Gemini 503 — falling back to OpenAI",
+          openaiModel
+        );
+        const fallbackRes = await callApi(
+          "https://api.openai.com/v1/chat/completions",
+          openaiKey,
+          openaiModel
+        );
+        if (fallbackRes.ok) {
+          return (await fallbackRes.json()) as InvokeResult;
+        }
+        const fallbackErr = await fallbackRes.text();
+        throw new Error(formatLlmError(fallbackRes.status, fallbackErr));
+      }
+    }
+
     throw new Error(formatLlmError(response.status, errorText));
   }
 

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+import { getLoginUrl, getSignupUrl } from "@/const";
 import { toast } from "sonner";
 import {
   Check,
@@ -11,77 +11,75 @@ import {
   Sparkles,
   Zap,
   Crown,
+  Rocket,
   ArrowRight,
   Star,
-  Users,
-  TrendingUp,
   Shield,
-  Clock,
   MessageSquare,
+  Bot,
+  TrendingUp,
   BarChart3,
   Calendar,
   Image,
-  Bot,
-  Rocket,
-  Building2,
-  HeadphonesIcon,
+  Users,
+  Brain,
+  Layers,
+  ChevronDown,
+  ChevronUp,
+  BadgeCheck,
+  Infinity,
+  Clock,
 } from "lucide-react";
-import { ROICalculator } from "@/components/ROICalculator";
-import { CompetitorComparison } from "@/components/CompetitorComparison";
 
 type BillingPeriod = "monthly" | "yearly";
+
+interface PlanFeature {
+  text: string;
+  included: boolean;
+  highlight?: boolean;
+}
 
 interface PricingPlan {
   id: string;
   name: string;
+  tagline: string;
   description: string;
   icon: React.ElementType;
+  color: string;
+  glowColor: string;
   monthlyPrice: number;
   yearlyPrice: number;
   popular: boolean;
-  features: {
-    text: string;
-    included: boolean;
-    highlight?: boolean;
-  }[];
+  trial?: string;
+  features: PlanFeature[];
   cta: string;
-  ctaVariant: "outline" | "default" | "premium";
+  badge?: string;
 }
 
 export default function Pricing() {
   const { user } = useAuth();
-  
-  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("yearly");
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
   const [isLoading, setIsLoading] = useState<string | null>(null);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const handleSubscribe = async (planId: string) => {
-    // Free plan - just redirect to dashboard
-    if (planId === "free" || planId === "starter") {
+    // Starter = essai gratuit 14 jours, pas de carte bancaire
+    if (planId === "starter") {
       if (!user) {
-        window.location.href = getLoginUrl();
+        window.location.href = getSignupUrl("/dashboard");
       } else {
         window.location.href = "/dashboard";
       }
       return;
     }
 
-    // Business plan - contact sales
-    if (planId === "business") {
-      window.location.href = "mailto:contact@linkedrank.fr?subject=Demande%20plan%20Business";
-      return;
-    }
-
-    // Pro plan - Stripe checkout
     if (!user) {
-      toast.error("Connexion requise", {
-        description: "Veuillez vous connecter pour souscrire à un abonnement.",
-      });
-      window.location.href = getLoginUrl();
+      toast.info("Créez un compte pour souscrire à ce plan.");
+      window.location.href = getSignupUrl("/pricing");
       return;
     }
 
     setIsLoading(planId);
-
     try {
       const response = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
@@ -94,16 +92,13 @@ export default function Pricing() {
           userName: user.name,
         }),
       });
-
       const data = await response.json();
-
       if (data.url) {
         window.location.href = data.url;
       } else {
         throw new Error(data.error || "Erreur lors de la création de la session");
       }
     } catch (error) {
-      console.error("Checkout error:", error);
       toast.error("Erreur", {
         description: error instanceof Error ? error.message : "Une erreur est survenue",
       });
@@ -114,126 +109,117 @@ export default function Pricing() {
 
   const plans: PricingPlan[] = [
     {
-      id: "free",
+      id: "starter",
       name: "Starter",
-      description: "Parfait pour découvrir la plateforme",
+      tagline: "Pour démarrer sur LinkedIn",
+      description: "Idéal pour les créateurs qui veulent publier régulièrement sans y passer des heures.",
       icon: Zap,
-      monthlyPrice: 0,
-      yearlyPrice: 0,
+      color: "from-blue-500 to-cyan-500",
+      glowColor: "shadow-blue-500/20",
+      monthlyPrice: 19,
+      yearlyPrice: 15,
       popular: false,
+      trial: "14 jours gratuits",
       features: [
-        { text: "Accès aux classements France", included: true },
-        { text: "5 générations IA par mois", included: true },
-        { text: "Aperçu des top créateurs", included: true },
-        { text: "Guides et ressources basiques", included: true },
-        { text: "Publication LinkedIn manuelle", included: true },
-        { text: "Classement mondial complet", included: false },
-        { text: "Publication automatique", included: false },
-        { text: "Génération d'images IA", included: false },
-        { text: "Analytics avancés", included: false },
-        { text: "Support prioritaire", included: false },
+        { text: "30 posts IA / mois", included: true, highlight: true },
+        { text: "Calendrier éditorial", included: true },
+        { text: "Programmation LinkedIn", included: true },
+        { text: "Analytics basiques", included: true },
+        { text: "1 compte LinkedIn", included: true },
+        { text: "Génération de carrousels", included: false },
+        { text: "Analytics avancées", included: false },
+        { text: "Bibliothèque d'idées", included: false },
+        { text: "Personnalisation du ton", included: false },
+        { text: "IA entraînée sur votre profil", included: false },
+        { text: "Multi-comptes", included: false },
       ],
-      cta: "Commencer gratuitement",
-      ctaVariant: "outline",
+      cta: "Démarrer l'essai gratuit",
+      badge: "14 jours offerts",
     },
     {
       id: "pro",
       name: "Pro",
-      description: "Pour les créateurs sérieux",
+      tagline: "Pour les créateurs sérieux",
+      description: "La solution complète pour développer votre audience et dominer votre secteur.",
       icon: Crown,
-      monthlyPrice: 29,
-      yearlyPrice: 19,
+      color: "from-violet-500 to-purple-600",
+      glowColor: "shadow-violet-500/30",
+      monthlyPrice: 49,
+      yearlyPrice: 39,
       popular: true,
       features: [
-        { text: "Tout du plan Starter", included: true },
-        { text: "Générations IA illimitées", included: true, highlight: true },
-        { text: "Classement mondial complet", included: true },
-        { text: "Publication automatique", included: true, highlight: true },
-        { text: "Génération d'images IA", included: true, highlight: true },
-        { text: "Planification des posts", included: true },
-        { text: "Analytics de performance", included: true },
-        { text: "Export des données", included: true },
-        { text: "Support par email", included: true },
-        { text: "API Access", included: false },
+        { text: "200 posts IA / mois", included: true, highlight: true },
+        { text: "Calendrier éditorial", included: true },
+        { text: "Programmation LinkedIn", included: true },
+        { text: "Analytics avancées", included: true, highlight: true },
+        { text: "Génération de carrousels", included: true, highlight: true },
+        { text: "Bibliothèque d'idées", included: true, highlight: true },
+        { text: "Personnalisation du ton", included: true, highlight: true },
+        { text: "1 compte LinkedIn", included: true },
+        { text: "Images IA (Nano Banana)", included: true },
+        { text: "IA entraînée sur votre profil", included: false },
+        { text: "Multi-comptes", included: false },
       ],
-      cta: "Essai gratuit 14 jours",
-      ctaVariant: "default",
+      cta: "Commencer avec Pro",
+      badge: "Le plus populaire",
     },
     {
-      id: "business",
-      name: "Business",
-      description: "Pour les équipes et agences",
-      icon: Building2,
-      monthlyPrice: 79,
-      yearlyPrice: 59,
+      id: "growth",
+      name: "Growth",
+      tagline: "Pour les leaders d'opinion",
+      description: "Tout ce dont vous avez besoin pour automatiser et scaler votre présence LinkedIn.",
+      icon: Rocket,
+      color: "from-rose-500 to-orange-500",
+      glowColor: "shadow-rose-500/20",
+      monthlyPrice: 99,
+      yearlyPrice: 79,
       popular: false,
       features: [
-        { text: "Tout du plan Pro", included: true },
-        { text: "Jusqu'à 10 comptes LinkedIn", included: true, highlight: true },
-        { text: "Gestion d'équipe", included: true, highlight: true },
-        { text: "API Access complet", included: true },
-        { text: "Webhooks personnalisés", included: true },
-        { text: "Analytics multi-comptes", included: true },
-        { text: "White-label disponible", included: true },
-        { text: "Onboarding personnalisé", included: true },
-        { text: "Support prioritaire 24/7", included: true, highlight: true },
-        { text: "Account manager dédié", included: true },
+        { text: "Posts illimités", included: true, highlight: true },
+        { text: "IA entraînée sur votre profil", included: true, highlight: true },
+        { text: "Automatisation complète", included: true, highlight: true },
+        { text: "Multi-comptes LinkedIn", included: true, highlight: true },
+        { text: "Rapports avancés", included: true, highlight: true },
+        { text: "Génération de carrousels", included: true },
+        { text: "Analytics avancées", included: true },
+        { text: "Bibliothèque d'idées", included: true },
+        { text: "Personnalisation du ton", included: true },
+        { text: "Images IA (Nano Banana)", included: true },
+        { text: "Support prioritaire", included: true },
       ],
-      cta: "Contacter les ventes",
-      ctaVariant: "premium",
-    },
-  ];
-
-  const testimonials = [
-    {
-      name: "Marie Dupont",
-      role: "CEO @ TechStartup",
-      avatar: "MD",
-      content: "LinkedRank a transformé ma présence LinkedIn. J'ai gagné 50K abonnés en 3 mois grâce à la publication automatique.",
-      rating: 5,
-    },
-    {
-      name: "Thomas Martin",
-      role: "Consultant Marketing",
-      avatar: "TM",
-      content: "Le générateur IA produit du contenu de qualité professionnelle. Je gagne 10h par semaine sur ma création de contenu.",
-      rating: 5,
-    },
-    {
-      name: "Sophie Bernard",
-      role: "Directrice RH",
-      avatar: "SB",
-      content: "Parfait pour notre équipe de recrutement. Nous publions 3x plus de contenu avec la même équipe.",
-      rating: 5,
+      cta: "Passer à Growth",
     },
   ];
 
   const faqs = [
     {
-      question: "Puis-je annuler à tout moment ?",
-      answer: "Oui, vous pouvez annuler votre abonnement à tout moment. Vous conserverez l'accès jusqu'à la fin de votre période de facturation.",
-    },
-    {
-      question: "L'essai gratuit nécessite-t-il une carte bancaire ?",
-      answer: "Non, l'essai gratuit de 14 jours ne nécessite aucune carte bancaire. Vous ne serez facturé que si vous décidez de continuer après l'essai.",
+      question: "L'essai gratuit 14 jours nécessite-t-il une carte bancaire ?",
+      answer: "Non. L'essai de 14 jours est entièrement gratuit, sans carte bancaire requise. Vous ne serez facturé que si vous choisissez de continuer après la période d'essai.",
     },
     {
       question: "Puis-je changer de plan à tout moment ?",
-      answer: "Absolument ! Vous pouvez upgrader ou downgrader votre plan à tout moment. Les changements prennent effet immédiatement.",
+      answer: "Oui, vous pouvez upgrader ou downgrader votre plan à tout moment. Les changements prennent effet immédiatement avec un ajustement au prorata.",
     },
     {
-      question: "Mes données sont-elles sécurisées ?",
-      answer: "Oui, nous utilisons un chiffrement de bout en bout et respectons le RGPD. Vos données LinkedIn ne sont jamais partagées avec des tiers.",
+      question: "Que se passe-t-il après l'essai gratuit ?",
+      answer: "À la fin des 14 jours, vous recevez un email de rappel. Si vous ne souscrivez pas, votre compte bascule en version limitée. Aucun prélèvement automatique sans accord.",
     },
     {
-      question: "Proposez-vous des remises pour les ONG ?",
-      answer: "Oui, nous offrons 50% de réduction pour les organisations à but non lucratif. Contactez-nous pour en bénéficier.",
+      question: "Mes données LinkedIn sont-elles sécurisées ?",
+      answer: "Absolument. Nous utilisons OAuth2 sécurisé pour la connexion LinkedIn. Vos données ne sont jamais stockées en clair ni partagées avec des tiers. Conformité RGPD garantie.",
+    },
+    {
+      question: "Qu'est-ce que l'IA entraînée sur le profil (Growth) ?",
+      answer: "Sur le plan Growth, notre IA apprend votre style d'écriture, vos thématiques et votre tonalité spécifique pour générer du contenu qui semble vraiment venir de vous.",
+    },
+    {
+      question: "Combien de comptes LinkedIn puis-je connecter en multi-comptes ?",
+      answer: "Le plan Growth inclut jusqu'à 5 comptes LinkedIn. Pour des besoins d'agence (10+ comptes), contactez-nous pour une offre sur mesure.",
     },
   ];
 
-  const getPrice = (plan: PricingPlan) => {
-    return billingPeriod === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
-  };
+  const getPrice = (plan: PricingPlan) =>
+    billingPeriod === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
 
   const getSavings = (plan: PricingPlan) => {
     if (plan.monthlyPrice === 0) return 0;
@@ -244,32 +230,39 @@ export default function Pricing() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="py-20 relative overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-violet/5 via-transparent to-transparent" />
-        
+      {/* Hero */}
+      <section className="relative overflow-hidden pt-20 pb-16">
+        <div className="absolute inset-0">
+          <div className="absolute left-1/4 top-1/3 h-96 w-96 rounded-full bg-violet/15 blur-[120px]" />
+          <div className="absolute right-1/4 bottom-1/3 h-64 w-64 rounded-full bg-rose/10 blur-[100px]" />
+        </div>
+
         <div className="container relative">
-          <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gold/10 border border-gold/20 text-gold text-sm mb-6">
-              <Sparkles className="w-4 h-4" />
-              Tarifs simples et transparents
+          <div className="mx-auto max-w-3xl text-center">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-4 py-2 text-sm text-gold">
+              <Sparkles className="h-4 w-4" />
+              Tarifs simples • Sans surprise
             </div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
-              Choisissez le plan qui{" "}
-              <span className="gradient-text">booste votre LinkedIn</span>
+
+            <h1 className="text-4xl font-bold text-white sm:text-5xl md:text-6xl">
+              Investissez dans votre{" "}
+              <span className="bg-gradient-to-r from-violet-light via-rose to-gold bg-clip-text text-transparent">
+                présence LinkedIn
+              </span>
             </h1>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Commencez gratuitement, puis passez à un plan payant quand vous êtes prêt à dominer LinkedIn.
+
+            <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
+              Commencez avec <strong className="text-white">14 jours gratuits</strong> sur le plan Starter.
+              Aucune carte bancaire requise.
             </p>
 
-            {/* Billing Toggle */}
-            <div className="inline-flex items-center gap-4 p-1.5 rounded-full bg-card/50 border border-white/10">
+            {/* Billing toggle */}
+            <div className="mt-10 inline-flex items-center gap-1 rounded-full border border-white/10 bg-card/50 p-1.5">
               <button
                 onClick={() => setBillingPeriod("monthly")}
-                className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                className={`rounded-full px-6 py-2.5 text-sm font-medium transition-all ${
                   billingPeriod === "monthly"
-                    ? "bg-violet text-white"
+                    ? "bg-violet text-white shadow-lg"
                     : "text-muted-foreground hover:text-white"
                 }`}
               >
@@ -277,15 +270,15 @@ export default function Pricing() {
               </button>
               <button
                 onClick={() => setBillingPeriod("yearly")}
-                className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                className={`flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-medium transition-all ${
                   billingPeriod === "yearly"
-                    ? "bg-violet text-white"
+                    ? "bg-violet text-white shadow-lg"
                     : "text-muted-foreground hover:text-white"
                 }`}
               >
                 Annuel
-                <span className="px-2 py-0.5 rounded-full bg-gold/20 text-gold text-xs">
-                  -35%
+                <span className="rounded-full bg-gold/20 px-2 py-0.5 text-xs text-gold">
+                  −20%
                 </span>
               </button>
             </div>
@@ -294,112 +287,114 @@ export default function Pricing() {
       </section>
 
       {/* Pricing Cards */}
-      <section className="py-12 -mt-8">
+      <section className="pb-24">
         <div className="container">
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-3">
             {plans.map((plan) => {
               const Icon = plan.icon;
               const price = getPrice(plan);
               const savings = getSavings(plan);
-              
+
               return (
                 <div
                   key={plan.id}
-                  className={`relative rounded-3xl border backdrop-blur-sm transition-all ${
+                  className={`relative flex flex-col rounded-3xl border backdrop-blur-sm transition-all duration-300 ${
                     plan.popular
-                      ? "bg-gradient-to-b from-violet/10 to-card/80 border-violet/30 scale-105 shadow-2xl shadow-violet/20"
-                      : "bg-card/50 border-white/10 hover:border-white/20"
+                      ? `border-violet/40 bg-gradient-to-b from-violet/10 via-card/90 to-card/80 shadow-2xl ${plan.glowColor} scale-[1.02]`
+                      : "border-white/10 bg-card/50 hover:border-white/20 hover:shadow-xl"
                   }`}
                 >
-                  {plan.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                      <span className="px-4 py-1.5 rounded-full bg-gradient-to-r from-violet to-rose text-white text-sm font-medium">
-                        Le plus populaire
+                  {/* Badge */}
+                  {plan.badge && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                      <span
+                        className={`rounded-full px-4 py-1.5 text-sm font-semibold text-white shadow-lg ${
+                          plan.popular
+                            ? "bg-gradient-to-r from-violet to-rose"
+                            : "bg-gradient-to-r from-blue-500 to-cyan-500"
+                        }`}
+                      >
+                        {plan.badge}
                       </span>
                     </div>
                   )}
 
-                  <div className="p-8">
+                  <div className="flex flex-1 flex-col p-8">
                     {/* Header */}
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className={`p-2.5 rounded-xl ${
-                        plan.popular ? "bg-violet/20" : "bg-white/5"
-                      }`}>
-                        <Icon className={`w-6 h-6 ${
-                          plan.popular ? "text-violet-light" : "text-muted-foreground"
-                        }`} />
+                    <div className="mb-6">
+                      <div
+                        className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${plan.color} shadow-lg`}
+                      >
+                        <Icon className="h-7 w-7 text-white" />
                       </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-white">{plan.name}</h3>
-                        <p className="text-sm text-muted-foreground">{plan.description}</p>
-                      </div>
+                      <h3 className="text-2xl font-bold text-white">{plan.name}</h3>
+                      <p className="text-sm font-medium text-violet-light">{plan.tagline}</p>
+                      <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
                     </div>
 
                     {/* Price */}
-                    <div className="mb-6">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-5xl font-bold text-white">
-                          {price === 0 ? "Gratuit" : `${price}€`}
-                        </span>
-                        {price > 0 && (
-                          <span className="text-muted-foreground">/mois</span>
-                        )}
+                    <div className="mb-6 border-b border-white/10 pb-6">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-5xl font-bold text-white">{price}€</span>
+                        <span className="text-muted-foreground">/mois</span>
                       </div>
-                      {billingPeriod === "yearly" && savings > 0 && (
-                        <p className="text-sm text-gold mt-1">
-                          Économisez {savings}% avec le plan annuel
+                      {billingPeriod === "yearly" && (
+                        <p className="mt-1 text-sm text-gold">
+                          Économisez {savings}% · Facturé {price * 12}€/an
                         </p>
                       )}
-                      {price > 0 && billingPeriod === "yearly" && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Facturé {price * 12}€/an
-                        </p>
+                      {plan.trial && (
+                        <div className="mt-3 flex items-center gap-1.5 text-sm text-emerald-400">
+                          <BadgeCheck className="h-4 w-4" />
+                          {plan.trial} • Sans carte bancaire
+                        </div>
                       )}
                     </div>
 
                     {/* CTA */}
                     <Button
-                      className={`w-full mb-8 h-12 text-base font-medium ${
-                        plan.ctaVariant === "default"
-                          ? "bg-gradient-to-r from-violet to-violet-light hover:opacity-90"
-                          : plan.ctaVariant === "premium"
-                          ? "bg-gradient-to-r from-gold to-gold-light text-background hover:opacity-90"
-                          : "border-white/20 hover:bg-white/5"
+                      className={`mb-8 h-12 w-full text-base font-semibold transition-all ${
+                        plan.popular
+                          ? "bg-gradient-to-r from-violet to-violet-light hover:opacity-90 shadow-lg shadow-violet/30"
+                          : plan.id === "growth"
+                          ? "bg-gradient-to-r from-rose-500 to-orange-500 hover:opacity-90"
+                          : "bg-gradient-to-r from-blue-500 to-cyan-500 hover:opacity-90"
                       }`}
-                      variant={plan.ctaVariant === "outline" ? "outline" : "default"}
                       onClick={() => handleSubscribe(plan.id)}
                       disabled={isLoading === plan.id}
                     >
                       {isLoading === plan.id ? (
-                        <>
-                          <span className="animate-spin mr-2">⏳</span>
+                        <span className="flex items-center gap-2">
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                           Chargement...
-                        </>
+                        </span>
                       ) : (
-                        <>
+                        <span className="flex items-center gap-2">
                           {plan.cta}
-                          <ArrowRight className="w-4 h-4 ml-2" />
-                        </>
+                          <ArrowRight className="h-4 w-4" />
+                        </span>
                       )}
                     </Button>
 
                     {/* Features */}
-                    <ul className="space-y-3">
-                      {plan.features.map((feature, index) => (
+                    <ul className="flex-1 space-y-3">
+                      {plan.features.map((feature, i) => (
                         <li
-                          key={index}
+                          key={i}
                           className={`flex items-start gap-3 text-sm ${
-                            feature.included ? "text-white" : "text-muted-foreground/50"
+                            feature.included ? "text-white/90" : "text-muted-foreground/40"
                           }`}
                         >
                           {feature.included ? (
-                            <Check className={`w-5 h-5 flex-shrink-0 ${
-                              feature.highlight ? "text-gold" : "text-green-500"
-                            }`} />
+                            <Check
+                              className={`mt-0.5 h-4 w-4 flex-shrink-0 ${
+                                feature.highlight ? "text-gold" : "text-emerald-400"
+                              }`}
+                            />
                           ) : (
-                            <X className="w-5 h-5 flex-shrink-0 text-muted-foreground/30" />
+                            <X className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground/30" />
                           )}
-                          <span className={feature.highlight ? "font-medium" : ""}>
+                          <span className={feature.highlight ? "font-medium text-white" : ""}>
                             {feature.text}
                           </span>
                         </li>
@@ -410,74 +405,145 @@ export default function Pricing() {
               );
             })}
           </div>
+
+          {/* Trial note */}
+          <div className="mx-auto mt-10 max-w-xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-5 py-2.5 text-sm text-emerald-400">
+              <Clock className="h-4 w-4" />
+              Le plan Starter inclut <strong className="ml-1">14 jours gratuits</strong> — aucun engagement, annulation en 1 clic
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Features Comparison */}
-      <section className="py-20 border-t border-white/5">
+      {/* Comparison table */}
+      <section className="border-t border-white/5 py-20">
         <div className="container">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Tout ce dont vous avez besoin pour{" "}
-              <span className="gradient-text">réussir sur LinkedIn</span>
+          <div className="mb-12 text-center">
+            <h2 className="text-3xl font-bold text-white sm:text-4xl">
+              Comparaison complète des plans
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Des outils puissants pour créer, publier et analyser votre contenu LinkedIn
+            <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
+              Choisissez le plan qui correspond à votre rythme de publication
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+          <div className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-white/10">
+            {/* Header */}
+            <div className="grid grid-cols-4 bg-card/80 px-6 py-4">
+              <div className="text-sm font-medium text-muted-foreground">Fonctionnalité</div>
+              {plans.map((plan) => (
+                <div key={plan.id} className="text-center">
+                  <span
+                    className={`text-sm font-bold ${
+                      plan.popular ? "text-violet-light" : "text-white"
+                    }`}
+                  >
+                    {plan.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {[
+              { label: "Posts IA / mois", values: ["30", "200", "Illimités"] },
+              { label: "Calendrier éditorial", values: [true, true, true] },
+              { label: "Programmation LinkedIn", values: [true, true, true] },
+              { label: "Génération de carrousels", values: [false, true, true] },
+              { label: "Analytics basiques", values: [true, true, true] },
+              { label: "Analytics avancées", values: [false, true, true] },
+              { label: "Bibliothèque d'idées", values: [false, true, true] },
+              { label: "Personnalisation du ton", values: [false, true, true] },
+              { label: "Images IA (Nano Banana)", values: [false, true, true] },
+              { label: "IA entraînée sur le profil", values: [false, false, true] },
+              { label: "Automatisation complète", values: [false, false, true] },
+              { label: "Multi-comptes", values: [false, false, true] },
+              { label: "Rapports avancés", values: [false, false, true] },
+              { label: "Support prioritaire", values: [false, false, true] },
+              { label: "Essai gratuit", values: ["14 jours", false, false] },
+            ].map((row, i) => (
+              <div
+                key={i}
+                className={`grid grid-cols-4 border-t border-white/5 px-6 py-3 ${
+                  i % 2 === 0 ? "bg-card/20" : "bg-transparent"
+                }`}
+              >
+                <div className="text-sm text-muted-foreground">{row.label}</div>
+                {row.values.map((val, j) => (
+                  <div key={j} className="flex justify-center">
+                    {typeof val === "boolean" ? (
+                      val ? (
+                        <Check className="h-4 w-4 text-emerald-400" />
+                      ) : (
+                        <X className="h-4 w-4 text-muted-foreground/30" />
+                      )
+                    ) : (
+                      <span
+                        className={`text-sm font-medium ${
+                          j === 1 ? "text-violet-light" : j === 2 ? "text-gold" : "text-white"
+                        }`}
+                      >
+                        {val}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Why section */}
+      <section className="border-t border-white/5 py-20 bg-card/20">
+        <div className="container">
+          <div className="mb-12 text-center">
+            <h2 className="text-3xl font-bold text-white sm:text-4xl">
+              Pourquoi choisir{" "}
+              <span className="bg-gradient-to-r from-violet-light to-rose bg-clip-text text-transparent">
+                LinkedRank ?
+              </span>
+            </h2>
+          </div>
+
+          <div className="mx-auto grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
+                icon: Brain,
+                title: "IA Gemini Nano Banana",
+                desc: "Génération d'images premium avec le dernier modèle Google",
+                color: "from-violet/20 to-purple/20",
+              },
+              {
                 icon: Bot,
-                title: "IA Générative",
-                description: "Créez du contenu viral en quelques secondes avec notre IA entraînée sur les meilleurs posts",
+                title: "Agents IA autonomes",
+                desc: "Votre équipe d'agents travaille 24h/24 pour vous",
+                color: "from-blue-500/20 to-cyan-500/20",
               },
               {
-                icon: Calendar,
-                title: "Publication Auto",
-                description: "Planifiez et publiez automatiquement aux meilleurs moments pour maximiser l'engagement",
-              },
-              {
-                icon: Image,
-                title: "Images IA",
-                description: "Générez des visuels professionnels et des citations inspirantes en un clic",
-              },
-              {
-                icon: BarChart3,
-                title: "Analytics",
-                description: "Suivez vos performances et optimisez votre stratégie avec des données précises",
-              },
-              {
-                icon: Users,
-                title: "Top Créateurs",
-                description: "Inspirez-vous des meilleurs créateurs LinkedIn classés par secteur et pays",
-              },
-              {
-                icon: TrendingUp,
-                title: "Tendances",
-                description: "Découvrez les sujets qui buzzent et surfez sur les tendances du moment",
+                icon: Layers,
+                title: "Carrousels en 1 clic",
+                desc: "Des carrousels visuels professionnels prêts à publier",
+                color: "from-rose/20 to-orange-500/20",
               },
               {
                 icon: Shield,
-                title: "Sécurité",
-                description: "Vos données sont protégées avec un chiffrement de bout en bout",
+                title: "100% sécurisé",
+                desc: "OAuth2 LinkedIn, chiffrement bout-en-bout, RGPD",
+                color: "from-emerald-500/20 to-teal-500/20",
               },
-              {
-                icon: HeadphonesIcon,
-                title: "Support",
-                description: "Une équipe dédiée pour vous accompagner dans votre croissance",
-              },
-            ].map((feature, index) => (
+            ].map((item, i) => (
               <div
-                key={index}
-                className="p-6 rounded-2xl bg-card/30 border border-white/5 hover:border-violet/20 transition-all"
+                key={i}
+                className="rounded-2xl border border-white/10 bg-card/50 p-6 text-center transition-all hover:border-violet/20"
               >
-                <div className="p-3 rounded-xl bg-violet/10 w-fit mb-4">
-                  <feature.icon className="w-6 h-6 text-violet-light" />
+                <div
+                  className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${item.color}`}
+                >
+                  <item.icon className="h-6 w-6 text-violet-light" />
                 </div>
-                <h3 className="font-semibold text-white mb-2">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground">{feature.description}</p>
+                <h3 className="mb-2 font-semibold text-white">{item.title}</h3>
+                <p className="text-sm text-muted-foreground">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -485,36 +551,67 @@ export default function Pricing() {
       </section>
 
       {/* Testimonials */}
-      <section className="py-20 border-t border-white/5 bg-gradient-to-b from-violet/5 to-transparent">
+      <section className="border-t border-white/5 py-20">
         <div className="container">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mb-4">
+          <div className="mb-12 text-center">
+            <h2 className="text-3xl font-bold text-white">
               Ils ont transformé leur LinkedIn
             </h2>
-            <p className="text-muted-foreground">
-              Rejoignez des milliers de créateurs qui utilisent LinkedRank
+            <p className="mt-4 text-muted-foreground">
+              Des créateurs qui publient plus, mieux, et sans effort
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {testimonials.map((testimonial, index) => (
+          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
+            {[
+              {
+                name: "Marie Dupont",
+                role: "CEO @ TechStartup",
+                avatar: "MD",
+                plan: "Growth",
+                content:
+                  "J'ai gagné 50K abonnés en 3 mois. L'IA entraînée sur mon profil génère du contenu qui semble vraiment venir de moi.",
+                rating: 5,
+              },
+              {
+                name: "Thomas Martin",
+                role: "Consultant Marketing",
+                avatar: "TM",
+                plan: "Pro",
+                content:
+                  "Les carrousels générés en 1 clic me font gagner 10h par semaine. La qualité est bluffante.",
+                rating: 5,
+              },
+              {
+                name: "Sophie Bernard",
+                role: "Directrice RH",
+                avatar: "SB",
+                plan: "Starter",
+                content:
+                  "J'ai commencé avec l'essai gratuit et j'ai souscrit dès le 3ème jour. Le calendrier éditorial a changé ma façon de travailler.",
+                rating: 5,
+              },
+            ].map((t, i) => (
               <div
-                key={index}
-                className="p-6 rounded-2xl bg-card/50 border border-white/10"
+                key={i}
+                className="rounded-2xl border border-white/10 bg-card/50 p-6"
               >
-                <div className="flex items-center gap-1 mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-gold text-gold" />
+                <div className="mb-3 flex items-center gap-1">
+                  {[...Array(t.rating)].map((_, j) => (
+                    <Star key={j} className="h-4 w-4 fill-gold text-gold" />
                   ))}
+                  <span className="ml-auto rounded-full bg-violet/20 px-2 py-0.5 text-xs text-violet-light">
+                    Plan {t.plan}
+                  </span>
                 </div>
-                <p className="text-white mb-6">"{testimonial.content}"</p>
+                <p className="mb-4 text-sm text-white/90">"{t.content}"</p>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet to-rose flex items-center justify-center text-white font-medium text-sm">
-                    {testimonial.avatar}
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet to-rose text-sm font-medium text-white">
+                    {t.avatar}
                   </div>
                   <div>
-                    <p className="font-medium text-white">{testimonial.name}</p>
-                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                    <p className="text-sm font-medium text-white">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">{t.role}</p>
                   </div>
                 </div>
               </div>
@@ -524,88 +621,131 @@ export default function Pricing() {
       </section>
 
       {/* FAQ */}
-      <section className="py-20 border-t border-white/5">
+      <section className="border-t border-white/5 py-20 bg-card/20">
         <div className="container">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Questions fréquentes
-            </h2>
-            <p className="text-muted-foreground">
-              Tout ce que vous devez savoir sur nos offres
-            </p>
+          <div className="mb-12 text-center">
+            <h2 className="text-3xl font-bold text-white">Questions fréquentes</h2>
+            <p className="mt-4 text-muted-foreground">Tout ce que vous devez savoir</p>
           </div>
 
-          <div className="max-w-3xl mx-auto space-y-4">
-            {faqs.map((faq, index) => (
+          <div className="mx-auto max-w-2xl space-y-3">
+            {faqs.map((faq, i) => (
               <div
-                key={index}
-                className="p-6 rounded-2xl bg-card/30 border border-white/5"
+                key={i}
+                className="overflow-hidden rounded-2xl border border-white/10 bg-card/50"
               >
-                <h3 className="font-semibold text-white mb-2">{faq.question}</h3>
-                <p className="text-muted-foreground">{faq.answer}</p>
+                <button
+                  className="flex w-full items-center justify-between px-6 py-4 text-left"
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                >
+                  <span className="font-medium text-white">{faq.question}</span>
+                  {openFaq === i ? (
+                    <ChevronUp className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  )}
+                </button>
+                {openFaq === i && (
+                  <div className="border-t border-white/5 px-6 py-4 text-sm text-muted-foreground">
+                    {faq.answer}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ROI Calculator */}
-      <ROICalculator />
-
-      {/* Competitor Comparison */}
-      <CompetitorComparison />
-
-      {/* CTA Section */}
-      <section className="py-20 border-t border-white/5">
+      {/* Final CTA */}
+      <section className="py-20">
         <div className="container">
-          <div className="max-w-4xl mx-auto text-center p-12 rounded-3xl bg-gradient-to-br from-violet/20 via-card/50 to-rose/10 border border-violet/20">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Prêt à dominer LinkedIn ?
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Rejoignez des milliers de créateurs qui utilisent LinkedRank pour développer leur audience et générer des opportunités.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                size="lg"
-                className="bg-gradient-to-r from-violet to-violet-light hover:opacity-90 h-14 px-8 text-lg"
-              >
-                <Rocket className="w-5 h-5 mr-2" />
-                Commencer l'essai gratuit
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-white/20 hover:bg-white/5 h-14 px-8 text-lg"
-              >
-                <MessageSquare className="w-5 h-5 mr-2" />
-                Parler à un expert
-              </Button>
+          <div className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-violet/20 bg-gradient-to-br from-violet/20 via-card/50 to-rose/10 p-12 text-center">
+            <div className="absolute inset-0 opacity-20">
+              <div className="absolute left-0 top-0 h-64 w-64 rounded-full bg-violet blur-[100px]" />
+              <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-rose blur-[100px]" />
             </div>
-            <p className="text-sm text-muted-foreground mt-6">
-              14 jours d'essai gratuit • Aucune carte bancaire requise • Annulation à tout moment
-            </p>
+
+            <div className="relative">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white">
+                <Sparkles className="h-4 w-4" />
+                Commencez aujourd'hui — sans risque
+              </div>
+
+              <h2 className="text-3xl font-bold text-white sm:text-4xl">
+                14 jours gratuits,{" "}
+                <span className="bg-gradient-to-r from-violet-light to-gold bg-clip-text text-transparent">
+                  sans carte bancaire
+                </span>
+              </h2>
+
+              <p className="mx-auto mt-4 max-w-xl text-lg text-white/80">
+                Essayez toutes les fonctionnalités Starter. Annulez quand vous voulez.
+              </p>
+
+              <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                {user ? (
+                  <Button
+                    className="h-14 bg-gradient-to-r from-violet to-violet-light px-10 text-lg font-semibold hover:opacity-90"
+                    onClick={() => { window.location.href = "/dashboard"; }}
+                  >
+                    <Rocket className="mr-2 h-5 w-5" />
+                    Démarrer mon essai gratuit
+                  </Button>
+                ) : (
+                  <a href={getSignupUrl("/dashboard")}>
+                    <Button className="h-14 bg-gradient-to-r from-violet to-violet-light px-10 text-lg font-semibold hover:opacity-90">
+                      <Rocket className="mr-2 h-5 w-5" />
+                      Démarrer mon essai gratuit
+                    </Button>
+                  </a>
+                )}
+                <Link href="/">
+                  <Button
+                    variant="outline"
+                    className="h-14 border-white/20 px-10 text-lg hover:bg-white/5"
+                  >
+                    <MessageSquare className="mr-2 h-5 w-5" />
+                    En savoir plus
+                  </Button>
+                </Link>
+              </div>
+
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-sm text-white/60">
+                <span className="flex items-center gap-1.5">
+                  <Check className="h-4 w-4 text-emerald-400" />
+                  Aucune carte requise
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Check className="h-4 w-4 text-emerald-400" />
+                  14 jours offerts
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Check className="h-4 w-4 text-emerald-400" />
+                  Annulation en 1 clic
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-8 border-t border-white/5">
+      <footer className="border-t border-white/5 py-10">
         <div className="container">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <p className="text-sm text-muted-foreground">
-              © 2024 LinkedRank. Tous droits réservés.
+              © {new Date().getFullYear()} LinkedRank. Tous droits réservés.
             </p>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <Link href="/terms" className="hover:text-white transition-colors">
-                Conditions d'utilisation
+              <Link href="/legal/confidentialite" className="hover:text-white transition-colors">
+                Confidentialité
               </Link>
-              <Link href="/privacy" className="hover:text-white transition-colors">
-                Politique de confidentialité
+              <Link href="/legal/cgu" className="hover:text-white transition-colors">
+                CGU
               </Link>
-              <Link href="/contact" className="hover:text-white transition-colors">
+              <a href="mailto:contact@linkedrank.fr" className="hover:text-white transition-colors">
                 Contact
-              </Link>
+              </a>
             </div>
           </div>
         </div>
