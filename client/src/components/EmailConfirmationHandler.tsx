@@ -6,6 +6,11 @@ export function EmailConfirmationHandler() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
+    // Signup confirmation always lands on the bare Site URL ("/"). Other
+    // Supabase redirects (e.g. password reset) use their own dedicated
+    // route and carry a "code" param too, so this must not run for those.
+    if (window.location.pathname !== "/") return;
+
     const search = new URLSearchParams(window.location.search);
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
 
