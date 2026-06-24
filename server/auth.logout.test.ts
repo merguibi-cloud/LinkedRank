@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
+import { getSessionCookieOptions } from "./_core/cookies";
 
 type CookieCall = {
   name: string;
@@ -10,7 +11,10 @@ type CookieCall = {
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
-function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] } {
+function createAuthContext(): {
+  ctx: TrpcContext;
+  clearedCookies: CookieCall[];
+} {
   const clearedCookies: CookieCall[] = [];
 
   const user: AuthenticatedUser = {
@@ -55,6 +59,22 @@ describe("auth.logout", () => {
       maxAge: -1,
       secure: true,
       sameSite: "none",
+      httpOnly: true,
+      path: "/",
+    });
+  });
+});
+
+describe("session cookie options", () => {
+  it("uses SameSite=Lax for insecure local requests", () => {
+    const options = getSessionCookieOptions({
+      protocol: "http",
+      headers: {},
+    } as TrpcContext["req"]);
+
+    expect(options).toMatchObject({
+      secure: false,
+      sameSite: "lax",
       httpOnly: true,
       path: "/",
     });

@@ -1,0 +1,113 @@
+<!--
+  Supabase Auth template: "Confirm signup"
+  Paste this into: Supabase Dashboard -> Authentication -> Email Templates -> Confirm signup
+  Available variables used below: {{ .ConfirmationURL }}
+-->
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Confirmez votre adresse email</title>
+  </head>
+  <body style="margin:0; padding:0; background-color:#05050D; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#05050D; padding:40px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px; width:100%; background-color:#0F101C; border:1px solid #262838; border-radius:16px;">
+
+            <!-- Logo -->
+            <tr>
+              <td align="center" style="padding:40px 32px 0 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="background-color:#614AFC; background-image:linear-gradient(135deg,#614AFC,#E24EA0); border-radius:12px; width:40px; height:40px; text-align:center; vertical-align:middle;">
+                      <span style="color:#ffffff; font-size:20px; line-height:40px;">&#9679;</span>
+                    </td>
+                    <td style="padding-left:10px; vertical-align:middle;">
+                      <span style="font-size:20px; font-weight:700; color:#ffffff;">LinkedAgents</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Heading -->
+            <tr>
+              <td align="center" style="padding:28px 32px 0 32px;">
+                <h1 style="margin:0; font-size:22px; line-height:30px; font-weight:700; color:#ffffff;">
+                  Confirmez votre adresse email
+                </h1>
+              </td>
+            </tr>
+
+            <!-- Body copy -->
+            <tr>
+              <td align="center" style="padding:14px 32px 0 32px;">
+                <p style="margin:0; font-size:15px; line-height:24px; color:#A3A3B8;">
+                  Bienvenue sur LinkedAgents ! Cliquez sur le bouton ci-dessous pour confirmer
+                  votre adresse email et activer votre compte.
+                </p>
+              </td>
+            </tr>
+
+            <!-- CTA button -->
+            <tr>
+              <td align="center" style="padding:28px 32px 0 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="background-color:#614AFC; background-image:linear-gradient(135deg,#614AFC,#E24EA0); border-radius:10px;">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block; padding:14px 32px; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none; border-radius:10px;">
+                        Confirmer mon compte
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Fallback link -->
+            <tr>
+              <td align="center" style="padding:24px 32px 0 32px;">
+                <p style="margin:0; font-size:13px; line-height:20px; color:#6E6E85;">
+                  Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :
+                </p>
+                <p style="margin:6px 0 0 0; font-size:13px; line-height:20px; word-break:break-all;">
+                  <a href="{{ .ConfirmationURL }}" style="color:#7B75FF; text-decoration:underline;">{{ .ConfirmationURL }}</a>
+                </p>
+              </td>
+            </tr>
+
+            <!-- Spam note -->
+            <tr>
+              <td align="center" style="padding:24px 32px 0 32px;">
+                <p style="margin:0; font-size:13px; line-height:20px; color:#6E6E85;">
+                  Vous n'avez pas créé de compte sur LinkedAgents ? Vous pouvez ignorer cet email
+                  en toute sécurité.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Divider -->
+            <tr>
+              <td style="padding:32px 32px 0 32px;">
+                <div style="border-top:1px solid #262838;"></div>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td align="center" style="padding:20px 32px 32px 32px;">
+                <p style="margin:0; font-size:12px; line-height:18px; color:#6E6E85;">
+                  &copy; LinkedAgents &middot; <a href="https://www.linkedrank.fr" style="color:#6E6E85; text-decoration:underline;">linkedrank.fr</a>
+                </p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

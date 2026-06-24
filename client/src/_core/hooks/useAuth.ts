@@ -1,4 +1,4 @@
-import { getLoginUrl } from "@/const";
+import { getCurrentPathWithSearch, getLoginUrl } from "@/const";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
@@ -58,11 +58,14 @@ export function useAuth(options?: UseAuthOptions) {
     }
   }, [logoutMutation, utils]);
 
-  const state = useMemo(() => {
+  useEffect(() => {
     localStorage.setItem(
       "manus-runtime-user-info",
       JSON.stringify(meQuery.data)
     );
+  }, [meQuery.data]);
+
+  const state = useMemo(() => {
     return {
       user: meQuery.data ?? null,
       loading: meQuery.isLoading || logoutMutation.isPending,
@@ -82,8 +85,8 @@ export function useAuth(options?: UseAuthOptions) {
     if (meQuery.isLoading || logoutMutation.isPending) return;
     if (state.user) return;
     if (typeof window === "undefined") return;
-    const loginUrl = redirectPath ?? getLoginUrl();
-    if (window.location.pathname === loginUrl) return;
+    const loginUrl = redirectPath ?? getLoginUrl(getCurrentPathWithSearch());
+    if (window.location.pathname === "/login") return;
 
     window.location.href = loginUrl;
   }, [

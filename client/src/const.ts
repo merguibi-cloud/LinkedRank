@@ -1,10 +1,37 @@
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
+export const DEFAULT_AUTH_REDIRECT = "/dashboard";
 export const VOICE_ONBOARDING_PATH = "/onboarding?new=1";
+
+export const getCurrentPathWithSearch = () =>
+  `${window.location.pathname}${window.location.search}`;
+
+export const sanitizeInternalRedirect = (
+  redirect: string | null | undefined,
+  fallback = DEFAULT_AUTH_REDIRECT
+) => {
+  if (!redirect) return fallback;
+
+  try {
+    const decoded = decodeURIComponent(redirect).trim();
+    if (!decoded.startsWith("/") || decoded.startsWith("//")) return fallback;
+    if (
+      decoded.includes("\\") ||
+      decoded.includes("\n") ||
+      decoded.includes("\r")
+    ) {
+      return fallback;
+    }
+
+    return decoded;
+  } catch {
+    return fallback;
+  }
+};
 
 /** Garantit le paramètre `new=1` pour lancer l'agent vocal après inscription. */
 export function ensureVoiceOnboardingUrl(redirect?: string | null): string {
-  const target = redirect?.trim() || VOICE_ONBOARDING_PATH;
+  const target = sanitizeInternalRedirect(redirect, VOICE_ONBOARDING_PATH);
 
   if (typeof window === "undefined") {
     return target.includes("/onboarding") ? VOICE_ONBOARDING_PATH : target;
@@ -17,14 +44,14 @@ export function ensureVoiceOnboardingUrl(redirect?: string | null): string {
   return `${url.pathname}${url.search}`;
 }
 
-export const getLoginUrl = (redirect = "/dashboard") =>
-  `/login?redirect=${encodeURIComponent(redirect)}`;
+export const getLoginUrl = (redirect = DEFAULT_AUTH_REDIRECT) =>
+  `/login?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}`;
 
 export const getSignupUrl = (redirect = VOICE_ONBOARDING_PATH) =>
   `/signup?redirect=${encodeURIComponent(ensureVoiceOnboardingUrl(redirect))}`;
 
-export const getLinkedInConnectUrl = (redirect = "/dashboard") =>
-  `/linkedin/connect?redirect=${encodeURIComponent(redirect)}`;
+export const getLinkedInConnectUrl = (redirect = DEFAULT_AUTH_REDIRECT) =>
+  `/linkedin/connect?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}`;
 
-export const getLinkedInAuthApiUrl = (redirect = "/dashboard") =>
-  `/api/linkedin/auth?redirect=${encodeURIComponent(redirect)}`;
+export const getLinkedInAuthApiUrl = (redirect = DEFAULT_AUTH_REDIRECT) =>
+  `/api/linkedin/auth?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}`;

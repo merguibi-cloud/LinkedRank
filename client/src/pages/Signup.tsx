@@ -8,7 +8,11 @@ import { ensureVoiceOnboardingUrl, getLoginUrl } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { waitForAuthenticatedUser } from "@/lib/authSession";
 import { trpc } from "@/lib/trpc";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase";
+import {
+  createClient,
+  isSupabaseConfigured,
+  PENDING_CONFIRMATION_EMAIL_KEY,
+} from "@/lib/supabase";
 import {
   ArrowLeft,
   ArrowRight,
@@ -98,6 +102,7 @@ export default function Signup() {
         }
 
         if (!data.session) {
+          localStorage.setItem(PENDING_CONFIRMATION_EMAIL_KEY, email);
           setPendingEmailVerification(true);
           toast.success("Compte créé ! Vérifiez votre email pour continuer.");
           return;

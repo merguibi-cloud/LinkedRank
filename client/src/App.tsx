@@ -8,6 +8,7 @@ import { LinkedInStatusProvider } from "./contexts/LinkedInStatusContext";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { AppShell } from "./components/AppShell";
 import { LinkedInOAuthHandler } from "./components/LinkedInOAuthHandler";
+import { EmailConfirmationHandler } from "./components/EmailConfirmationHandler";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -168,6 +169,7 @@ function AppContent() {
     <>
       <ScrollToTop />
       <LinkedInOAuthHandler />
+      <EmailConfirmationHandler />
       <OnboardingRedirect />
       {showOnboarding && (
         <InteractiveOnboarding 

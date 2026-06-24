@@ -2,7 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthLayout } from "@/components/auth/AuthLayout";
-import { getLinkedInConnectUrl, getSignupUrl } from "@/const";
+import {
+  getLinkedInConnectUrl,
+  getSignupUrl,
+  sanitizeInternalRedirect,
+} from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase";
 import { ArrowRight, Eye, EyeOff, Linkedin, Loader2, Lock, Mail } from "lucide-react";
@@ -14,14 +18,27 @@ import { motion } from "framer-motion";
 export default function Login() {
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
-  const [email, setEmail] = useState("");
+  const params = new URLSearchParams(window.location.search);
+  const redirect = sanitizeInternalRedirect(params.get("redirect"));
+  const connectLinkedIn = params.get("connectLinkedIn") === "1";
+  const confirmed = params.get("confirmed") === "1";
+  const confirmError = params.get("confirm_error");
+
+  const [email, setEmail] = useState(params.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const params = new URLSearchParams(window.location.search);
-  const redirect = params.get("redirect") || "/dashboard";
-  const connectLinkedIn = params.get("connectLinkedIn") === "1";
+  useEffect(() => {
+    if (confirmed) {
+      toast.success("Email confirmé ! Vous pouvez maintenant vous connecter.");
+    } else if (confirmError) {
+      toast.error(
+        "Le lien de confirmation est invalide ou a expiré. Veuillez réessayer de vous inscrire."
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!loading && user) {
@@ -46,11 +63,11 @@ export default function Login() {
         });
 
         if (error) {
-          toast.error(error.message || "Connexion Ã©chouÃ©e");
+          toast.error(error.message || "Connexion échouée");
           return;
         }
 
-        toast.success("Connexion rÃ©ussie !");
+        toast.success("Connexion réussie !");
       } else {
         const response = await fetch("/api/auth/login", {
           method: "POST",
@@ -62,11 +79,11 @@ export default function Login() {
         const data = await response.json();
 
         if (!response.ok) {
-          toast.error(data.error || "Connexion Ã©chouÃ©e");
+          toast.error(data.error || "Connexion échouée");
           return;
         }
 
-        toast.success("Connexion rÃ©ussie !");
+        toast.success("Connexion réussie !");
       }
 
       if (connectLinkedIn) {
@@ -99,7 +116,7 @@ export default function Login() {
         <div className="mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Connexion</h1>
           <p className="text-muted-foreground mt-2">
-            AccÃ©dez Ã  votre espace et reprenez votre stratÃ©gie LinkedIn
+            Accédez à votre espace et reprenez votre stratégie LinkedIn
           </p>
         </div>
 
@@ -107,7 +124,7 @@ export default function Login() {
           <div className="flex items-center gap-3 rounded-xl border border-[#0077B5]/30 bg-[#0077B5]/10 p-4 mb-6 text-sm">
             <Linkedin className="h-5 w-5 text-[#0077B5] shrink-0" />
             <p className="text-muted-foreground">
-              Connectez-vous d'abord, puis vous serez redirigÃ© vers LinkedIn.
+              Connectez-vous d'abord, puis vous serez redirigé vers LinkedIn.
             </p>
           </div>
         )}
@@ -139,7 +156,7 @@ export default function Login() {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                placeholder="????????"
                 required
                 autoComplete="current-password"
                 className="bg-white/5 border-white/10 pl-10 pr-10 h-12 focus:border-violet/50"
@@ -163,7 +180,7 @@ export default function Login() {
               </>
             ) : (
               <>
-                AccÃ©der Ã  mon espace
+                Accéder à mon espace
                 <ArrowRight className="ml-2 h-4 w-4" />
               </>
             )}
@@ -174,7 +191,7 @@ export default function Login() {
           <p className="text-center text-sm text-muted-foreground">
             Pas encore de compte ?{" "}
             <Link href={getSignupUrl(redirect)} className="text-violet-light hover:underline font-medium">
-              CrÃ©er un compte gratuit
+              Créer un compte gratuit
             </Link>
           </p>
         </div>

@@ -72,8 +72,14 @@ export default function Pricing() {
       return;
     }
 
+    if (planId === "business") {
+      window.location.href =
+        "mailto:contact@linkedrank.fr?subject=Demande%20plan%20Business";
+      return;
+    }
+
     if (!user) {
-      toast.info("CrÃ©ez un compte pour souscrire Ã  ce plan.");
+      toast.info("Créez un compte pour souscrire à ce plan.");
       window.location.href = getSignupUrl("/pricing");
       return;
     }
@@ -83,12 +89,10 @@ export default function Pricing() {
       const response = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           planId,
           billingPeriod,
-          userId: user.id,
-          userEmail: user.email,
-          userName: user.name,
         }),
       });
       const data = await response.json();
