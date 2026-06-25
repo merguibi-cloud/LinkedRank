@@ -25,11 +25,11 @@ export function useAuth(options?: UseAuthOptions) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
-      void meQuery.refetch();
+      void utils.auth.me.invalidate();
     });
 
     return () => subscription.unsubscribe();
-  }, [meQuery]);
+  }, [utils]);
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
