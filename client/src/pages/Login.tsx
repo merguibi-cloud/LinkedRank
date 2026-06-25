@@ -31,10 +31,10 @@ export default function Login() {
 
   useEffect(() => {
     if (confirmed) {
-      toast.success("Email confirmÃ© ! Vous pouvez maintenant vous connecter.");
+      toast.success("Email confirmé ! Vous pouvez maintenant vous connecter.");
     } else if (confirmError) {
       toast.error(
-        "Le lien de confirmation est invalide ou a expirÃ©. Veuillez rÃ©essayer de vous inscrire."
+        "Le lien de confirmation est invalide ou a expiré. Veuillez réessayer de vous inscrire."
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,11 +63,11 @@ export default function Login() {
         });
 
         if (error) {
-          toast.error(error.message || "Connexion Ã©chouÃ©e");
+          toast.error(error.message || "Connexion échouée");
           return;
         }
 
-        toast.success("Connexion rÃ©ussie !");
+        toast.success("Connexion réussie !");
       } else {
         const response = await fetch("/api/auth/login", {
           method: "POST",
@@ -79,11 +79,11 @@ export default function Login() {
         const data = await response.json();
 
         if (!response.ok) {
-          toast.error(data.error || "Connexion Ã©chouÃ©e");
+          toast.error(data.error || "Connexion échouée");
           return;
         }
 
-        toast.success("Connexion rÃ©ussie !");
+        toast.success("Connexion réussie !");
       }
 
       if (connectLinkedIn) {
@@ -116,7 +116,7 @@ export default function Login() {
         <div className="mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Connexion</h1>
           <p className="text-muted-foreground mt-2">
-            AccÃ©dez Ã  votre espace et reprenez votre stratÃ©gie LinkedIn
+            Accédez à votre espace et reprenez votre stratégie LinkedIn
           </p>
         </div>
 
@@ -124,7 +124,7 @@ export default function Login() {
           <div className="flex items-center gap-3 rounded-xl border border-[#0077B5]/30 bg-[#0077B5]/10 p-4 mb-6 text-sm">
             <Linkedin className="h-5 w-5 text-[#0077B5] shrink-0" />
             <p className="text-muted-foreground">
-              Connectez-vous d&apos;abord, puis vous serez redirigÃ© vers LinkedIn.
+              Connectez-vous d&apos;abord, puis vous serez redirigé vers LinkedIn.
             </p>
           </div>
         )}
@@ -148,7 +148,15 @@ export default function Login() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Mot de passe</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Mot de passe</Label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-violet-light hover:underline"
+              >
+                Mot de passe oublié ?
+              </Link>
+            </div>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -180,7 +188,7 @@ export default function Login() {
               </>
             ) : (
               <>
-                AccÃ©der Ã  mon espace
+                Accéder à mon espace
                 <ArrowRight className="ml-2 h-4 w-4" />
               </>
             )}
@@ -191,7 +199,7 @@ export default function Login() {
           <p className="text-center text-sm text-muted-foreground">
             Pas encore de compte ?{" "}
             <Link href={getSignupUrl(redirect)} className="text-violet-light hover:underline font-medium">
-              CrÃ©er un compte gratuit
+              Créer un compte gratuit
             </Link>
           </p>
         </div>
