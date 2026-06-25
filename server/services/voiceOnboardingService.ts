@@ -11,63 +11,28 @@ import { initializeUserAgents } from "./agentService";
 export const ONBOARDING_QUESTIONS = [
   {
     id: "intro",
-    question:
-      "Parlez-moi de vous : quel est votre métier et le nom de votre entreprise ou activité ?",
+    question: "Votre métier, votre entreprise et votre secteur ?",
     options: undefined as readonly string[] | undefined,
-  },
-  {
-    id: "sector",
-    question:
-      "Dans quel secteur travaillez-vous ? Par exemple tech, BTP, conseil ou santé.",
-    options: undefined as readonly string[] | undefined,
-  },
-  {
-    id: "audience",
-    question:
-      "Qui voulez-vous toucher sur LinkedIn ? Décrivez votre client ou lecteur idéal.",
-    options: undefined as readonly string[] | undefined,
+    selectionMode: "none" as const,
   },
   {
     id: "goals",
     question:
-      "Quels sont vos objectifs ? Trouver des clients, gagner en visibilité, recruter, ou devenir une référence ?",
+      "Votre cible et votre objectif sur LinkedIn ? Clients, visibilité, recrutement ou référence ?",
     options: ["Trouver des clients", "Gagner en visibilité", "Recruter", "Devenir une référence"],
+    selectionMode: "multiple" as const,
   },
   {
     id: "topics",
-    question:
-      "Quels contenus aimez-vous publier ? Conseils, histoires, coulisses, témoignages clients ?",
+    question: "Quel contenu préférez-vous ? Conseils, histoires, coulisses ou témoignages ?",
     options: ["Conseils", "Histoires", "Coulisses", "Témoignages clients"],
-  },
-  {
-    id: "tone",
-    question:
-      "Quel ton préférez-vous ? Professionnel, décontracté, inspirant, pédagogique ou provocateur ?",
-    options: ["Professionnel", "Décontracté", "Inspirant", "Pédagogique", "Provocateur"],
+    selectionMode: "multiple" as const,
   },
   {
     id: "frequency",
-    question:
-      "À quelle fréquence voulez-vous publier ? Tous les jours, plusieurs fois par semaine, ou une fois par semaine ?",
+    question: "À quelle fréquence publier ? Tous les jours, plusieurs fois par semaine, ou une fois ?",
     options: ["Tous les jours", "Plusieurs fois par semaine", "Une fois par semaine"],
-  },
-  {
-    id: "language",
-    question:
-      "Dans quelle langue publier ? Français, anglais, arabe, espagnol ou allemand ?",
-    options: ["Français", "Anglais", "Arabe", "Espagnol", "Allemand"],
-  },
-  {
-    id: "avoid",
-    question:
-      "Y a-t-il des sujets que vous préférez éviter ?",
-    options: undefined as readonly string[] | undefined,
-  },
-  {
-    id: "unique",
-    question:
-      "Pour finir, qu'est-ce qui vous rend unique dans votre domaine ?",
-    options: undefined as readonly string[] | undefined,
+    selectionMode: "single" as const,
   },
 ] as const;
 
@@ -174,17 +139,20 @@ function fallbackExtract(answers: OnboardingAnswer[]): ExtractedOnboardingProfil
   if (allText.includes("recrut")) goals.push("Recruter des talents");
   if (goals.length === 0) goals.push("Développer mon activité");
 
+  const introAnswer = byId.intro || "";
+  const goalsAnswer = byId.goals || "";
+
   return {
-    companyName: byId.intro?.split(",")[0]?.trim() || "Mon activité",
-    industry: byId.sector || "Services",
-    sector: byId.sector || "Services",
-    targetAudience: byId.audience || "Professionnels de mon secteur",
-    personalBio: byId.intro || "",
+    companyName: introAnswer.split(",")[0]?.trim() || "Mon activité",
+    industry: byId.sector || introAnswer || "Services",
+    sector: byId.sector || introAnswer || "Services",
+    targetAudience: byId.audience || goalsAnswer || "Professionnels de mon secteur",
+    personalBio: introAnswer,
     expertise: topics,
     preferredTone: detectTone(),
     preferredLanguages: [detectLanguage()],
     contentGoals: goals,
-    businessGoals: byId.goals || "",
+    businessGoals: goalsAnswer,
     uniqueSellingPoints: byId.unique || "",
     contentTopics: topics,
     contentTypes: ["tips", "story", "insight"],
@@ -207,7 +175,7 @@ export async function extractProfileFromAnswers(
       messages: [
         {
           role: "system",
-          content: `Tu es un assistant qui structure les réponses d'onboarding vocal pour LinkedIn.
+          content: `Tu es un assistant qui structure les réponses d'onboarding pour LinkedIn.
 Analyse la conversation et extrais un profil structuré pour automatiser la création de contenu.
 Réponds UNIQUEMENT en JSON valide avec cette structure:
 {

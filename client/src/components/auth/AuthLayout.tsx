@@ -1,4 +1,4 @@
-import { Bot, Check, Mic, Linkedin, Sparkles, PenTool, BarChart3 } from "lucide-react";
+import { Bot, Check, ClipboardList, Linkedin, Sparkles, PenTool, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import type { ReactNode } from "react";
@@ -8,7 +8,7 @@ export type SignupStep = 1 | 2;
 
 const JOURNEY_STEPS = [
   { icon: Sparkles, label: "Créer votre compte", description: "30 secondes chrono" },
-  { icon: Mic, label: "Parler à votre agent", description: "Configuration vocale guidée" },
+  { icon: ClipboardList, label: "Personnaliser votre profil", description: "Questions guidées en quelques clics" },
   { icon: Linkedin, label: "Connecter LinkedIn", description: "OAuth sécurisé" },
   { icon: PenTool, label: "Première publication", description: "Post généré par l'IA" },
 ];
@@ -79,7 +79,7 @@ export function AuthLayout({ mode, signupStep = 1, children }: AuthLayoutProps) 
                   >
                     {signupStep === 1
                       ? "Des milliers de professionnels utilisent nos agents pour publier sans effort sur LinkedIn."
-                      : "Après l'inscription, vous parlerez directement à votre agent vocal pour une configuration sur mesure."}
+                      : "Ensuite, répondez à quelques questions — l'IA structure votre profil et calibre vos posts."}
                   </motion.p>
                 </div>
 

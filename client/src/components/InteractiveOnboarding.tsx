@@ -295,7 +295,7 @@ export function useOnboarding() {
 
     const hasCompletedOnboarding =
       localStorage.getItem("linkedagents_onboarding_completed") ||
-      localStorage.getItem("linkedrank_voice_onboarding_completed");
+      localStorage.getItem("linkedrank_profile_onboarding_completed");
     const savedProfile = localStorage.getItem("linkedagents_user_profile");
 
     if (isLoggedIn && !hasCompletedOnboarding && window.location.pathname !== "/onboarding") {

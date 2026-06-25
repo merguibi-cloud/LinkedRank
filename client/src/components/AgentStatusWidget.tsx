@@ -27,8 +27,9 @@ const statusConfig = {
 export function AgentStatusWidget() {
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
 
-  const availableCount = AGENTS_ROSTER.filter(a => a.availability === "available").length;
-  const lea = AGENTS_ROSTER.find(a => a.availability === "available");
+  const availableAgents = AGENTS_ROSTER.filter(a => a.availability === "available");
+  const availableCount = availableAgents.length;
+  const comingSoonAgents = AGENTS_ROSTER.filter(a => a.availability === "coming_soon");
 
   return (
     <div className="space-y-4">
@@ -40,7 +41,7 @@ export function AgentStatusWidget() {
           <div>
             <h3 className="font-semibold text-white">Votre Équipe IA</h3>
             <p className="text-xs text-white/50">
-              {availableCount} agent disponible · {AGENTS_ROSTER.length - availableCount} bientôt
+              {availableCount} agent{availableCount > 1 ? "s" : ""} disponible{availableCount > 1 ? "s" : ""} · {comingSoonAgents.length} bientôt
             </p>
           </div>
         </div>
@@ -52,30 +53,38 @@ export function AgentStatusWidget() {
         </Link>
       </div>
 
-      {lea && (
-        <Link href={lea.ctaHref ?? "/generate"}>
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-violet-500/15 to-fuchsia-500/10 border border-violet-500/30 hover:border-violet-400/50 transition-all cursor-pointer group">
-            <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl bg-gradient-to-br ${lea.gradient} text-xl shadow-md`}>
-                {lea.avatar}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-white">{lea.name}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    Disponible
-                  </span>
+      <div className="space-y-2">
+        {availableAgents.map(agent => (
+          <Link key={agent.id} href={agent.ctaHref ?? "/generate"}>
+            <div className={`p-4 rounded-2xl border transition-all cursor-pointer group ${
+              agent.id === "scheduler"
+                ? "bg-gradient-to-r from-amber-500/15 to-orange-500/10 border-amber-500/30 hover:border-amber-400/50"
+                : "bg-gradient-to-r from-violet-500/15 to-fuchsia-500/10 border-violet-500/30 hover:border-violet-400/50"
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-xl bg-gradient-to-br ${agent.gradient} text-xl shadow-md`}>
+                  {agent.avatar}
                 </div>
-                <p className="text-xs text-white/50">{lea.role}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-white">{agent.name}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      Disponible
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/50">{agent.role}</p>
+                </div>
+                <Sparkles className={`w-4 h-4 group-hover:scale-110 transition-transform ${
+                  agent.id === "scheduler" ? "text-amber-400" : "text-violet-400"
+                }`} />
               </div>
-              <Sparkles className="w-4 h-4 text-violet-400 group-hover:scale-110 transition-transform" />
             </div>
-          </div>
-        </Link>
-      )}
+          </Link>
+        ))}
+      </div>
 
       <div className="space-y-2">
-        {AGENTS_ROSTER.filter(a => a.availability === "coming_soon").map(agent => {
+        {comingSoonAgents.map(agent => {
           const status = statusConfig.coming_soon;
           const colors = COLOR_CLASSES[agent.color];
           const isExpanded = expandedAgent === agent.id;

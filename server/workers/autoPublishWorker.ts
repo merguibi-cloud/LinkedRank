@@ -1,18 +1,16 @@
 import { getDb } from "../db";
 import { autoPublishSettings, autoPublishSchedule, autoPublishQueue, generatedPosts } from "../../drizzle/schema";
 import { eq, and, lte } from "drizzle-orm";
-import { generateLinkedInPost } from "../services/ai";
-import {
-  buildLinkedInPostParams,
-  getInfluencersForSettings,
-  parseInspirationTopics,
-} from "../services/autoPublishGeneration";
-import { postToLinkedIn, getLinkedInProfile } from "../services/linkedin";
+import { postToLinkedIn } from "../services/linkedin";
 import { getLinkedinSettings } from "../db";
-import { renderQuoteImage } from "../services/htmlToImage";
-import { generatePostImage } from "../services/postImageService";
 import { notifyPostPublished } from "../services/notificationService";
 import { recordPublishedPost } from "../services/agentLearningService";
+import {
+  prefillAllEnabledUsers,
+  generateSmartAutoPost,
+  emergencyGenerateForSlot,
+  isQueueItemForSlot,
+} from "../services/autoPublishOrchestrator";
 
 // Check interval in milliseconds (every minute)
 const CHECK_INTERVAL = 60 * 1000;
@@ -21,6 +19,8 @@ let workerInterval: NodeJS.Timeout | null = null;
 let cleanupInterval: NodeJS.Timeout | null = null;
 let isProcessingQueue = false;
 let isProcessingRecurring = false;
+let isPrefilling = false;
+let prefillTick = 0;
 
 // Track published slots to prevent duplicates (key: `userId-dayOfWeek-publishTime-date`)
 const publishedSlots = new Set<string>();
@@ -71,125 +71,7 @@ function isTimeMatch(scheduledTime: string, currentTime: string): boolean {
   return Math.abs(schedTotal - currTotal) <= 1;
 }
 
-// Color palettes for variety
-const COLOR_PALETTES = [
-  "violet",
-  "ocean", 
-  "sunset",
-  "forest",
-  "royal",
-  "fire",
-  "midnight",
-  "gold"
-];
-
-interface ParsedImageSettings {
-  includeImage: boolean;
-  imageType: "ai" | "quote";
-  imageStyle: string;
-  colorPalette: string;
-  customQuote: string;
-  aiImageStyle: string;
-  aiImageFormat: string;
-}
-
-function parseImageSettings(settings: { inspirationTopics?: string | null }): ParsedImageSettings {
-  const topics = parseInspirationTopics(settings);
-  return {
-    includeImage: topics.includeImage,
-    imageType: topics.imageType,
-    imageStyle: topics.imageStyle,
-    colorPalette: topics.colorPalette,
-    customQuote: topics.customQuote,
-    aiImageStyle: topics.aiImageStyle,
-    aiImageFormat: topics.aiImageFormat,
-  };
-}
-
-/**
- * Generate a quote image using HTML rendering (reliable, no AI errors)
- */
-async function generateQuoteImageHTML(
-  content: string,
-  userName: string,
-  imageSettings?: Pick<ParsedImageSettings, "customQuote" | "colorPalette" | "imageStyle">
-): Promise<string | null> {
-  try {
-    let quote = imageSettings?.customQuote?.trim() || "";
-    if (!quote) {
-      const lines = content.split('\n').filter(l => l.trim().length > 20 && l.trim().length < 150);
-      quote = "Le succès est la somme de petits efforts répétés jour après jour.";
-
-      if (lines.length > 0) {
-        const quoteLine = lines.find(l => l.includes('"') || l.includes('«')) || lines[0];
-        quote = quoteLine.replace(/["*«»]/g, '').trim();
-        if (quote.length > 120) {
-          quote = quote.substring(0, 117) + '...';
-        }
-      }
-    }
-
-    const palette =
-      imageSettings?.colorPalette ||
-      COLOR_PALETTES[Math.floor(Math.random() * COLOR_PALETTES.length)];
-
-    console.log("[AutoPublish] Generating quote image with HTML rendering...");
-    console.log("[AutoPublish] Quote:", quote.substring(0, 50) + "...");
-    console.log("[AutoPublish] Palette:", palette);
-
-    const result = await renderQuoteImage({
-      quote,
-      authorName: userName || "Auteur",
-      style: imageSettings?.imageStyle || "gradient",
-      colorPalette: palette,
-    });
-
-    console.log("[AutoPublish] Quote image generated:", result?.url ? "success" : "no URL");
-    return result?.url || null;
-  } catch (error) {
-    console.error("[AutoPublish] Error generating quote image:", error);
-    return null;
-  }
-}
-
-/**
- * Generate a post for a user based on their settings
- */
-async function generatePostForUser(userId: number, settings: typeof autoPublishSettings.$inferSelect): Promise<{ content: string; imageUrl: string | null }> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const influencers = await getInfluencersForSettings(db, settings);
-  const postParams = buildLinkedInPostParams(settings, influencers);
-
-  const content = await generateLinkedInPost(postParams);
-
-  // Generate image if enabled
-  let imageUrl: string | null = null;
-  const imageSettings = parseImageSettings(settings);
-      if (imageSettings.includeImage) {
-    try {
-      const userName = "Auteur";
-      if (imageSettings.imageType === "ai") {
-        console.log("[AutoPublish] Generating AI image...");
-        const result = await generatePostImage(userId, {
-          content,
-          title: settings.sector || "Post LinkedIn",
-          visualStyle: imageSettings.aiImageStyle,
-          imageSize: imageSettings.aiImageFormat,
-        });
-        imageUrl = result.imageUrl;
-        console.log("[AutoPublish] AI image generated:", imageUrl ? "success" : "no URL");
-      } else {
-        imageUrl = await generateQuoteImageHTML(content, userName, imageSettings);
-      }
-    } catch (error) {
-      console.error("[AutoPublish] Image generation failed, continuing without image:", error);
-    }
-  }
-
-  return { content, imageUrl };
-}
+// Color palettes for variety — moved to orchestrator
 
 /**
  * Publish a post to LinkedIn for a user
@@ -232,15 +114,6 @@ async function publishToLinkedIn(userId: number, content: string, imageUrl?: str
   }
 }
 
-function isManualScheduledPost(generatedFrom: string | null): boolean {
-  if (!generatedFrom) return true;
-  try {
-    const meta = JSON.parse(generatedFrom);
-    return meta.type === "manual" || meta.type === "generator";
-  } catch {
-    return false;
-  }
-}
 
 async function tryClaimQueueItem(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
@@ -260,8 +133,20 @@ async function tryClaimQueueItem(
   return affectedRows > 0;
 }
 
+async function runPrefillCycle(): Promise<void> {
+  if (isPrefilling) return;
+  isPrefilling = true;
+  try {
+    await prefillAllEnabledUsers();
+  } catch (error) {
+    console.error("[AutoPublish] Prefill cycle error:", error);
+  } finally {
+    isPrefilling = false;
+  }
+}
+
 /**
- * Publish posts scheduled for a specific date/time (manual scheduling)
+ * Publish posts scheduled for a specific date/time
  */
 async function processScheduledQueue(): Promise<void> {
   if (isProcessingQueue) return;
@@ -286,15 +171,11 @@ async function processScheduledQueue(): Promise<void> {
         )
       );
 
-    const manualPosts = pendingPosts.filter((post) =>
-      isManualScheduledPost(post.generatedFrom)
-    );
+    if (pendingPosts.length === 0) return;
 
-    if (manualPosts.length === 0) return;
+    console.log(`[AutoPublish] Processing ${pendingPosts.length} queue item(s)`);
 
-    console.log(`[AutoPublish] Processing ${manualPosts.length} scheduled queue item(s)`);
-
-    for (const post of manualPosts) {
+    for (const post of pendingPosts) {
       const claimed = await tryClaimQueueItem(db, post.id);
       if (!claimed) {
         console.log(`[AutoPublish] Post ${post.id} already claimed, skipping`);
@@ -414,29 +295,66 @@ async function processScheduledPublications(): Promise<void> {
         continue;
       }
 
+      const slotDate = new Date();
+      const [h, m] = schedule.publishTime.split(":").map(Number);
+      slotDate.setHours(h, m, 0, 0);
+
+      const existingQueue = await db
+        .select()
+        .from(autoPublishQueue)
+        .where(
+          and(
+            eq(autoPublishQueue.userId, schedule.userId),
+            eq(autoPublishQueue.status, "pending")
+          )
+        );
+
+      const hasPrefilled = existingQueue.some((q) =>
+        isQueueItemForSlot(q, slotDate, schedule.id)
+      );
+
+      if (hasPrefilled) {
+        publishedSlots.add(slotKey);
+        console.log(`[AutoPublish] Slot ${slotKey} already in queue, worker will publish`);
+        continue;
+      }
+
       // Mark slot as processed to prevent duplicates
       publishedSlots.add(slotKey);
 
-      // Generate and publish the post
       try {
-        console.log(`[AutoPublish] Generating post for user ${schedule.userId}...`);
-        const { content, imageUrl } = await generatePostForUser(schedule.userId, settings);
+        console.log(`[AutoPublish] Emergency generate for user ${schedule.userId} slot ${schedule.id}`);
+        const { content, imageUrl, plan, generatedPostId } =
+          await emergencyGenerateForSlot(schedule.userId, settings, schedule.id);
 
-        console.log(`[AutoPublish] Publishing to LinkedIn for user ${schedule.userId}...`);
         const success = await publishToLinkedIn(schedule.userId, content, imageUrl);
 
         await db.insert(autoPublishQueue).values({
           userId: schedule.userId,
           content,
           imageUrl: imageUrl || null,
+          generatedPostId: generatedPostId ?? null,
           scheduledFor: new Date(),
           status: success ? "published" : "failed",
           publishedAt: success ? new Date() : null,
-          generatedFrom: JSON.stringify({ type: "auto_recurring" }),
+          generatedFrom: JSON.stringify({
+            type: "auto_recurring",
+            slotId: schedule.id,
+            topicAngle: plan.topicAngle,
+            emergency: true,
+          }),
           errorMessage: success ? null : "Publication LinkedIn échouée",
         });
 
         console.log(`[AutoPublish] Post ${success ? "published" : "failed"} for user ${schedule.userId}`);
+
+        if (schedule.publishDate && success) {
+          await db
+            .update(autoPublishSchedule)
+            .set({ isActive: false })
+            .where(eq(autoPublishSchedule.id, schedule.id));
+          console.log(`[AutoPublish] One-shot slot ${schedule.id} deactivated after publish`);
+        }
       } catch (error) {
         console.error(`[AutoPublish] Error processing schedule for user ${schedule.userId}:`, error);
       }
@@ -468,6 +386,17 @@ function cleanupOldSlots(): void {
   }
 }
 
+/** Exécution d'un cycle de publication (file + créneaux récurrents). */
+export async function runAutoPublishTick(): Promise<void> {
+  await processScheduledQueue();
+  await processScheduledPublications();
+}
+
+/** Remplit la file d'attente pour tous les utilisateurs actifs. */
+export async function runAutoPublishPrefill(): Promise<void> {
+  await runPrefillCycle();
+}
+
 /**
  * Start the auto-publish worker
  */
@@ -479,12 +408,15 @@ export function startAutoPublishWorker(): void {
 
   console.log("[AutoPublish] Starting auto-publish worker...");
   
-  void processScheduledQueue();
-  void processScheduledPublications();
-  
+  void runAutoPublishTick();
+  void runAutoPublishPrefill();
+
   workerInterval = setInterval(() => {
-    void processScheduledQueue();
-    void processScheduledPublications();
+    void runAutoPublishTick();
+    prefillTick += 1;
+    if (prefillTick % 5 === 0) {
+      void runAutoPublishPrefill();
+    }
   }, CHECK_INTERVAL);
   
   cleanupInterval = setInterval(() => {
@@ -536,8 +468,8 @@ export async function publishNowWithContent(
         return { success: false, message: "No auto-publish settings found. Please configure your preferences first." };
       }
 
-      console.log(`[AutoPublish] No content provided, generating new post for user ${userId}...`);
-      const generated = await generatePostForUser(userId, settings);
+      console.log(`[AutoPublish] No content provided, generating smart post for user ${userId}...`);
+      const generated = await generateSmartAutoPost(userId, settings);
       finalContent = generated.content;
       finalImageUrl = generated.imageUrl || undefined;
     }
@@ -599,8 +531,8 @@ export async function publishNow(userId: number): Promise<{ success: boolean; me
     }
 
     // Generate post with image
-    console.log(`[AutoPublish] Generating immediate post for user ${userId}...`);
-    const { content, imageUrl } = await generatePostForUser(userId, settings);
+    console.log(`[AutoPublish] Generating immediate smart post for user ${userId}...`);
+    const { content, imageUrl } = await generateSmartAutoPost(userId, settings);
 
     // Publish to LinkedIn
     const success = await publishToLinkedIn(userId, content, imageUrl);

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 interface UpcomingEmptyStateProps {
   isAutoEnabled: boolean;
   hasSchedule: boolean;
+  hasObjectives?: boolean;
   onToggleAuto?: (enabled: boolean) => void;
   onGoToSchedule: () => void;
   onGoToObjectives: () => void;
@@ -16,6 +17,7 @@ interface UpcomingEmptyStateProps {
 export function UpcomingEmptyState({
   isAutoEnabled,
   hasSchedule,
+  hasObjectives = false,
   onToggleAuto,
   onGoToSchedule,
   onGoToObjectives,
@@ -26,7 +28,7 @@ export function UpcomingEmptyState({
       icon: Sparkles,
       title: "Définir vos objectifs",
       desc: "Secteur, ton, types de contenu",
-      done: false,
+      done: hasObjectives,
       action: onGoToObjectives,
     },
     {

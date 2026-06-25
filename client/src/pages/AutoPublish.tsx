@@ -5,11 +5,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLinkedInConnectUrl, getSignupUrl } from "@/const";
+import { getLinkedInConnectUrl, getLoginUrl, getSignupUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { formatDateInput, getDefaultScheduleTime, combineDateAndTime } from "@/lib/scheduleUtils";
 import { AI_IMAGE_FORMATS, AI_IMAGE_STYLES } from "@/lib/aiImageStyles";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
+import { GettingStartedJourney } from "@/components/GettingStartedJourney";
+import { isGuidedMode } from "@/lib/gettingStartedJourney";
 import { ToolsQuickNav } from "@/components/tools/ToolsQuickNav";
 import { CreatorAvatar } from "@/components/CreatorAvatar";
 import { toast } from "sonner";
@@ -53,7 +55,7 @@ import {
   FolderOpen,
   List,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { MediaLibraryPicker, MediaUploadZone } from "@/components/MediaLibraryPicker";
 import { UpcomingPublicationsView } from "@/components/autopublish/UpcomingPublicationsView";
 import {
@@ -280,6 +282,8 @@ type FlowOverlay =
 
 export default function AutoPublish() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const guided = isGuidedMode();
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<AutoPublishTab>("upcoming");
   const [flowOverlay, setFlowOverlay] = useState<FlowOverlay>(null);
@@ -384,8 +388,10 @@ export default function AutoPublish() {
     }
   }, [mediaSuggestions, mediaSuggestionsApplied, previewContent]);
 
-  // Load all influencers on mount (no sector filtering - show all top creators)
+  // Load influencers when authenticated
   useEffect(() => {
+    if (!user?.id) return;
+
     const loadInfluencers = async () => {
       setIsLoadingInfluencers(true);
       try {
@@ -407,8 +413,8 @@ export default function AutoPublish() {
         setIsLoadingInfluencers(false);
       }
     };
-    loadInfluencers();
-  }, []);
+    void loadInfluencers();
+  }, [user?.id]);
 
   // Load existing settings (once per session to avoid overwriting user edits)
   useEffect(() => {
@@ -477,6 +483,36 @@ export default function AutoPublish() {
     if (ok) setUpcomingKey((k) => k + 1);
   };
 
+  const handleSaveAndActivate = async () => {
+    if (schedule.length === 0) {
+      toast.error("Ajoutez au moins un créneau dans l'onglet Planning");
+      setActiveTab("schedule");
+      return;
+    }
+    if (settings.objectives.length === 0) {
+      toast.info("Sélectionnez au moins un objectif pour personnaliser le contenu");
+      setActiveTab("objectives");
+      return;
+    }
+
+    const newSettings = { ...settings, isEnabled: true };
+    setSettings(newSettings);
+    const ok = await persistSettings(newSettings, schedule);
+    if (ok) {
+      setUpcomingKey((k) => k + 1);
+      if (guided) {
+        toast.success("Parcours terminé ! Votre automatisation est active.", {
+          description: "L'IA publiera selon votre calendrier.",
+        });
+        setLocation("/dashboard");
+      } else {
+        toast.success("Configuration sauvegardée — auto-publication activée !");
+      }
+    } else {
+      setSettings((prev) => ({ ...prev, isEnabled: settings.isEnabled }));
+    }
+  };
+
   const handleToggleEnabled = async (enabled?: boolean) => {
     const newEnabled = enabled ?? !settings.isEnabled;
     const newSettings = { ...settings, isEnabled: newEnabled };
@@ -499,7 +535,7 @@ export default function AutoPublish() {
     }
   };
 
-  const handleAddScheduleSlot = () => {
+  const handleAddScheduleSlot = async () => {
     if (planningMode === "recurring") {
       if (selectedDay === null) {
         toast.error("Sélectionnez un jour");
@@ -533,25 +569,41 @@ export default function AutoPublish() {
       return;
     }
 
-    setSchedule([
+    const newSchedule = [
       ...schedule,
       { dayOfWeek, publishTime: selectedTime, isActive: true, publishDate },
-    ]);
-    toast.success("Créneau ajouté !");
+    ];
+    setSchedule(newSchedule);
+    const saved = await persistSettings(settings, newSchedule, true);
+    if (saved) {
+      toast.success("Créneau ajouté et sauvegardé");
+      setUpcomingKey((k) => k + 1);
+    } else {
+      setSchedule(schedule);
+      toast.error("Créneau non sauvegardé — réessayez");
+    }
   };
 
-  const handleRemoveScheduleSlot = (
+  const handleRemoveScheduleSlot = async (
     dayOfWeek: number,
     publishTime: string,
     publishDate?: string | null
   ) => {
-    setSchedule(schedule.filter(
+    const newSchedule = schedule.filter(
       s => !(
         s.dayOfWeek === dayOfWeek &&
         s.publishTime === publishTime &&
         (s.publishDate ?? null) === (publishDate ?? null)
       )
-    ));
+    );
+    setSchedule(newSchedule);
+    const saved = await persistSettings(settings, newSchedule, true);
+    if (saved) {
+      setUpcomingKey((k) => k + 1);
+    } else {
+      setSchedule(schedule);
+      toast.error("Impossible de supprimer le créneau");
+    }
   };
 
   const toggleObjective = (objectiveId: string) => {
@@ -584,23 +636,35 @@ export default function AutoPublish() {
     });
   };
 
-  const toggleScheduleSlotActive = (
+  const toggleScheduleSlotActive = async (
     dayOfWeek: number,
     publishTime: string,
     publishDate?: string | null
   ) => {
-    setSchedule((prev) =>
-      prev.map((s) =>
-        s.dayOfWeek === dayOfWeek &&
-        s.publishTime === publishTime &&
-        (s.publishDate ?? null) === (publishDate ?? null)
-          ? { ...s, isActive: !s.isActive }
-          : s
-      )
+    const newSchedule = schedule.map((s) =>
+      s.dayOfWeek === dayOfWeek &&
+      s.publishTime === publishTime &&
+      (s.publishDate ?? null) === (publishDate ?? null)
+        ? { ...s, isActive: !s.isActive }
+        : s
     );
+    setSchedule(newSchedule);
+    const saved = await persistSettings(settings, newSchedule, true);
+    if (saved) {
+      setUpcomingKey((k) => k + 1);
+    } else {
+      setSchedule(schedule);
+      toast.error("Impossible de mettre à jour le créneau");
+    }
   };
 
   const handleGeneratePreview = async () => {
+    if (settings.objectives.length === 0 && !settings.sector) {
+      toast.error("Configurez au moins un objectif ou un secteur avant de générer");
+      setActiveTab("objectives");
+      return;
+    }
+
     setIsGenerating(true);
     setPreviewContent(null);
     setPreviewContents([]);
@@ -920,9 +984,16 @@ export default function AutoPublish() {
             <p className="text-muted-foreground mb-8">
               Connectez-vous pour configurer la publication automatique de vos posts LinkedIn.
             </p>
-            <a href={getSignupUrl("/auto-publish")}>
-              <Button className="btn-gradient">Créer un compte</Button>
-            </a>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <a href={getLoginUrl("/auto-publish")}>
+                <Button variant="outline" className="border-white/20 w-full sm:w-auto">
+                  Se connecter
+                </Button>
+              </a>
+              <a href={getSignupUrl("/auto-publish")}>
+                <Button className="btn-gradient w-full sm:w-auto">Créer un compte</Button>
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -933,6 +1004,7 @@ export default function AutoPublish() {
     <div className="min-h-screen bg-background">
 
       <div className="container py-8">
+        <GettingStartedJourney variant="compact" className="mb-6" />
         <LinkedInConnectBanner />
         <ToolsQuickNav />
         {/* Header */}
@@ -944,10 +1016,12 @@ export default function AutoPublish() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-white">
-                  Publication Automatique IA
+                  {guided ? "Étape 4 — Activez l'automatisation" : "Publication Automatique IA"}
                 </h1>
                 <p className="text-muted-foreground">
-                  Configurez vos objectifs et laissez l'IA publier pour vous
+                  {guided
+                    ? "Choisissez vos objectifs et un créneau — l'IA publie pour vous."
+                    : "Configurez vos objectifs et laissez l'IA publier pour vous"}
                 </p>
               </div>
             </div>
@@ -1062,6 +1136,7 @@ export default function AutoPublish() {
               refreshToken={upcomingKey}
               isAutoEnabled={settings.isEnabled}
               hasSchedule={schedule.length > 0}
+              hasObjectives={settings.objectives.length > 0 || Boolean(settings.sector)}
               onToggleAuto={(enabled) => void handleToggleEnabled(enabled)}
               onGoToSchedule={() => setActiveTab("schedule")}
               onGoToObjectives={() => setActiveTab("objectives")}
@@ -1268,6 +1343,7 @@ export default function AutoPublish() {
                           />
                           <span className="text-sm text-white">{creator.name}</span>
                           <button
+                            type="button"
                             onClick={() => toggleCreator(creatorId)}
                             className="text-violet-light hover:text-white"
                           >
@@ -1903,7 +1979,7 @@ export default function AutoPublish() {
 
               {/* Add Button */}
               <Button
-                onClick={handleAddScheduleSlot}
+                onClick={() => void handleAddScheduleSlot()}
                 className="btn-gradient"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -1936,7 +2012,11 @@ export default function AutoPublish() {
                           <Switch
                             checked={slot.isActive}
                             onCheckedChange={() =>
-                              toggleScheduleSlotActive(slot.dayOfWeek, slot.publishTime, slot.publishDate)
+                              void toggleScheduleSlotActive(
+                                slot.dayOfWeek,
+                                slot.publishTime,
+                                slot.publishDate
+                              )
                             }
                             className="data-[state=checked]:bg-emerald-500"
                             aria-label={slot.isActive ? "Désactiver ce créneau" : "Activer ce créneau"}
@@ -1959,7 +2039,13 @@ export default function AutoPublish() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => handleRemoveScheduleSlot(slot.dayOfWeek, slot.publishTime, slot.publishDate)}
+                          onClick={() =>
+                            void handleRemoveScheduleSlot(
+                              slot.dayOfWeek,
+                              slot.publishTime,
+                              slot.publishDate
+                            )
+                          }
                           className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
                         >
                           <X className="w-5 h-5" />
@@ -2446,7 +2532,7 @@ export default function AutoPublish() {
               </p>
               <Button
                 className="btn-gradient"
-                onClick={handleSaveSettings}
+                onClick={handleSaveAndActivate}
                 disabled={isSaving}
               >
                 {isSaving ? (

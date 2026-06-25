@@ -79,7 +79,7 @@ export default function Pricing() {
     }
 
     if (!user) {
-      toast.info("Créez un compte pour souscrire à ce plan.");
+      toast.info("CrÃ©ez un compte pour souscrire Ã  ce plan.");
       window.location.href = getSignupUrl("/pricing");
       return;
     }

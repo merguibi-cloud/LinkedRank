@@ -38,8 +38,11 @@ function BannerSkeleton() {
 
 
 
-export function LinkedInConnectBanner() {
-
+export function LinkedInConnectBanner({
+  hideWhenConnected = true,
+}: {
+  hideWhenConnected?: boolean;
+}) {
   const { status, loading } = useLinkedInStatus();
 
 
@@ -53,6 +56,7 @@ export function LinkedInConnectBanner() {
 
 
   if (status.connected) {
+    if (hideWhenConnected) return null;
 
     return (
 
