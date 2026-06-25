@@ -29,23 +29,22 @@ export const sanitizeInternalRedirect = (
   }
 };
 
-export function ensureOnboardingUrl(redirect?: string | null): string {
-  return sanitizeInternalRedirect(redirect, ONBOARDING_PATH);
-}
-
-/** @deprecated Utiliser ensureOnboardingUrl */
-export function ensureVoiceOnboardingUrl(redirect?: string | null): string {
-  return ensureOnboardingUrl(redirect);
-}
-
 export const getLoginUrl = (redirect = DEFAULT_AUTH_REDIRECT) =>
   `/login?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}`;
 
-export const getSignupUrl = (redirect = ONBOARDING_PATH) =>
-  `/signup?redirect=${encodeURIComponent(ensureOnboardingUrl(redirect))}`;
+export const getSignupUrl = (redirect = DEFAULT_AUTH_REDIRECT) =>
+  `/signup?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}`;
 
-export const getLinkedInConnectUrl = (redirect = DEFAULT_AUTH_REDIRECT) =>
-  `/linkedin/connect?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}`;
+export const getOnboardingRedirectUrl = (redirect = DEFAULT_AUTH_REDIRECT) =>
+  `${ONBOARDING_PATH}?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}`;
+
+export const getLinkedInConnectUrl = (
+  redirect = DEFAULT_AUTH_REDIRECT,
+  skippable = false
+) =>
+  `/linkedin/connect?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}${
+    skippable ? "&skippable=1" : ""
+  }`;
 
 export const getLinkedInAuthApiUrl = (redirect = DEFAULT_AUTH_REDIRECT) =>
   `/api/linkedin/auth?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}`;

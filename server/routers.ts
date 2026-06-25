@@ -1,11 +1,13 @@
 import { COOKIE_NAME } from "@shared/const";
+import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { signOutSupabase } from "./_core/supabase";
 import { resolvePublicUrls, resolveStorageAssetUrl } from "./_core/publicUrl";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { getAllPosts, getPostById, createPost, updatePost, deletePost, getPostsCount, getAllCategories, getDb } from "./db";
+import { hashPassword, verifyPassword } from "./services/password";
+import { getAllPosts, getPostById, createPost, updatePost, deletePost, getPostsCount, getAllCategories, getDb, getUserByEmail, upsertUser } from "./db";
 import {
   createAgent,
   getUserAgents,
@@ -80,6 +82,68 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+    // Supabase accounts update name/email/password via supabase.auth.updateUser()
+    // client-side — our DB mirrors that on the next request. These mutations
+    // are only for the legacy email/password login method.
+    updateProfile: protectedProcedure
+      .input(z.object({ name: z.string().trim().min(1).max(100) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.loginMethod === "supabase") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Utilisez les paramètres de votre compte Supabase pour modifier votre nom",
+          });
+        }
+        await upsertUser({ openId: ctx.user.openId, name: input.name });
+        return { success: true } as const;
+      }),
+    updateEmail: protectedProcedure
+      .input(z.object({ email: z.string().trim().email() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.loginMethod === "supabase") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Utilisez les paramètres de votre compte Supabase pour modifier votre email",
+          });
+        }
+        const normalized = input.email.toLowerCase();
+        const existing = await getUserByEmail(normalized);
+        if (existing && existing.id !== ctx.user.id) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Un compte existe déjà avec cet email",
+          });
+        }
+        await upsertUser({ openId: ctx.user.openId, email: normalized });
+        return { success: true } as const;
+      }),
+    changePassword: protectedProcedure
+      .input(
+        z.object({
+          currentPassword: z.string().min(1),
+          newPassword: z.string().min(8),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.loginMethod === "supabase") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Utilisez les paramètres de votre compte Supabase pour modifier votre mot de passe",
+          });
+        }
+        if (
+          !ctx.user.passwordHash ||
+          !(await verifyPassword(input.currentPassword, ctx.user.passwordHash))
+        ) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Mot de passe actuel incorrect",
+          });
+        }
+        const passwordHash = await hashPassword(input.newPassword);
+        await upsertUser({ openId: ctx.user.openId, passwordHash });
+        return { success: true } as const;
+      }),
   }),
 
   // Posts router

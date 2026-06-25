@@ -1,15 +1,20 @@
 import { LinkedInConnectAnimation } from "@/components/linkedin/LinkedInConnectAnimation";
 import { getLinkedInAuthApiUrl } from "@/const";
 import { markLinkedInOAuthFlow } from "@/lib/linkedinOAuthFlow";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export default function LinkedInConnect() {
   const redirect = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("redirect") || "/dashboard";
   }, []);
+  const skippable = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("skippable") === "1";
+  }, []);
 
   const [phase, setPhase] = useState(0);
+  const timersRef = useRef<number[]>([]);
 
   useEffect(() => {
     markLinkedInOAuthFlow();
@@ -19,13 +24,22 @@ export default function LinkedInConnect() {
     const redirectTimer = window.setTimeout(() => {
       window.location.href = getLinkedInAuthApiUrl(redirect);
     }, 2900);
+    timersRef.current = [phase1, phase2, redirectTimer];
 
     return () => {
-      window.clearTimeout(phase1);
-      window.clearTimeout(phase2);
-      window.clearTimeout(redirectTimer);
+      timersRef.current.forEach(window.clearTimeout);
     };
   }, [redirect]);
 
-  return <LinkedInConnectAnimation phase={phase} />;
+  const handleSkip = useCallback(() => {
+    timersRef.current.forEach(window.clearTimeout);
+    window.location.href = redirect;
+  }, [redirect]);
+
+  return (
+    <LinkedInConnectAnimation
+      phase={phase}
+      onSkip={skippable ? handleSkip : undefined}
+    />
+  );
 }
