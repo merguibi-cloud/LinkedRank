@@ -23,16 +23,47 @@ export default function ResetPassword() {
       return;
     }
 
-    const code = new URLSearchParams(window.location.search).get("code");
-    if (!code) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") || params.get("error_code")) {
       setVerifyState("invalid");
       return;
     }
 
+    // The Supabase browser client auto-detects and exchanges the "code" in
+    // the URL on creation (detectSessionInUrl), then strips it from the URL.
+    // So we don't exchange it ourselves here — that would race against the
+    // SDK's own exchange and fail since the code is already consumed. We
+    // just wait for the resulting session to show up.
     const supabase = createClient();
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      setVerifyState(error ? "invalid" : "ready");
+    let settled = false;
+
+    const markReady = () => {
+      if (settled) return;
+      settled = true;
+      setVerifyState("ready");
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) markReady();
     });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) markReady();
+    });
+
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        setVerifyState("invalid");
+      }
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
