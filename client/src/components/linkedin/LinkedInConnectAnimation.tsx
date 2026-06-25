@@ -9,9 +9,13 @@ const PHASE_LABELS = [
 
 interface LinkedInConnectAnimationProps {
   phase: number;
+  onSkip?: () => void;
 }
 
-export function LinkedInConnectAnimation({ phase }: LinkedInConnectAnimationProps) {
+export function LinkedInConnectAnimation({
+  phase,
+  onSkip,
+}: LinkedInConnectAnimationProps) {
   const label = PHASE_LABELS[Math.min(phase, PHASE_LABELS.length - 1)];
 
   return (
@@ -131,6 +135,19 @@ export function LinkedInConnectAnimation({ phase }: LinkedInConnectAnimationProp
             transition={{ duration: 2.8, ease: "easeInOut" }}
           />
         </div>
+
+        {onSkip && (
+          <motion.button
+            type="button"
+            onClick={onSkip}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="mt-6 text-sm text-muted-foreground hover:text-white hover:underline transition-colors"
+          >
+            Passer pour l'instant
+          </motion.button>
+        )}
       </div>
     </div>
   );

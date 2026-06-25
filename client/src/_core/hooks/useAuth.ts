@@ -14,7 +14,19 @@ export function useAuth(options?: UseAuthOptions) {
   const utils = trpc.useUtils();
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
-    retry: false,
+    // Genuine "not logged in" (401) should fail fast — but a transient
+    // server/DB hiccup shouldn't flicker `user` to null and remount
+    // whatever's conditionally rendered on it. Retry everything except
+    // an actual UNAUTHORIZED a couple of times before giving up.
+    retry: (failureCount, error) => {
+      if (
+        error instanceof TRPCClientError &&
+        error.data?.code === "UNAUTHORIZED"
+      ) {
+        return false;
+      }
+      return failureCount < 2;
+    },
     refetchOnWindowFocus: false,
   });
 
