@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -10,6 +10,8 @@ import {
   formatDateInput,
   formatTimeInput,
   getDefaultScheduleTime,
+  buildScheduledAtIso,
+  isScheduledInFuture,
 } from "@/lib/scheduleUtils";
 import {
   Calendar,
@@ -33,27 +35,41 @@ interface ScheduledPost {
 }
 
 type PostModalMode = "create" | "edit";
+type TimeEditTarget = { post: ScheduledPost; date: string; time: string } | null;
 
 export default function Schedule() {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showPostModal, setShowPostModal] = useState(false);
+  const [showTimeModal, setShowTimeModal] = useState(false);
+  const [timeEditTarget, setTimeEditTarget] = useState<TimeEditTarget>(null);
   const [modalMode, setModalMode] = useState<PostModalMode>("create");
   const [editingPost, setEditingPost] = useState<ScheduledPost | null>(null);
   const [postContent, setPostContent] = useState("");
   const [postDate, setPostDate] = useState(getDefaultScheduleTime().date);
   const [postTime, setPostTime] = useState(getDefaultScheduleTime().time);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
+  const hasLoadedOnce = useRef(false);
 
-  const loadScheduledPosts = useCallback(async () => {
-    if (!user) return;
-    setIsLoading(true);
+  const loadScheduledPosts = useCallback(async (silent = false) => {
+    const userId = user?.id;
+    if (!userId) return;
+
+    const background = silent || hasLoadedOnce.current;
+    if (background) {
+      setIsRefreshing(true);
+    } else {
+      setIsInitialLoading(true);
+    }
+
     try {
       const response = await fetch("/api/schedule", { credentials: "include" });
       const data = await response.json();
       if (response.ok) {
+        hasLoadedOnce.current = true;
         setScheduledPosts(
           (data.posts || []).map((p: { id: number; content: string; scheduledDate: string; status: string; imageUrl?: string }) => ({
             id: p.id,
@@ -65,11 +81,14 @@ export default function Schedule() {
         );
       }
     } catch {
-      toast.error("Impossible de charger les posts planifiés");
+      if (!background) {
+        toast.error("Impossible de charger les posts planifiés");
+      }
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
+      setIsRefreshing(false);
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     loadScheduledPosts();
@@ -83,6 +102,101 @@ export default function Schedule() {
     setPostDate(formatDateInput(selectedDate) >= defaults.date ? formatDateInput(selectedDate) : defaults.date);
     setPostTime(defaults.time);
     setShowPostModal(true);
+  };
+
+  const openTimeEditModal = (post: ScheduledPost) => {
+    if (post.status !== "pending") {
+      toast.error("Seuls les posts en attente peuvent être modifiés");
+      return;
+    }
+    const scheduled = new Date(post.scheduledDate);
+    setTimeEditTarget({
+      post,
+      date: formatDateInput(scheduled),
+      time: formatTimeInput(scheduled),
+    });
+    setShowTimeModal(true);
+  };
+
+  const applyPostUpdate = (updated: {
+    id: number;
+    content: string;
+    scheduledDate: string;
+    status: string;
+    imageUrl?: string | null;
+  }) => {
+    setScheduledPosts((prev) =>
+      prev.map((p) =>
+        p.id === updated.id
+          ? {
+              ...p,
+              content: updated.content,
+              scheduledDate: new Date(updated.scheduledDate),
+              status: updated.status as ScheduledPost["status"],
+              imageUrl: updated.imageUrl,
+            }
+          : p
+      )
+    );
+    const newDate = new Date(updated.scheduledDate);
+    if (formatDateInput(newDate) !== formatDateInput(selectedDate)) {
+      setSelectedDate(newDate);
+    }
+  };
+
+  const patchScheduledPost = async (
+    postId: number,
+    payload: { content?: string; date: string; time: string }
+  ) => {
+    if (!isScheduledInFuture(payload.date, payload.time)) {
+      toast.error("Choisissez une date et une heure dans le futur");
+      return null;
+    }
+
+    const response = await fetch(`/api/schedule/${postId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        ...(payload.content !== undefined ? { content: payload.content } : {}),
+        date: payload.date,
+        time: payload.time,
+        scheduledAt: buildScheduledAtIso(payload.date, payload.time),
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      toast.error(data.error || "Erreur lors de la mise à jour");
+      return null;
+    }
+
+    if (data.post) {
+      applyPostUpdate(data.post);
+    }
+    return data.post;
+  };
+
+  const handleQuickTimeSave = async () => {
+    if (!timeEditTarget) return;
+
+    setIsSaving(true);
+    try {
+      const result = await patchScheduledPost(timeEditTarget.post.id, {
+        content: timeEditTarget.post.content,
+        date: timeEditTarget.date,
+        time: timeEditTarget.time,
+      });
+      if (result) {
+        toast.success("Heure mise à jour !");
+        setShowTimeModal(false);
+        setTimeEditTarget(null);
+      }
+    } catch {
+      toast.error("Erreur de connexion");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const openEditModal = (post: ScheduledPost) => {
@@ -109,30 +223,43 @@ export default function Schedule() {
       return;
     }
 
+    if (!isScheduledInFuture(postDate, postTime)) {
+      toast.error("Choisissez une date et une heure dans le futur");
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const url =
-        modalMode === "edit" && editingPost
-          ? `/api/schedule/${editingPost.id}`
-          : "/api/schedule";
-      const method = modalMode === "edit" ? "PATCH" : "POST";
+      if (modalMode === "edit" && editingPost) {
+        const result = await patchScheduledPost(editingPost.id, {
+          content: postContent,
+          date: postDate,
+          time: postTime,
+        });
+        if (result) {
+          toast.success("Programmation mise à jour !");
+          closeModal();
+        }
+        return;
+      }
 
-      const response = await fetch(url, {
-        method,
+      const response = await fetch("/api/schedule", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           content: postContent,
           date: postDate,
           time: postTime,
+          scheduledAt: buildScheduledAtIso(postDate, postTime),
         }),
       });
 
       const data = await response.json();
       if (response.ok) {
-        toast.success(modalMode === "edit" ? "Programmation mise à jour !" : "Post planifié avec succès !");
+        toast.success("Post planifié avec succès !");
         closeModal();
-        await loadScheduledPosts();
+        void loadScheduledPosts(true);
       } else {
         toast.error(data.error || "Erreur lors de la planification");
       }
@@ -180,7 +307,7 @@ export default function Schedule() {
           method: "DELETE",
           credentials: "include",
         });
-        await loadScheduledPosts();
+        void loadScheduledPosts(true);
         toast.success("Post publié sur LinkedIn !");
       } else if (data.error?.includes("LinkedIn not connected")) {
         toast.info("Connectez LinkedIn pour publier");
@@ -211,10 +338,13 @@ export default function Schedule() {
   };
 
   const getPostsForDate = (date: Date) => {
-    return scheduledPosts.filter((post) => {
-      const postDate = new Date(post.scheduledDate);
-      return postDate.toDateString() === date.toDateString();
-    });
+    const targetKey = formatDateInput(date);
+    return scheduledPosts
+      .filter((post) => formatDateInput(new Date(post.scheduledDate)) === targetKey)
+      .sort(
+        (a, b) =>
+          new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
+      );
   };
 
   const formatTime = (date: Date) => {
@@ -339,10 +469,17 @@ export default function Schedule() {
                         {day.getDate()}
                       </span>
                       {postsOnDay.length > 0 && (
-                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
-                          {postsOnDay.slice(0, 3).map((_, i) => (
-                            <div key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                          ))}
+                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5">
+                          <div className="flex gap-1">
+                            {postsOnDay.slice(0, 3).map((_, i) => (
+                              <div key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            ))}
+                          </div>
+                          {postsOnDay.length > 1 && (
+                            <span className="text-[9px] text-emerald-400 font-medium leading-none">
+                              {postsOnDay.length}
+                            </span>
+                          )}
                         </div>
                       )}
                     </button>
@@ -354,12 +491,17 @@ export default function Schedule() {
 
           <div>
             <div className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
-              <h3 className="text-lg font-semibold text-white mb-4">
-                Posts du{" "}
-                {selectedDate.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">
+                  Posts du{" "}
+                  {selectedDate.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
+                </h3>
+                {isRefreshing && (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
 
-              {isLoading ? (
+              {isInitialLoading && scheduledPosts.length === 0 ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="w-8 h-8 animate-spin text-violet-light" />
                 </div>
@@ -383,10 +525,18 @@ export default function Schedule() {
                         className="p-4 rounded-xl border border-white/10 bg-background/50"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <button
+                            type="button"
+                            onClick={() => openTimeEditModal(post)}
+                            disabled={post.status !== "pending"}
+                            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-violet-light transition-colors disabled:cursor-default disabled:hover:text-muted-foreground"
+                            title="Modifier l'heure"
+                          >
                             <Clock className="w-4 h-4" />
-                            {formatTime(new Date(post.scheduledDate))}
-                          </span>
+                            <span className="underline-offset-2 hover:underline">
+                              {formatTime(new Date(post.scheduledDate))}
+                            </span>
+                          </button>
                           <span
                             className={`px-2 py-0.5 rounded-full text-xs ${
                               post.status === "published"
@@ -407,6 +557,15 @@ export default function Schedule() {
                         <div className="flex items-center gap-2">
                           {post.status === "pending" && (
                             <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-violet-light"
+                                onClick={() => openTimeEditModal(post)}
+                              >
+                                <Clock className="w-4 h-4 mr-1" />
+                                Heure
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -444,20 +603,29 @@ export default function Schedule() {
             </div>
 
             <div className="mt-6 p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm">
-              <h3 className="text-lg font-semibold text-white mb-4">Prochaines publications</h3>
-              <div className="space-y-3">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Prochaines publications
+                {scheduledPosts.filter((p) => p.status === "pending").length > 0 && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    ({scheduledPosts.filter((p) => p.status === "pending").length})
+                  </span>
+                )}
+              </h3>
+              <div className="space-y-3 max-h-80 overflow-y-auto">
                 {scheduledPosts
                   .filter((p) => p.status === "pending")
                   .sort(
                     (a, b) =>
                       new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
                   )
-                  .slice(0, 5)
                   .map((post) => (
                     <button
                       key={post.id}
                       type="button"
-                      onClick={() => openEditModal(post)}
+                      onClick={() => {
+                        setSelectedDate(new Date(post.scheduledDate));
+                        openTimeEditModal(post);
+                      }}
                       className="w-full flex items-center gap-3 p-3 rounded-lg bg-background/50 hover:bg-background/80 transition-colors text-left"
                     >
                       <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0">
@@ -495,6 +663,30 @@ export default function Schedule() {
             </h3>
 
             <div className="space-y-4">
+              {modalMode === "edit" && (
+                <div className="grid sm:grid-cols-2 gap-4 p-4 rounded-xl border border-violet/30 bg-violet/5">
+                  <div>
+                    <label className="block text-sm text-muted-foreground mb-2">Date</label>
+                    <input
+                      type="date"
+                      value={postDate}
+                      min={formatDateInput(new Date())}
+                      onChange={(e) => setPostDate(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-background border border-white/10 text-white focus:outline-none focus:border-violet/50 [color-scheme:dark]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-muted-foreground mb-2">Heure</label>
+                    <input
+                      type="time"
+                      value={postTime}
+                      onChange={(e) => setPostTime(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-background border border-white/10 text-white focus:outline-none focus:border-violet/50 [color-scheme:dark]"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm text-muted-foreground mb-2">
                   Contenu du post
@@ -507,27 +699,29 @@ export default function Schedule() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-muted-foreground mb-2">Date</label>
-                  <input
-                    type="date"
-                    value={postDate}
-                    min={formatDateInput(new Date())}
-                    onChange={(e) => setPostDate(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-background border border-white/10 text-white focus:outline-none focus:border-violet/50 [color-scheme:dark]"
-                  />
+              {modalMode === "create" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-muted-foreground mb-2">Date</label>
+                    <input
+                      type="date"
+                      value={postDate}
+                      min={formatDateInput(new Date())}
+                      onChange={(e) => setPostDate(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-background border border-white/10 text-white focus:outline-none focus:border-violet/50 [color-scheme:dark]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-muted-foreground mb-2">Heure</label>
+                    <input
+                      type="time"
+                      value={postTime}
+                      onChange={(e) => setPostTime(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-background border border-white/10 text-white focus:outline-none focus:border-violet/50 [color-scheme:dark]"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm text-muted-foreground mb-2">Heure</label>
-                  <input
-                    type="time"
-                    value={postTime}
-                    onChange={(e) => setPostTime(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-background border border-white/10 text-white focus:outline-none focus:border-violet/50 [color-scheme:dark]"
-                  />
-                </div>
-              </div>
+              )}
 
               <p className="text-xs text-muted-foreground">
                 Le post sera publié automatiquement sur LinkedIn à la date et l&apos;heure choisies.
@@ -551,6 +745,70 @@ export default function Schedule() {
                   )}
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTimeModal && timeEditTarget && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl border border-white/10 p-6 max-w-sm w-full">
+            <h3 className="text-xl font-semibold text-white mb-2">Modifier l&apos;heure</h3>
+            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+              {timeEditTarget.post.content}
+            </p>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2">Date</label>
+                <input
+                  type="date"
+                  value={timeEditTarget.date}
+                  min={formatDateInput(new Date())}
+                  onChange={(e) =>
+                    setTimeEditTarget({ ...timeEditTarget, date: e.target.value })
+                  }
+                  className="w-full px-4 py-3 rounded-xl bg-background border border-white/10 text-white focus:outline-none focus:border-violet/50 [color-scheme:dark]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2">Heure</label>
+                <input
+                  type="time"
+                  value={timeEditTarget.time}
+                  onChange={(e) =>
+                    setTimeEditTarget({ ...timeEditTarget, time: e.target.value })
+                  }
+                  className="w-full px-4 py-3 rounded-xl bg-background border border-white/10 text-white focus:outline-none focus:border-violet/50 [color-scheme:dark]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowTimeModal(false);
+                  setTimeEditTarget(null);
+                }}
+              >
+                Annuler
+              </Button>
+              <Button
+                className="flex-1 btn-gradient"
+                onClick={handleQuickTimeSave}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Enregistrement...
+                  </>
+                ) : (
+                  "Enregistrer"
+                )}
+              </Button>
             </div>
           </div>
         </div>

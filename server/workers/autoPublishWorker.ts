@@ -6,6 +6,12 @@ import { getLinkedinSettings } from "../db";
 import { notifyPostPublished } from "../services/notificationService";
 import { recordPublishedPost } from "../services/agentLearningService";
 import {
+  getDateKeyInZone,
+  getDayOfWeekInZone,
+  getTimeKeyInZone,
+  wallClockToUtc,
+} from "@shared/scheduleTime";
+import {
   prefillAllEnabledUsers,
   generateSmartAutoPost,
   emergencyGenerateForSlot,
@@ -33,28 +39,24 @@ interface ScheduledPost {
 }
 
 /**
- * Get the day of week (0 = Sunday, 1 = Monday, etc.)
+ * Get the day of week (0 = Sunday, 1 = Monday, etc.) — Europe/Paris
  */
 function getDayOfWeek(): number {
-  return new Date().getDay();
+  return getDayOfWeekInZone();
 }
 
 /**
- * Get current time in HH:MM format
+ * Get current time in HH:MM format — Europe/Paris
  */
 function getCurrentTime(): string {
-  const now = new Date();
-  const hours = now.getHours().toString().padStart(2, "0");
-  const minutes = now.getMinutes().toString().padStart(2, "0");
-  return `${hours}:${minutes}`;
+  return getTimeKeyInZone();
 }
 
 /**
- * Get today's date string for tracking
+ * Get today's date string for tracking — Europe/Paris
  */
 function getTodayString(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}-${now.getDate().toString().padStart(2, "0")}`;
+  return getDateKeyInZone();
 }
 
 /**
@@ -145,6 +147,36 @@ async function runPrefillCycle(): Promise<void> {
   }
 }
 
+/** Repasse en pending les posts bloqués en publishing (timeout serverless). */
+async function recoverStuckPublishingItems(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  const staleBefore = new Date(Date.now() - 3 * 60 * 1000);
+  const stuck = await db
+    .select({ id: autoPublishQueue.id })
+    .from(autoPublishQueue)
+    .where(
+      and(
+        eq(autoPublishQueue.status, "publishing"),
+        lte(autoPublishQueue.updatedAt, staleBefore)
+      )
+    );
+
+  if (stuck.length === 0) return;
+
+  for (const row of stuck) {
+    await db
+      .update(autoPublishQueue)
+      .set({ status: "pending", updatedAt: new Date() })
+      .where(eq(autoPublishQueue.id, row.id));
+  }
+
+  console.log(
+    `[AutoPublish] ${stuck.length} post(s) débloqué(s) (publishing → pending)`
+  );
+}
+
 /**
  * Publish posts scheduled for a specific date/time
  */
@@ -175,14 +207,25 @@ async function processScheduledQueue(): Promise<void> {
 
     console.log(`[AutoPublish] Processing ${pendingPosts.length} queue item(s)`);
 
-    for (const post of pendingPosts) {
+    const batchLimit = process.env.VERCEL ? 1 : pendingPosts.length;
+
+    for (const post of pendingPosts.slice(0, batchLimit)) {
       const claimed = await tryClaimQueueItem(db, post.id);
       if (!claimed) {
         console.log(`[AutoPublish] Post ${post.id} already claimed, skipping`);
         continue;
       }
 
-      const success = await publishToLinkedIn(post.userId, post.content, post.imageUrl);
+      let success = false;
+      try {
+        success = await publishToLinkedIn(
+          post.userId,
+          post.content,
+          post.imageUrl
+        );
+      } catch (error) {
+        console.error(`[AutoPublish] Post ${post.id} publish error:`, error);
+      }
 
       await db
         .update(autoPublishQueue)
@@ -295,9 +338,7 @@ async function processScheduledPublications(): Promise<void> {
         continue;
       }
 
-      const slotDate = new Date();
-      const [h, m] = schedule.publishTime.split(":").map(Number);
-      slotDate.setHours(h, m, 0, 0);
+      const slotDate = wallClockToUtc(todayString, schedule.publishTime);
 
       const existingQueue = await db
         .select()
@@ -388,6 +429,7 @@ function cleanupOldSlots(): void {
 
 /** Exécution d'un cycle de publication (file + créneaux récurrents). */
 export async function runAutoPublishTick(): Promise<void> {
+  await recoverStuckPublishingItems();
   await processScheduledQueue();
   await processScheduledPublications();
 }

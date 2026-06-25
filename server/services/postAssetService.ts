@@ -20,7 +20,12 @@ export async function persistAiGeneratedImage(
   } = {}
 ): Promise<PersistedPostImage> {
   const fileName = options.fileName ?? `ai-post-${Date.now()}.png`;
-  const { fileUrl, fileKey } = await saveMediaFile(buffer, fileName, userId);
+  const { fileUrl, fileKey } = await saveMediaFile(
+    buffer,
+    fileName,
+    userId,
+    "image/png"
+  );
 
   const db = await getDb();
   if (!db) throw new Error("Database not available");

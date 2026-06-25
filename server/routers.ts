@@ -1,6 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { signOutSupabase } from "./_core/supabase";
+import { resolvePublicUrls, resolveStorageAssetUrl } from "./_core/publicUrl";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
@@ -357,7 +358,10 @@ export const appRouter = router({
           .where(and(...conditions));
 
         return {
-          posts,
+          posts: posts.map((post) => ({
+            ...post,
+            imageUrl: resolveStorageAssetUrl(post.imageUrl, post.imageKey),
+          })),
           total: countResult[0]?.count || 0,
         };
       }),
@@ -939,7 +943,7 @@ export const appRouter = router({
         return {
           id: saved.id,
           slides: result.slides,
-          imageUrls: result.imageUrls,
+          imageUrls: resolvePublicUrls(result.imageUrls),
         };
       }),
 
@@ -963,7 +967,9 @@ export const appRouter = router({
         return carousels.map(c => ({
           ...c,
           slides: c.slides ? JSON.parse(c.slides) : [],
-          previewImages: c.previewImages ? JSON.parse(c.previewImages) : [],
+          previewImages: resolvePublicUrls(
+            c.previewImages ? JSON.parse(c.previewImages) : []
+          ),
         }));
       }),
 
@@ -987,7 +993,9 @@ export const appRouter = router({
         return {
           ...carousel,
           slides: carousel.slides ? JSON.parse(carousel.slides) : [],
-          previewImages: carousel.previewImages ? JSON.parse(carousel.previewImages) : [],
+          previewImages: resolvePublicUrls(
+            carousel.previewImages ? JSON.parse(carousel.previewImages) : []
+          ),
         };
       }),
 

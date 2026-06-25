@@ -1,4 +1,5 @@
 import {
+  extractCronAuthFromRequest,
   isAuthorizedCronRequest,
   runAutoPublishCron,
 } from "../_lib/vercel-cron.js";
@@ -8,17 +9,32 @@ export const config = {
   memory: 1024,
 };
 
+function getQuery(req) {
+  if (req.query && typeof req.query === "object") return req.query;
+  try {
+    const host = req.headers?.host ?? "localhost";
+    const url = new URL(req.url ?? "/", `http://${host}`);
+    return Object.fromEntries(url.searchParams.entries());
+  } catch {
+    return {};
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "GET" && req.method !== "POST") {
     return res.status(405).end("Method not allowed");
   }
 
-  const authorization =
+  const headers =
     typeof req.headers?.get === "function"
-      ? req.headers.get("authorization")
-      : req.headers?.authorization;
+      ? Object.fromEntries(req.headers.entries())
+      : req.headers;
 
-  if (!isAuthorizedCronRequest(authorization ?? undefined)) {
+  if (
+    !isAuthorizedCronRequest(
+      extractCronAuthFromRequest({ headers, query: getQuery(req) })
+    )
+  ) {
     return res.status(401).end("Unauthorized");
   }
 

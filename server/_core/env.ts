@@ -3,7 +3,6 @@ export const ENV = {
   appUrl: process.env.APP_URL ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
   databaseUrl: process.env.DATABASE_URL ?? "",
-  databaseDirectUrl: process.env.DATABASE_DIRECT_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
@@ -29,6 +28,11 @@ export const ENV = {
     process.env.OPENAI_MODEL ??
     (process.env.GEMINI_API_KEY ? "gemini-2.5-flash" : "gpt-4o"),
   openaiImageModel: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1",
+  geminiImageModel:
+    process.env.GEMINI_IMAGE_MODEL ?? "gemini-2.5-flash-image",
+  imageProvider:
+    process.env.IMAGE_PROVIDER ??
+    (process.env.GEMINI_API_KEY ? "gemini" : "openai"),
   /** @deprecated use llmModel */
   openaiModel:
     process.env.GEMINI_MODEL ??
@@ -42,4 +46,5 @@ export const ENV = {
     process.env.SUPABASE_ANON_KEY ??
     process.env.VITE_SUPABASE_ANON_KEY ??
     "",
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
 };

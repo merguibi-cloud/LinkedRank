@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { UpcomingCountdownHero } from "./UpcomingCountdownHero";
 import { UpcomingEmptyState } from "./UpcomingEmptyState";
+import { resolveDisplayImageUrl } from "@/lib/imageUrl";
 
 export interface UpcomingPublication {
   id: string;
@@ -429,9 +430,12 @@ export function UpcomingPublicationsView({
 
                         {item.imageUrl && (
                           <img
-                            src={item.imageUrl}
+                            src={resolveDisplayImageUrl(item.imageUrl) ?? item.imageUrl}
                             alt=""
                             className="mt-2 h-16 w-24 rounded-lg object-cover border border-white/10"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
                           />
                         )}
                       </div>

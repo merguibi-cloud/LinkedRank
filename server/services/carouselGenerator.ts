@@ -7,6 +7,7 @@
 
 import puppeteer from "puppeteer";
 import { storagePut } from "../storage";
+import { generateImageBuffer } from "../_core/imageGeneration";
 import { generateLinkedInPost } from "./ai";
 
 // Carousel slide types
@@ -530,19 +531,69 @@ function generateSlideHTML(
 /**
  * Render carousel slides to images
  */
-export async function renderCarouselToImages(
+function buildCarouselSlidePrompt(
+  slide: CarouselSlide,
+  config: CarouselConfig,
+  slideIndex: number,
+  totalSlides: number
+): string {
+  const styleDesc: Record<CarouselConfig["style"], string> = {
+    modern: "modern gradient background with violet and pink tones",
+    minimal: "clean minimal white design with subtle gray accents",
+    bold: "bold vibrant red-orange gradient with high contrast",
+    gradient: "spectacular multi-color gradient purple pink and amber",
+  };
+
+  const parts: string[] = [];
+  if (slide.title) parts.push(`Headline: "${slide.title}"`);
+  if (slide.content) parts.push(`Body: "${slide.content}"`);
+  if (slide.items?.length) parts.push(`Bullet points: ${slide.items.join(", ")}`);
+  if (slide.quote) parts.push(`Quote: "${slide.quote}"`);
+  if (slide.stat) parts.push(`Stat: ${slide.stat} — ${slide.statLabel ?? ""}`);
+
+  return [
+    `LinkedIn carousel slide ${slideIndex + 1} of ${totalSlides}, portrait 4:5 format.`,
+    styleDesc[config.style],
+    "Professional social media slide design with large readable French typography.",
+    parts.join(". "),
+    `Slide counter ${slideIndex + 1}/${totalSlides} in corner.`,
+    `Author: ${config.authorName}${config.authorTitle ? `, ${config.authorTitle}` : ""}.`,
+    "Premium editorial layout, no watermarks.",
+  ].join(" ");
+}
+
+async function renderCarouselToImagesWithAI(
+  slides: CarouselSlide[],
+  config: CarouselConfig
+): Promise<string[]> {
+  console.log("[CarouselGenerator] Rendering", slides.length, "slides via AI");
+  const imageUrls: string[] = [];
+
+  for (let i = 0; i < slides.length; i++) {
+    const prompt = buildCarouselSlidePrompt(slides[i], config, i, slides.length);
+    const buffer = await generateImageBuffer({ prompt, size: "1024x1536" });
+    const fileName = `carousels/${Date.now()}_slide_${i + 1}.png`;
+    const result = await storagePut(fileName, buffer, "image/png");
+    imageUrls.push(result.url);
+    console.log(`[CarouselGenerator] Slide ${i + 1} uploaded:`, result.url);
+  }
+
+  return imageUrls;
+}
+
+async function renderCarouselWithPuppeteer(
   slides: CarouselSlide[],
   config: CarouselConfig
 ): Promise<string[]> {
   console.log("[CarouselGenerator] Starting image rendering for", slides.length, "slides");
-  
+
   const browser = await puppeteer.launch({
     headless: true,
     args: [
-      "--no-sandbox", 
+      "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
-      "--disable-gpu"
+      "--disable-gpu",
     ],
     timeout: 60000,
   });
@@ -557,37 +608,48 @@ export async function renderCarouselToImages(
 
     for (let i = 0; i < slides.length; i++) {
       console.log(`[CarouselGenerator] Rendering slide ${i + 1}/${slides.length}`);
-      
+
       const html = generateSlideHTML(slides[i], config, i, slides.length);
-      await page.setContent(html, { 
+      await page.setContent(html, {
         waitUntil: "domcontentloaded",
-        timeout: 30000
+        timeout: 30000,
       });
-      
-      // Small delay to ensure rendering is complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const imageBuffer = await page.screenshot({ 
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const imageBuffer = await page.screenshot({
         type: "png",
         fullPage: false,
       });
 
-      // Upload to S3
       const fileName = `carousels/${Date.now()}_slide_${i + 1}.png`;
-      console.log(`[CarouselGenerator] Uploading slide ${i + 1} to S3...`);
+      console.log(`[CarouselGenerator] Uploading slide ${i + 1} to storage...`);
       const result = await storagePut(fileName, imageBuffer, "image/png");
       imageUrls.push(result.url);
       console.log(`[CarouselGenerator] Slide ${i + 1} uploaded:`, result.url);
     }
-  } catch (error) {
-    console.error("[CarouselGenerator] Error rendering slides:", error);
-    throw error;
   } finally {
     await browser.close();
   }
 
   console.log("[CarouselGenerator] All slides rendered successfully");
   return imageUrls;
+}
+
+export async function renderCarouselToImages(
+  slides: CarouselSlide[],
+  config: CarouselConfig
+): Promise<string[]> {
+  if (process.env.VERCEL) {
+    return renderCarouselToImagesWithAI(slides, config);
+  }
+
+  try {
+    return await renderCarouselWithPuppeteer(slides, config);
+  } catch (error) {
+    console.warn("[CarouselGenerator] Puppeteer unavailable, falling back to AI:", error);
+    return renderCarouselToImagesWithAI(slides, config);
+  }
 }
 
 /**

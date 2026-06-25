@@ -9,7 +9,7 @@ import { randomBytes } from "node:crypto";
 const ENV_FILE = ".env";
 const TARGETS = ["production", "preview", "development"];
 const DEFAULT_PROD_URL =
-  process.env.VERCEL_PROD_URL || "https://linkedrank-pi.vercel.app";
+  process.env.VERCEL_PROD_URL || "https://www.linkedrank.fr";
 
 function parseEnvFile(content) {
   const vars = new Map();
