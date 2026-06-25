@@ -6,6 +6,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { UserProfileProvider } from "./contexts/UserProfileContext";
 import { LinkedInStatusProvider } from "./contexts/LinkedInStatusContext";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { AppShell } from "./components/AppShell";
 import { LinkedInOAuthHandler } from "./components/LinkedInOAuthHandler";
 import { EmailConfirmationHandler } from "./components/EmailConfirmationHandler";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -60,6 +61,7 @@ const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const LinkedInConnect = lazy(() => import("./pages/LinkedInConnect"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const Confidentialite = lazy(() => import("./pages/legal/Confidentialite"));
@@ -98,6 +100,7 @@ function Router() {
         <Route path={"/signup"} component={Signup} />
         <Route path={"/forgot-password"} component={ForgotPassword} />
         <Route path={"/reset-password"} component={ResetPassword} />
+        <Route path={"/linkedin/connect"} component={LinkedInConnect} />
         <Route path={"/generate"} component={Generator} />
         <Route path={"/generator"}><Redirect to="/generate" /></Route>
         <Route path={"/settings/linkedin"}><Redirect to="/linkedin-settings" /></Route>
@@ -178,7 +181,9 @@ function AppContent() {
           onSkip={skipOnboarding}
         />
       )}
-      <Router />
+      <AppShell>
+        <Router />
+      </AppShell>
       {/* Composants non-critiques chargés en lazy */}
       <Suspense fallback={null}>
         <LiveChatWidget />

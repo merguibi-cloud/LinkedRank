@@ -13,6 +13,7 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:check": "tsx scripts/verify-db-connection.ts",
     "db:reset": "tsx scripts/reset-database.ts && drizzle-kit push"
   },
   "dependencies": {

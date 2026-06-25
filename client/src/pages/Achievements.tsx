@@ -1,5 +1,4 @@
 import { useState } from "react";
-import Navbar from "@/components/Navbar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
@@ -33,7 +32,6 @@ export default function Achievements() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
         <div className="container py-20 text-center">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
@@ -56,7 +54,6 @@ export default function Achievements() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       <div className="container py-8">
         {/* Header */}

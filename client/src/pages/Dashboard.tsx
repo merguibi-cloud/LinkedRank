@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getSignupUrl } from "@/const";
+import { getLinkedInConnectUrl, getSignupUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
-import Navbar from "@/components/Navbar";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
 import { QuickActions } from "@/components/QuickActions";
 import { PersonalizedTips } from "@/components/PersonalizedTips";
@@ -66,24 +65,10 @@ export default function Dashboard() {
       if (data.success) {
         toast.success("Post publié sur LinkedIn");
       } else if (data.error === "LinkedIn not connected") {
-        const authResponse = await fetch("/api/linkedin/auth?format=json", {
-          credentials: "include",
-        });
-        const authData = await authResponse.json();
-        if (authData.authUrl) {
-          toast.info("Redirection vers LinkedIn...");
-          window.location.href = authData.authUrl;
-        } else {
-          toast.error("Erreur de configuration LinkedIn");
-        }
+        toast.info("Redirection vers LinkedIn...");
+        window.location.href = getLinkedInConnectUrl("/dashboard");
       } else if (data.error === "LinkedIn token expired, please reconnect") {
-        const authResponse = await fetch("/api/linkedin/auth?format=json", {
-          credentials: "include",
-        });
-        const authData = await authResponse.json();
-        if (authData.authUrl) {
-          window.location.href = authData.authUrl;
-        }
+        window.location.href = getLinkedInConnectUrl("/dashboard");
       } else {
         toast.error(data.error || "Erreur lors de la publication");
       }
@@ -97,7 +82,6 @@ export default function Dashboard() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
         <div className="container py-20 text-center">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-violet to-rose flex items-center justify-center">
@@ -175,7 +159,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       <div className="container py-6 md:py-8 space-y-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

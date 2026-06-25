@@ -1,6 +1,7 @@
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
 export const DEFAULT_AUTH_REDIRECT = "/dashboard";
+export const VOICE_ONBOARDING_PATH = "/onboarding?new=1";
 
 export const getCurrentPathWithSearch = () =>
   `${window.location.pathname}${window.location.search}`;
@@ -28,11 +29,29 @@ export const sanitizeInternalRedirect = (
   }
 };
 
-export const getLoginUrl = (redirect = "/dashboard") =>
+/** Garantit le paramètre `new=1` pour lancer l'agent vocal après inscription. */
+export function ensureVoiceOnboardingUrl(redirect?: string | null): string {
+  const target = sanitizeInternalRedirect(redirect, VOICE_ONBOARDING_PATH);
+
+  if (typeof window === "undefined") {
+    return target.includes("/onboarding") ? VOICE_ONBOARDING_PATH : target;
+  }
+
+  const url = new URL(target, window.location.origin);
+  if (url.pathname === "/onboarding") {
+    url.searchParams.set("new", "1");
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+export const getLoginUrl = (redirect = DEFAULT_AUTH_REDIRECT) =>
   `/login?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}`;
 
-export const getSignupUrl = (redirect = "/onboarding?new=1") =>
-  `/signup?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect, "/onboarding?new=1"))}`;
+export const getSignupUrl = (redirect = VOICE_ONBOARDING_PATH) =>
+  `/signup?redirect=${encodeURIComponent(ensureVoiceOnboardingUrl(redirect))}`;
 
-export const getLinkedInConnectUrl = (redirect = "/dashboard") =>
+export const getLinkedInConnectUrl = (redirect = DEFAULT_AUTH_REDIRECT) =>
+  `/linkedin/connect?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}`;
+
+export const getLinkedInAuthApiUrl = (redirect = DEFAULT_AUTH_REDIRECT) =>
   `/api/linkedin/auth?redirect=${encodeURIComponent(sanitizeInternalRedirect(redirect))}`;

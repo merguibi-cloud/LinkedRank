@@ -1,5 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { PostTemplates } from "@/components/PostTemplates";
+import { ToolsQuickNav } from "@/components/tools/ToolsQuickNav";
 import { useLocation } from "wouter";
 
 export default function Templates() {
@@ -14,6 +15,8 @@ export default function Templates() {
   return (
     <DashboardLayout>
       <div className="space-y-8">
+        <ToolsQuickNav />
+
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto">
           <h1 className="text-3xl font-bold text-white mb-3">

@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import { closeDb } from "../db";
 import { configureApp, logStartupInfo, startBackgroundWorkers } from "./app";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -39,6 +40,15 @@ async function startServer() {
     logStartupInfo(port);
     startBackgroundWorkers();
   });
+
+  const shutdown = async (signal: string) => {
+    console.log(`[Server] ${signal} received, closing connections...`);
+    await closeDb();
+    server.close(() => process.exit(0));
+  };
+
+  process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
 }
 
 startServer().catch(console.error);

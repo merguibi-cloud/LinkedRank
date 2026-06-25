@@ -1,7 +1,12 @@
 import { getDb } from "../db";
-import { autoPublishSettings, autoPublishSchedule, autoPublishQueue, linkedinInfluencers, generatedPosts } from "../../drizzle/schema";
-import { eq, and, lte, desc, sql } from "drizzle-orm";
+import { autoPublishSettings, autoPublishSchedule, autoPublishQueue, generatedPosts } from "../../drizzle/schema";
+import { eq, and, lte } from "drizzle-orm";
 import { generateLinkedInPost } from "../services/ai";
+import {
+  buildLinkedInPostParams,
+  getInfluencersForSettings,
+  parseInspirationTopics,
+} from "../services/autoPublishGeneration";
 import { postToLinkedIn, getLinkedInProfile } from "../services/linkedin";
 import { getLinkedinSettings } from "../db";
 import { renderQuoteImage } from "../services/htmlToImage";
@@ -89,23 +94,15 @@ interface ParsedImageSettings {
 }
 
 function parseImageSettings(settings: { inspirationTopics?: string | null }): ParsedImageSettings {
-  let topics: Record<string, unknown> = {};
-  if (settings.inspirationTopics) {
-    try {
-      topics = JSON.parse(settings.inspirationTopics);
-    } catch {
-      topics = {};
-    }
-  }
-
+  const topics = parseInspirationTopics(settings);
   return {
-    includeImage: topics.includeImage !== false,
-    imageType: topics.imageType === "quote" ? "quote" : "ai",
-    imageStyle: (topics.imageStyle as string) || "gradient",
-    colorPalette: (topics.colorPalette as string) || "violet",
-    customQuote: (topics.customQuote as string) || "",
-    aiImageStyle: (topics.aiImageStyle as string) || "professional",
-    aiImageFormat: (topics.aiImageFormat as string) || "1536x1024",
+    includeImage: topics.includeImage,
+    imageType: topics.imageType,
+    imageStyle: topics.imageStyle,
+    colorPalette: topics.colorPalette,
+    customQuote: topics.customQuote,
+    aiImageStyle: topics.aiImageStyle,
+    aiImageFormat: topics.aiImageFormat,
   };
 }
 
@@ -158,31 +155,14 @@ async function generateQuoteImageHTML(
 /**
  * Generate a post for a user based on their settings
  */
-async function generatePostForUser(userId: number, settings: any): Promise<{ content: string; imageUrl: string | null }> {
+async function generatePostForUser(userId: number, settings: typeof autoPublishSettings.$inferSelect): Promise<{ content: string; imageUrl: string | null }> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Get top influencers for inspiration
-  const influencers = await db
-    .select()
-    .from(linkedinInfluencers)
-    .orderBy(desc(linkedinInfluencers.followers))
-    .limit(5);
+  const influencers = await getInfluencersForSettings(db, settings);
+  const postParams = buildLinkedInPostParams(settings, influencers);
 
-  // Generate post using AI
-  const content = await generateLinkedInPost({
-    sector: settings.sector,
-    targetAudience: settings.targetAudience,
-    tone: settings.tone,
-    language: settings.language,
-    viralityLevel: settings.viralityLevel,
-    contentLength: settings.contentLength,
-    includeEmojis: settings.includeEmojis,
-    includeHashtags: settings.includeHashtags,
-    includeCallToAction: settings.includeCallToAction,
-    personalContext: settings.personalContext,
-    inspirationFrom: influencers.map((i) => i.name).join(", "),
-  });
+  const content = await generateLinkedInPost(postParams);
 
   // Generate image if enabled
   let imageUrl: string | null = null;

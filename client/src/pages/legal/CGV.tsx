@@ -1,11 +1,9 @@
-import Navbar from "@/components/Navbar";
 import { Link } from "wouter";
 import { ArrowLeft, FileText, CreditCard, RefreshCcw, AlertTriangle, CheckCircle } from "lucide-react";
 
 export default function CGV() {
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
       
       <div className="container py-12 max-w-4xl">
         {/* Back button */}
