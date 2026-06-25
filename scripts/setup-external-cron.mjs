@@ -8,7 +8,7 @@
 import { readFileSync, existsSync } from "node:fs";
 
 const ENV_FILE = ".env";
-const SITE = process.env.APP_URL || "https://linkedrank.vercel.app";
+const SITE = process.env.APP_URL || process.env.VERCEL_PROD_URL || "https://linkedrank-pi.vercel.app";
 const CRON_URL = `${SITE.replace(/\/$/, "")}/api/cron/auto-publish`;
 
 function getCronSecret() {

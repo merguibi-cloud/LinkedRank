@@ -8,6 +8,8 @@ import { randomBytes } from "node:crypto";
 
 const ENV_FILE = ".env";
 const TARGETS = ["production", "preview", "development"];
+const DEFAULT_PROD_URL =
+  process.env.VERCEL_PROD_URL || "https://linkedrank-pi.vercel.app";
 
 function parseEnvFile(content) {
   const vars = new Map();
@@ -73,17 +75,25 @@ if (!vars.has("CRON_SECRET") || !vars.get("CRON_SECRET")) {
 }
 
 if (!vars.get("APP_URL")) {
-  vars.set("APP_URL", "https://linkedrank.vercel.app");
+  vars.set("APP_URL", DEFAULT_PROD_URL);
 }
 if (!vars.get("VITE_APP_URL")) {
-  vars.set("VITE_APP_URL", "https://linkedrank.vercel.app");
+  vars.set("VITE_APP_URL", DEFAULT_PROD_URL);
 }
 if (!vars.get("LINKEDIN_REDIRECT_URI")) {
   vars.set(
     "LINKEDIN_REDIRECT_URI",
-    "https://linkedrank.vercel.app/api/linkedin/callback"
+    `${DEFAULT_PROD_URL.replace(/\/$/, "")}/api/linkedin/callback`
   );
 }
+
+// Toujours aligner les URLs publiques sur le déploiement Elite actuel
+vars.set("APP_URL", DEFAULT_PROD_URL);
+vars.set("VITE_APP_URL", DEFAULT_PROD_URL);
+vars.set(
+  "LINKEDIN_REDIRECT_URI",
+  `${DEFAULT_PROD_URL.replace(/\/$/, "")}/api/linkedin/callback`
+);
 
 console.log(`Synchronisation de ${vars.size} variables vers Vercel...\n`);
 
