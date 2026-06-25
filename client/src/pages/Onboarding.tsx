@@ -1,20 +1,24 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getSignupUrl } from "@/const";
+import { DEFAULT_AUTH_REDIRECT, getSignupUrl, sanitizeInternalRedirect } from "@/const";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Loader2, Sparkles } from "lucide-react";
 import { ProfileOnboarding } from "@/components/ProfileOnboarding";
 import { refreshAuthSession } from "@/lib/authSession";
+import { resolvePostAuthRedirect } from "@/lib/postAuthGate";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
-import { useLocation } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
   const utils = trpc.useUtils();
-  const [, setLocation] = useLocation();
   const [syncingAuth, setSyncingAuth] = useState(false);
+
+  const redirect = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return sanitizeInternalRedirect(params.get("redirect"), DEFAULT_AUTH_REDIRECT);
+  }, []);
 
   const { data: status } = trpc.onboarding.getStatus.useQuery(undefined, {
     enabled: !!user,
@@ -50,10 +54,17 @@ export default function Onboarding() {
 
   useEffect(() => {
     if (loading) return;
-    if (user && status?.completed) {
-      setLocation("/dashboard");
-    }
-  }, [user, loading, status, setLocation]);
+    if (!user || !status?.completed) return;
+
+    let cancelled = false;
+    void resolvePostAuthRedirect(redirect, utils).then(destination => {
+      if (!cancelled) window.location.href = destination;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, loading, status, redirect, utils]);
 
   if (loading || (!user && syncingAuth)) {
     return (
