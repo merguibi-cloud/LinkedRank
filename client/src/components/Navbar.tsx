@@ -239,11 +239,15 @@ export default function Navbar() {
 
                     {userMenuOpen && (
                       <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-white/10 bg-card/95 backdrop-blur-xl shadow-xl overflow-hidden">
-                        <div className="p-3 border-b border-white/10 space-y-2">
+                        <Link
+                          href="/profile"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="block p-3 border-b border-white/10 space-y-2 hover:bg-white/5 transition-colors"
+                        >
                           <p className="text-sm font-medium text-white truncate">{user.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                           <LinkedInStatusBadge showPhoto size="sm" />
-                        </div>
+                        </Link>
                         <div className="p-1">
                           <Link href="/dashboard" onClick={() => setUserMenuOpen(false)}>
                             <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white hover:bg-white/10">
