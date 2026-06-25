@@ -47,6 +47,7 @@ const LiveAnalytics = lazy(() => import("./pages/LiveAnalytics"));
 const Gamification = lazy(() => import("./pages/Gamification"));
 const Rewards = lazy(() => import("./pages/Rewards"));
 const Settings = lazy(() => import("./pages/Settings"));
+const Profile = lazy(() => import("./pages/Profile"));
 const Referral = lazy(() => import("./pages/Referral"));
 const Challenges = lazy(() => import("./pages/Challenges"));
 const Notifications = lazy(() => import("./pages/Notifications"));
@@ -143,6 +144,7 @@ function Router() {
         <Route path={"/gamification"} component={Gamification} />
         <Route path={"/rewards"} component={Rewards} />
         <Route path={"/settings"} component={Settings} />
+        <Route path={"/profile"} component={Profile} />
         <Route path={"/referral"} component={Referral} />
         <Route path={"/challenges"} component={Challenges} />
         <Route path={"/notifications"} component={Notifications} />
