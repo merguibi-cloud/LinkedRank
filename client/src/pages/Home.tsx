@@ -63,6 +63,8 @@ export default function Home() {
     description: string;
     quote: string;
     availability: AgentAvailability;
+    href?: string;
+    ctaLabel?: string;
   }> = [
     {
       icon: PenTool,
@@ -73,6 +75,8 @@ export default function Home() {
       description: "Transforme vos idées en posts structurés, adaptés à votre audience LinkedIn.",
       quote: "Chaque publication est une opportunité de marquer les esprits.",
       availability: "available",
+      href: "/generate",
+      ctaLabel: "Créer avec Léa",
     },
     {
       icon: Search,
@@ -112,9 +116,14 @@ export default function Home() {
       personality: "Organisé et précis",
       description: "Programme vos publications aux créneaux les plus performants.",
       quote: "Le timing fait la différence — je m'en occupe.",
-      availability: "coming_soon",
+      availability: "available",
+      href: "/auto-publish",
+      ctaLabel: "Configurer l'auto-publication",
     },
   ];
+
+  const availableAgentsCount = agents.filter((a) => a.availability === "available").length;
+  const comingSoonAgentsCount = agents.filter((a) => a.availability === "coming_soon").length;
 
   const features = [
     {
@@ -224,7 +233,7 @@ export default function Home() {
             <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                1 agent disponible · {agents.filter(a => a.availability === "coming_soon").length} arrive bientôt
+                {availableAgentsCount} agent{availableAgentsCount > 1 ? "s" : ""} disponible{availableAgentsCount > 1 ? "s" : ""} · {comingSoonAgentsCount} arrive bientôt
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-400" />
@@ -300,7 +309,7 @@ export default function Home() {
               </span>
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-              Commencez avec Léa, votre créatrice de contenu. Les autres agents arrivent progressivement.
+              Commencez avec Léa pour créer du contenu et Sam pour automatiser vos publications LinkedIn.
             </p>
           </div>
 
@@ -308,14 +317,13 @@ export default function Home() {
             {agents.map((agent) => {
               const isComingSoon = agent.availability === "coming_soon";
               const AgentIcon = agent.icon;
-              return (
+              const card = (
               <div
-                key={agent.name}
                 className={[
-                  "group relative rounded-2xl border p-6 backdrop-blur-sm transition-all",
+                  "group relative rounded-2xl border p-6 backdrop-blur-sm transition-all h-full",
                   isComingSoon
                     ? "border-white/5 bg-card/30 opacity-80 hover:opacity-95 hover:border-white/10"
-                    : "border-violet/20 bg-card/50 hover:border-violet/40 hover:bg-card/80 shadow-lg shadow-violet/5",
+                    : "border-violet/20 bg-card/50 hover:border-violet/40 hover:bg-card/80 shadow-lg shadow-violet/5 cursor-pointer",
                 ].join(" ")}
               >
                 <AgentStatusBadge availability={agent.availability} />
@@ -350,24 +358,50 @@ export default function Home() {
                   </div>
                 )}
 
+                {!isComingSoon && agent.href && (
+                  <div className="relative mt-4">
+                    <Button className="w-full btn-gradient h-10 text-sm">
+                      {agent.ctaLabel ?? "Ouvrir"}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
                 {/* Hover Effect */}
                 {!isComingSoon && (
                   <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-violet/5 to-rose/5 opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none" />
                 )}
               </div>
-            );
+              );
+
+              return agent.href && !isComingSoon ? (
+                <Link key={agent.name} href={agent.href}>
+                  {card}
+                </Link>
+              ) : (
+                <div key={agent.name}>{card}</div>
+              );
             })}
           </div>
 
-          <div className="mt-10 text-center">
+          <div className="mt-10 flex flex-wrap justify-center gap-3">
             {user ? (
-              <Link href="/generate">
-                <Button className="btn-gradient h-12 px-8">
-                  <Sparkles className="mr-2 h-5 w-5" />
-                  Créer avec Léa
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
+              <>
+                <Link href="/generate">
+                  <Button className="btn-gradient h-12 px-8">
+                    <Sparkles className="mr-2 h-5 w-5" />
+                    Créer avec Léa
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="/auto-publish">
+                  <Button variant="outline" className="h-12 px-8 border-amber-500/30 text-amber-200 hover:bg-amber-500/10">
+                    <CalendarDays className="mr-2 h-5 w-5" />
+                    Automatiser avec Sam
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </>
             ) : (
               <a href={getSignupUrl()}>
                 <Button className="btn-gradient h-12 px-8">

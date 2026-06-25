@@ -1,57 +1,37 @@
 import express, { type Express } from "express";
 import { type Server } from "http";
-import path from "path";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
-import { appRouter } from "../routers";
-import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
-import authRouter from "../routes/auth";
-import linkedinRouter from "../routes/linkedin";
-import autoPublishRouter from "../routes/autoPublish";
-import scheduleRouter from "../routes/schedule";
-import stripeRouter from "../routes/stripe";
-import stripeWebhookRouter from "../routes/stripeWebhook";
 import { startAutoPublishWorker } from "../workers/autoPublishWorker";
 import { startAgentScheduler } from "../services/agentScheduler";
 import { getLinkedInRedirectUri } from "./linkedinRedirect";
 import { isLinkedInConfigured } from "../services/linkedin";
-import { supabaseSessionMiddleware } from "./supabaseMiddleware";
 import { isSupabaseConfigured } from "./supabase";
+import { registerHttpApi } from "./httpApi";
 
 let workersStarted = false;
 
 export function startBackgroundWorkers() {
-  if (workersStarted || process.env.VERCEL) return;
+  if (workersStarted) return;
   workersStarted = true;
+
+  if (process.env.VERCEL) {
+    console.log(
+      "[AutoPublish] Vercel détecté — worker local désactivé, jobs via /api/cron/*"
+    );
+    return;
+  }
+
   startAutoPublishWorker();
   startAgentScheduler();
 }
 
 export async function configureApp(app: Express, httpServer?: Server) {
-  app.use("/api/stripe/webhook", express.raw({ type: "application/json" }), stripeWebhookRouter);
-
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
-  app.use(supabaseSessionMiddleware);
-  registerOAuthRoutes(app);
-  app.use("/api/auth", authRouter);
-  app.use("/api/linkedin", linkedinRouter);
-  app.use("/api/auto-publish", autoPublishRouter);
-  app.use("/api/schedule", scheduleRouter);
-  app.use("/api/stripe", stripeRouter);
-  app.use(
-    "/api/trpc",
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
+  registerHttpApi(app);
 
   if (process.env.NODE_ENV === "development" && httpServer) {
+    const { setupVite } = await import("./vite");
     await setupVite(app, httpServer);
   } else {
+    const { serveStatic } = await import("./vite");
     serveStatic(app);
   }
 }
@@ -61,6 +41,8 @@ export async function createApp(): Promise<Express> {
   await configureApp(app);
   return app;
 }
+
+export { createApiApp } from "./httpApi";
 
 export function logStartupInfo(port: number) {
   console.log(`Server running on http://localhost:${port}/`);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLinkedInConnectUrl, getSignupUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
@@ -36,10 +36,17 @@ import {
   Clock,
   FolderOpen,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { formatDateInput, getDefaultScheduleTime } from "@/lib/scheduleUtils";
+import { isGuidedMode } from "@/lib/gettingStartedJourney";
 import { MediaLibraryPicker, MediaUploadZone } from "@/components/MediaLibraryPicker";
 import { AI_IMAGE_FORMATS, AI_IMAGE_STYLES, type AiImageFormatId, type AiImageStyleId } from "@/lib/aiImageStyles";
+
+const GettingStartedJourney = lazy(() =>
+  import("@/components/GettingStartedJourney").then((m) => ({
+    default: m.GettingStartedJourney,
+  }))
+);
 
 type Post = {
   id: number;
@@ -61,7 +68,10 @@ const STEPS: { id: WorkflowStep; label: string; icon: typeof Lightbulb }[] = [
 
 export default function Generator() {
   const { user } = useAuth();
-  const login = () => { window.location.href = getSignupUrl("/generate"); };
+  const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
+  const guided = isGuidedMode();
+  const login = () => { window.location.href = getSignupUrl("/generate?guided=1"); };
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const [theme, setTheme] = useState("");
@@ -177,7 +187,18 @@ export default function Generator() {
     onSuccess: (data) => {
       setGeneratedPosts(prev => [data, ...prev]);
       startWorkflow(data);
-      toast.success("Post généré ! Passez à l'étape Éditer.");
+      void utils.generator.myPosts.invalidate();
+      if (isGuidedMode()) {
+        toast.success("Premier post créé !", {
+          description: "Passez à l'automatisation pour publier régulièrement.",
+          action: {
+            label: "Étape suivante",
+            onClick: () => setLocation("/auto-publish?guided=1"),
+          },
+        });
+      } else {
+        toast.success("Post généré ! Passez à l'étape Éditer.");
+      }
     },
     onError: (error) => toast.error(`Erreur: ${error.message}`),
   });
@@ -186,7 +207,17 @@ export default function Generator() {
     onSuccess: (data) => {
       setGeneratedPosts(prev => [...data, ...prev]);
       if (data[0]) startWorkflow(data[0]);
-      toast.success(`${data.length} posts générés !`);
+      void utils.generator.myPosts.invalidate();
+      if (isGuidedMode() && data[0]) {
+        toast.success("Premier post créé !", {
+          action: {
+            label: "Activer l'automatisation",
+            onClick: () => setLocation("/auto-publish?guided=1"),
+          },
+        });
+      } else {
+        toast.success(`${data.length} posts générés !`);
+      }
     },
     onError: (error) => toast.error(`Erreur: ${error.message}`),
   });
@@ -376,12 +407,18 @@ export default function Generator() {
       </header>
 
       <div className="container space-y-4 py-4 sm:space-y-6 sm:py-6">
+        <Suspense fallback={null}>
+          <GettingStartedJourney variant="compact" />
+        </Suspense>
+
         <div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-violet-light to-rose bg-clip-text text-transparent sm:text-3xl">
-            Créer un post LinkedIn
+            {guided ? "Étape 3 — Votre premier post" : "Créer un post LinkedIn"}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Générez votre texte, ajoutez une image IA, puis publiez — tout en 4 étapes
+            {guided
+              ? "Choisissez un thème, générez — l'IA s'occupe du reste."
+              : "Générez votre texte, ajoutez une image IA, puis publiez — tout en 4 étapes"}
           </p>
         </div>
 

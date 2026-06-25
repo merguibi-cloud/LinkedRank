@@ -11,10 +11,11 @@ import { LinkedInOAuthHandler } from "./components/LinkedInOAuthHandler";
 import { EmailConfirmationHandler } from "./components/EmailConfirmationHandler";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { Toaster } from "@/components/ui/sonner";
+import { lazyRetry } from "@/lib/lazyRetry";
 
 // Lazy load des pages pour améliorer les performances
-const Home = lazy(() => import("./pages/Home"));
-const Generator = lazy(() => import("./pages/Generator"));
+const Home = lazyRetry(() => import("./pages/Home"));
+const Generator = lazyRetry(() => import("./pages/Generator"));
 const RankingsFrance = lazy(() => import("./pages/RankingsFrance"));
 const RankingsWorld = lazy(() => import("./pages/RankingsWorld"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
@@ -72,9 +73,6 @@ const FeedbackWidget = lazy(() => import("./components/FeedbackWidget").then(m =
 const MobileNavigation = lazy(() => import("./components/MobileNavigation").then(m => ({ default: m.MobileNavigation })));
 const CookieConsent = lazy(() => import("./components/CookieConsent"));
 
-// Import direct pour l'onboarding (nécessaire au démarrage)
-import { InteractiveOnboarding, useOnboarding } from "./components/InteractiveOnboarding";
-import { OnboardingRedirect } from "./components/OnboardingRedirect";
 import { useIsMobile } from "./hooks/useMobile";
 
 // Composant de chargement léger
@@ -98,6 +96,7 @@ function Router() {
         <Route path={"/signup"} component={Signup} />
         <Route path={"/linkedin/connect"} component={LinkedInConnect} />
         <Route path={"/generate"} component={Generator} />
+        <Route path={"/create"}><Redirect to="/generate" /></Route>
         <Route path={"/generator"}><Redirect to="/generate" /></Route>
         <Route path={"/settings/linkedin"}><Redirect to="/linkedin-settings" /></Route>
         <Route path={"/agents/meet"}><Redirect to="/meet-the-agents" /></Route>
@@ -154,14 +153,13 @@ function Router() {
         <Route path={"/legal/cgv"} component={CGV} />
         <Route path={"/legal/cgu"} component={CGU} />
         <Route path={"/404"} component={NotFound} />
-        <Route component={NotFound} />
+        <Route path="/:rest*"><NotFound /></Route>
       </Switch>
     </Suspense>
   );
 }
 
 function AppContent() {
-  const { showOnboarding, completeOnboarding, skipOnboarding } = useOnboarding();
   // Activer les raccourcis clavier globaux
   useKeyboardShortcuts();
 
@@ -170,13 +168,6 @@ function AppContent() {
       <ScrollToTop />
       <LinkedInOAuthHandler />
       <EmailConfirmationHandler />
-      <OnboardingRedirect />
-      {showOnboarding && (
-        <InteractiveOnboarding 
-          onComplete={completeOnboarding}
-          onSkip={skipOnboarding}
-        />
-      )}
       <AppShell>
         <Router />
       </AppShell>

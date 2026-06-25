@@ -52,6 +52,7 @@ interface UpcomingPublicationsViewProps {
   compact?: boolean;
   isAutoEnabled?: boolean;
   hasSchedule?: boolean;
+  hasObjectives?: boolean;
   refreshToken?: number;
   onToggleAuto?: (enabled: boolean) => void;
   onGoToSchedule?: () => void;
@@ -87,6 +88,7 @@ export function UpcomingPublicationsView({
   compact = false,
   isAutoEnabled = false,
   hasSchedule = false,
+  hasObjectives = false,
   refreshToken = 0,
   onToggleAuto,
   onGoToSchedule,
@@ -118,6 +120,11 @@ export function UpcomingPublicationsView({
         setGrouped(data.grouped || []);
         setPublications(data.publications || []);
         setMeta(data.meta || null);
+      } else if (res.status === 401) {
+        setError(false);
+        setGrouped([]);
+        setPublications([]);
+        setMeta(null);
       } else {
         setError(true);
         setGrouped([]);
@@ -229,6 +236,7 @@ export function UpcomingPublicationsView({
       <UpcomingEmptyState
         isAutoEnabled={isAutoEnabled || (meta?.isEnabled ?? false)}
         hasSchedule={hasSchedule || (meta?.scheduleCount ?? 0) > 0}
+        hasObjectives={hasObjectives}
         onToggleAuto={onToggleAuto}
         onGoToSchedule={onGoToSchedule ?? (() => {})}
         onGoToObjectives={onGoToObjectives ?? (() => {})}

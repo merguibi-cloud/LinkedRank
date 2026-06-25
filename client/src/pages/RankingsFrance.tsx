@@ -210,7 +210,7 @@ export default function RankingsFrance() {
               Créez votre profil créateur et commencez à générer du contenu qui performe.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link href="/onboarding">
+              <Link href="/signup">
                 <Button className="btn-gradient">
                   Créer mon profil créateur
                 </Button>

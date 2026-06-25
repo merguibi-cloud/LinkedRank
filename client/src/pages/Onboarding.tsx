@@ -1,14 +1,14 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl, getSignupUrl } from "@/const";
+import { getSignupUrl } from "@/const";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, Mic, Sparkles } from "lucide-react";
-import { VoiceOnboarding } from "@/components/VoiceOnboarding";
+import { Loader2, Sparkles } from "lucide-react";
+import { ProfileOnboarding } from "@/components/ProfileOnboarding";
 import { refreshAuthSession } from "@/lib/authSession";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
@@ -16,19 +16,12 @@ export default function Onboarding() {
   const [, setLocation] = useLocation();
   const [syncingAuth, setSyncingAuth] = useState(false);
 
-  const isNewSignup = useMemo(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("new") === "1" || params.get("voice") === "1";
-  }, []);
-
-  const autoStart = isNewSignup;
-
   const { data: status } = trpc.onboarding.getStatus.useQuery(undefined, {
     enabled: !!user,
   });
 
   useEffect(() => {
-    if (!isNewSignup || user || loading) return;
+    if (user || loading) return;
 
     let cancelled = false;
     setSyncingAuth(true);
@@ -49,29 +42,24 @@ export default function Onboarding() {
       window.clearTimeout(timer);
       authListener?.data.subscription.unsubscribe();
     };
-  }, [isNewSignup, user, loading, utils]);
+  }, [user, loading, utils]);
 
   useEffect(() => {
     if (user) setSyncingAuth(false);
   }, [user]);
 
   useEffect(() => {
-    if (status?.completed && !isNewSignup) {
+    if (loading) return;
+    if (user && status?.completed) {
       setLocation("/dashboard");
     }
-  }, [status, isNewSignup, setLocation]);
+  }, [user, loading, status, setLocation]);
 
-  if (loading || (isNewSignup && !user && syncingAuth)) {
+  if (loading || (!user && syncingAuth)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet to-rose">
-          <Mic className="h-7 w-7 text-white animate-pulse" />
-        </div>
-        <div className="text-center">
-          <p className="text-white font-medium">Préparation de votre agent vocal...</p>
-          <p className="text-sm text-muted-foreground mt-1">Connexion en cours</p>
-        </div>
-        <Loader2 className="h-5 w-5 animate-spin text-violet-light" />
+        <Loader2 className="h-8 w-8 animate-spin text-violet-light" />
+        <p className="text-sm text-muted-foreground">Chargement...</p>
       </div>
     );
   }
@@ -84,26 +72,16 @@ export default function Onboarding() {
             <Sparkles className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-4">
-            Parlez à votre agent vocal
+            Configurez votre profil
           </h1>
           <p className="text-muted-foreground mb-8">
-            {isNewSignup
-              ? "Créez un compte pour démarrer immédiatement votre onboarding vocal."
-              : "Connectez-vous pour démarrer une conversation vocale avec votre agent LinkedRank."}
+            Créez un compte pour personnaliser votre contenu LinkedIn en quelques clics.
           </p>
-          {isNewSignup ? (
-            <a href={getSignupUrl()}>
-              <Button className="btn-gradient w-full">
-                Créer mon compte gratuitement
-              </Button>
-            </a>
-          ) : (
-            <a href={getLoginUrl("/onboarding?new=1")}>
-              <Button className="btn-gradient w-full">
-                Se connecter pour continuer
-              </Button>
-            </a>
-          )}
+          <a href={getSignupUrl()}>
+            <Button className="btn-gradient w-full">
+              Créer mon compte gratuitement
+            </Button>
+          </a>
           <Link href="/">
             <Button variant="ghost" className="mt-4 text-muted-foreground">
               Retour à l'accueil
@@ -114,5 +92,5 @@ export default function Onboarding() {
     );
   }
 
-  return <VoiceOnboarding autoStart={autoStart} />;
+  return <ProfileOnboarding />;
 }

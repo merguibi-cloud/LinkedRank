@@ -23,7 +23,7 @@ import {
   type AgentRosterEntry,
 } from "@/lib/agentsRoster";
 
-const leaAgent = AGENTS_ROSTER.find(a => a.availability === "available")!;
+const availableAgents = AGENTS_ROSTER.filter(a => a.availability === "available");
 const comingSoonAgents = AGENTS_ROSTER.filter(a => a.availability === "coming_soon");
 
 function AvailabilityBadge({ agent }: { agent: AgentRosterEntry }) {
@@ -185,14 +185,16 @@ export default function MeetTheAgents() {
               </span>
             </h1>
             <p className="text-lg text-white/60 mb-8">
-              Commencez avec <strong className="text-white">Léa</strong>, votre créatrice de contenu.
-              Les autres agents arrivent progressivement.
+              Commencez avec <strong className="text-white">Léa</strong> pour créer du contenu et{" "}
+              <strong className="text-white">Sam</strong> pour automatiser vos publications.
             </p>
 
             <div className="flex flex-wrap justify-center gap-4">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/15 border border-emerald-500/30">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm text-emerald-200">1 agent disponible</span>
+                <span className="text-sm text-emerald-200">
+                  {availableAgents.length} agent{availableAgents.length > 1 ? "s" : ""} disponible{availableAgents.length > 1 ? "s" : ""}
+                </span>
               </div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
                 <Clock className="w-4 h-4 text-white/50" />
@@ -202,13 +204,17 @@ export default function MeetTheAgents() {
           </div>
         </div>
 
-        {/* Léa — featured */}
+        {/* Agents disponibles */}
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-5 h-5 text-violet-400" />
-            <h2 className="text-xl font-semibold text-white">Agent disponible</h2>
+            <h2 className="text-xl font-semibold text-white">Agents disponibles</h2>
           </div>
-          <AgentCard agent={leaAgent} featured />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {availableAgents.map(agent => (
+              <AgentCard key={agent.id} agent={agent} featured />
+            ))}
+          </div>
         </div>
 
         {/* Coming soon grid */}

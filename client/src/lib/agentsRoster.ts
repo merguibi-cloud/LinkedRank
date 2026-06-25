@@ -105,7 +105,9 @@ export const AGENTS_ROSTER: AgentRosterEntry[] = [
     skills: ["Timing optimal", "Planification", "Automatisation"],
     quote: "Le bon contenu au bon moment !",
     bestFor: "Publier régulièrement",
-    availability: "coming_soon",
+    availability: "available",
+    ctaHref: "/auto-publish",
+    ctaLabel: "Configurer l'auto-publication",
   },
 ];
 
