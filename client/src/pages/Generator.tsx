@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
@@ -69,12 +70,12 @@ type WorkflowStep =
   | "configure-automation"
   | "publish";
 
-const STEPS: { id: WorkflowStep; label: string; icon: typeof Lightbulb }[] = [
-  { id: "configure", label: "Configurer", icon: Lightbulb },
-  { id: "image", label: "Créer le visuel", icon: ImageIcon },
-  { id: "choose-automation", label: "Choisir l'automatisation", icon: Zap },
-  { id: "configure-automation", label: "Configurer l'automatisation", icon: Calendar },
-  { id: "publish", label: "Publier", icon: Send },
+const STEPS: { id: WorkflowStep; number: number; label: string; icon: typeof Lightbulb }[] = [
+  { id: "configure", number: 1, label: "Configurer", icon: Lightbulb },
+  { id: "image", number: 2, label: "Créer le visuel", icon: ImageIcon },
+  { id: "choose-automation", number: 3, label: "Choisir l'automatisation", icon: Zap },
+  { id: "configure-automation", number: 4, label: "Configurer l'automatisation", icon: Calendar },
+  { id: "publish", number: 5, label: "Publier", icon: Send },
 ];
 
 export default function Generator() {
@@ -438,7 +439,12 @@ export default function Generator() {
   };
 
   const isLoading = generateMutation.isPending || generateBatchMutation.isPending;
-  const stepIndex = STEPS.findIndex(s => s.id === workflowStep);
+  // "Configurer l'automatisation" only exists in the flow when automation is
+  // actually toggled on — otherwise step 3 goes straight to step 5.
+  const visibleSteps = STEPS.filter(
+    s => s.id !== "configure-automation" || publishMode === "schedule"
+  );
+  const stepIndex = visibleSteps.findIndex(s => s.id === workflowStep);
 
   if (!user) {
     return (
@@ -546,7 +552,7 @@ export default function Generator() {
 
             {/* Stepper — défilement horizontal sur mobile */}
             <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide snap-x snap-mandatory sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-              {STEPS.map((step, i) => {
+              {visibleSteps.map((step, i) => {
                 const Icon = step.icon;
                 const isActive = step.id === workflowStep;
                 const isDone = i < stepIndex;
@@ -568,16 +574,16 @@ export default function Generator() {
                   >
                     <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     <span className="sm:hidden">{step.label}</span>
-                    <span className="hidden sm:inline">{i + 1}. {step.label}</span>
-                    {i < STEPS.length - 1 && <ChevronRight className="w-3 h-3 opacity-50 hidden sm:block" />}
+                    <span className="hidden sm:inline">{step.number}. {step.label}</span>
+                    {i < visibleSteps.length - 1 && <ChevronRight className="w-3 h-3 opacity-50 hidden sm:block" />}
                   </button>
                 );
               })}
             </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Left: Config (always visible on configure step, collapsed otherwise) */}
-          <div className={`space-y-4 ${workflowStep !== "configure" ? "lg:opacity-60" : ""}`}>
+        {/* Only the current step's content is shown — never two at once */}
+        <div className="max-w-2xl mx-auto w-full space-y-4">
+          {workflowStep === "configure" && !activePost && (
             <Tabs defaultValue="generate" className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-card/50">
                 <TabsTrigger value="generate">Paramètres</TabsTrigger>
@@ -764,52 +770,28 @@ export default function Generator() {
                 <ProfileForm profile={profile} />
               </TabsContent>
             </Tabs>
-          </div>
+          )}
 
-          {/* Right: Workflow steps */}
-          <div className="space-y-4">
-            {workflowStep === "configure" && !activePost && isCarousel && (
-              <Card className="bg-card/30 border-dashed border-violet/30">
-                <CardContent className="py-16 text-center">
-                  <Layers className="w-12 h-12 mx-auto mb-4 text-violet-light/50" />
-                  <p className="text-muted-foreground mb-2">Configurez votre carrousel et générez-le</p>
-                  <p className="text-xs text-muted-foreground">Le parcours vous guidera ensuite : relecture → visuels → automatisation → publication</p>
-                </CardContent>
-              </Card>
-            )}
+          {workflowStep === "configure" && !activePost && !isCarousel && generatedPosts.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-medium text-muted-foreground">Posts récents — cliquez pour continuer</h2>
+              {generatedPosts.map(post => (
+                <Card key={post.id} className="bg-card/50 border-violet/30 cursor-pointer hover:border-violet/40 transition-colors" onClick={() => startWorkflow(post)}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">{post.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground line-clamp-3">{post.content}</p>
+                    <Button size="sm" variant="ghost" className="mt-2 text-violet-light" onClick={e => { e.stopPropagation(); startWorkflow(post); }}>
+                      Continuer <ChevronRight className="w-3 h-3 ml-1" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
-            {workflowStep === "configure" && !activePost && !isCarousel && (
-              <>
-                {generatedPosts.length === 0 ? (
-                  <Card className="bg-card/30 border-dashed border-violet/30">
-                    <CardContent className="py-16 text-center">
-                      <Sparkles className="w-12 h-12 mx-auto mb-4 text-violet-light/50" />
-                      <p className="text-muted-foreground mb-2">Commencez par configurer et générer un post</p>
-                      <p className="text-xs text-muted-foreground">Le parcours vous guidera ensuite : relecture → image → automatisation → publication</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="space-y-3">
-                    <h2 className="text-sm font-medium text-muted-foreground">Posts récents — cliquez pour continuer</h2>
-                    {generatedPosts.map(post => (
-                      <Card key={post.id} className="bg-card/50 border-violet/30 cursor-pointer hover:border-violet/40 transition-colors" onClick={() => startWorkflow(post)}>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base">{post.title}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground line-clamp-3">{post.content}</p>
-                          <Button size="sm" variant="ghost" className="mt-2 text-violet-light" onClick={e => { e.stopPropagation(); startWorkflow(post); }}>
-                            Continuer <ChevronRight className="w-3 h-3 ml-1" />
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {workflowStep === "configure" && activePost && (
+          {workflowStep === "configure" && activePost && (
               <Card className="bg-card/50 border-violet/30">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -1107,40 +1089,32 @@ export default function Generator() {
                     <Zap className="w-5 h-5 text-violet-light" />
                     Étape 3 — Choisir l&apos;automatisation
                   </CardTitle>
-                  <CardDescription>Publiez immédiatement ou planifiez la diffusion</CardDescription>
+                  <CardDescription>Souhaitez-vous planifier la diffusion ?</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <PostPreviewCard
-                    title={activePost.title}
-                    content={editedContent}
-                    hashtags={editedHashtags}
-                    imageUrl={imageUrl}
-                  />
-
-                  <div className="flex gap-2 p-1 rounded-lg bg-background/50 border border-border">
-                    <Button
-                      type="button"
-                      variant={publishMode === "now" ? "secondary" : "ghost"}
-                      className="flex-1"
-                      onClick={() => setPublishMode("now")}
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Publier maintenant
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={publishMode === "schedule" ? "secondary" : "ghost"}
-                      className="flex-1"
-                      onClick={() => setPublishMode("schedule")}
-                    >
-                      <Calendar className="w-4 h-4 mr-2" />
-                      Planifier
-                    </Button>
+                  <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-background/50 p-4">
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium">Planifier la publication</p>
+                      <p className="text-xs text-muted-foreground">
+                        {publishMode === "schedule"
+                          ? "Choisissez une date et une heure à l'étape suivante"
+                          : "Désactivé : le post sera publié immédiatement"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={publishMode === "schedule"}
+                      onCheckedChange={checked => setPublishMode(checked ? "schedule" : "now")}
+                    />
                   </div>
 
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={() => setWorkflowStep("image")}>← Retour</Button>
-                    <Button className="flex-1 btn-gradient" onClick={() => setWorkflowStep("configure-automation")}>
+                    <Button
+                      className="flex-1 btn-gradient"
+                      onClick={() =>
+                        setWorkflowStep(publishMode === "schedule" ? "configure-automation" : "publish")
+                      }
+                    >
                       Continuer <ChevronRight className="w-4 h-4 ml-1" />
                     </Button>
                   </div>
@@ -1229,7 +1203,17 @@ export default function Generator() {
                   />
 
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setWorkflowStep("configure-automation")}>← Retour</Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setWorkflowStep(
+                          publishMode === "schedule" ? "configure-automation" : "choose-automation"
+                        )
+                      }
+                    >
+                      ← Retour
+                    </Button>
                     {publishMode === "now" ? (
                       <Button
                         className="flex-1 bg-[#0077B5] hover:bg-[#006699]"
@@ -1253,7 +1237,6 @@ export default function Generator() {
                 </CardContent>
               </Card>
             )}
-          </div>
         </div>
           </>
         )}
