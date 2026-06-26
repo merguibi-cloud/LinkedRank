@@ -23,7 +23,6 @@ import {
   Settings,
   Zap,
   Globe,
-  Wrench,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { NotificationCenter } from "./NotificationCenter";
@@ -52,8 +51,11 @@ export default function Navbar() {
   const userMenuRef = useRef<HTMLDivElement>(null);
   const submenuTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Top nav is intentionally minimal: Créer, Dashboard, Découvrir, Ressources.
+  // Agents and the former « Outils » destinations live inside the Découvrir
+  // dropdown instead of as separate top-level menus.
   const navItems: NavItem[] = [
-    ...PRIMARY_NAV.filter((item) => item.href !== "/").map((item) => ({
+    ...PRIMARY_NAV.filter((item) => item.href !== "/" && item.href !== "/agents").map((item) => ({
       label: item.label,
       icon: item.icon,
       href: item.href,
@@ -61,22 +63,21 @@ export default function Navbar() {
     {
       label: "Découvrir",
       icon: Globe,
-      submenu: DISCOVER_NAV.map((item) => ({
-        href: item.href,
-        label: item.label,
-        icon: item.icon,
-        description: item.description,
-      })),
-    },
-    {
-      label: "Outils",
-      icon: Wrench,
-      submenu: TOOLS_NAV.map((item) => ({
-        href: item.href,
-        label: item.label,
-        icon: item.icon,
-        description: item.description,
-      })),
+      submenu: [
+        ...DISCOVER_NAV.map((item) => ({
+          href: item.href,
+          label: item.label,
+          icon: item.icon,
+          description: item.description,
+        })),
+        { href: "/agents", label: "Agents", icon: Bot, description: "Vos agents IA" },
+        ...TOOLS_NAV.filter((item) => item.href !== "/generate").map((item) => ({
+          href: item.href,
+          label: item.label,
+          icon: item.icon,
+          description: item.description,
+        })),
+      ],
     },
     { label: "Ressources", icon: Sparkles, href: "/resources" },
   ];
