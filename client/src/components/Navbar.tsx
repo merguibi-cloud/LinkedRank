@@ -268,6 +268,12 @@ export default function Navbar() {
                               Paramètres
                             </button>
                           </Link>
+                          <Link href="/linkedin-settings" onClick={() => setUserMenuOpen(false)}>
+                            <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white hover:bg-white/10">
+                              <Linkedin className="h-4 w-4" />
+                              Paramètres LinkedIn
+                            </button>
+                          </Link>
                           {!linkedInStatus.connected && (
                             <>
                               <div className="border-t border-white/10 my-1" />

@@ -14,7 +14,6 @@ import {
   Settings,
   Linkedin,
   BookOpen,
-  Globe,
   Flame,
   Users,
   Wrench,
@@ -104,45 +103,6 @@ export const MOBILE_FULL_MENU: NavGroup[] = [
       { href: "/resources", label: "Ressources", icon: BookOpen },
       { href: "/linkedin-settings", label: "LinkedIn", icon: Linkedin },
       { href: "/settings", label: "Paramètres", icon: Settings },
-    ],
-  },
-];
-
-/** Sidebar dashboard — structure épurée */
-export const SIDEBAR_NAV: NavGroup[] = [
-  {
-    title: "Principal",
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/generate", label: "Générateur", icon: PenTool, badge: "IA" },
-      { href: "/agents", label: "Mes agents", icon: Bot },
-      { href: "/auto-publish", label: "Auto-publication", icon: Zap },
-    ],
-  },
-  {
-    title: "Contenu",
-    items: [
-      { href: "/mes-outils", label: "Mes outils", icon: Wrench },
-      { href: "/mes-outils?tab=mediatheque", label: "Médiathèque", icon: FolderOpen },
-      { href: "/carousels", label: "Carrousels", icon: Layers },
-      { href: "/templates", label: "Templates", icon: FileText },
-      { href: "/schedule", label: "Calendrier", icon: Calendar },
-    ],
-  },
-  {
-    title: "Insights",
-    items: [
-      { href: "/analytics", label: "Analytics", icon: BarChart3 },
-      { href: "/trending", label: "Tendances", icon: TrendingUp },
-      { href: "/rankings/france", label: "Classements", icon: Trophy },
-    ],
-  },
-  {
-    title: "Compte",
-    items: [
-      { href: "/resources", label: "Ressources", icon: BookOpen },
-      { href: "/settings", label: "Paramètres", icon: Settings },
-      { href: "/linkedin-settings", label: "LinkedIn", icon: Linkedin },
     ],
   },
 ];
