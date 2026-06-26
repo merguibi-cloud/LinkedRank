@@ -368,18 +368,23 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   if (!response.ok) {
     const errorText = await response.text();
 
+    const isGeminiQuotaExhausted =
+      ENV.llmProvider === "gemini" &&
+      (response.status === 429 ||
+        /insufficient_quota|RESOURCE_EXHAUSTED|quota/i.test(errorText));
+
     const isGeminiOverloaded =
       ENV.llmProvider === "gemini" &&
       (response.status === 503 || response.status === 502) &&
       /UNAVAILABLE|high demand|overloaded/i.test(errorText);
 
-    if (isGeminiOverloaded) {
+    if (isGeminiQuotaExhausted || isGeminiOverloaded) {
       const openaiKey =
         process.env.OPENAI_API_KEY ?? process.env.BUILT_IN_FORGE_API_KEY ?? "";
       const openaiModel = process.env.OPENAI_MODEL ?? "gpt-4o";
       if (openaiKey) {
         console.warn(
-          "[LLM] Gemini 503 — falling back to OpenAI",
+          `[LLM] Gemini ${isGeminiQuotaExhausted ? "quota" : "503"} — falling back to OpenAI`,
           openaiModel
         );
         const fallbackRes = await callApi(

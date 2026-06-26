@@ -1,13 +1,14 @@
 import { Router, Request, Response } from "express";
 import { getDb } from "../db";
-import { autoPublishSettings, autoPublishSchedule, autoPublishQueue, linkedinInfluencers } from "../../drizzle/schema";
-import { eq, desc, like, or, and, sql } from "drizzle-orm";
+import { autoPublishSettings, autoPublishSchedule, autoPublishQueue, linkedinInfluencers, mediaLibrary, generatedPosts } from "../../drizzle/schema";
+import { eq, desc, like, or, and, sql, inArray } from "drizzle-orm";
 import { generateLinkedInPost } from "../services/ai";
 import { type AuthenticatedRequest, requireAuth } from "../_core/authMiddleware";
 import {
   buildLinkedInPostParams,
   getInfluencersForSettings,
 } from "../services/autoPublishGeneration";
+import { resolvePublicUrl, resolveStorageAssetUrl } from "../_core/publicUrl";
 
 type ScheduleSlot = {
   dayOfWeek: number;
@@ -493,6 +494,67 @@ router.get("/upcoming", async (req: Request, res: Response) => {
       days,
     });
 
+    const mediaIds = [
+      ...new Set(
+        queue
+          .map((q) => q.mediaLibraryId)
+          .filter((id): id is number => typeof id === "number")
+      ),
+    ];
+    const mediaById = new Map<number, string>();
+    if (mediaIds.length > 0) {
+      const mediaRows = await db
+        .select({ id: mediaLibrary.id, fileUrl: mediaLibrary.fileUrl, fileKey: mediaLibrary.fileKey })
+        .from(mediaLibrary)
+        .where(
+          and(eq(mediaLibrary.userId, userId), inArray(mediaLibrary.id, mediaIds))
+        );
+      for (const row of mediaRows) {
+        mediaById.set(
+          row.id,
+          resolveStorageAssetUrl(row.fileUrl, row.fileKey) ?? resolvePublicUrl(row.fileUrl)
+        );
+      }
+    }
+
+    const queueById = new Map(queue.map((q) => [q.id, q]));
+    const postIds = [
+      ...new Set(
+        queue
+          .map((q) => q.generatedPostId)
+          .filter((id): id is number => typeof id === "number")
+      ),
+    ];
+    const postsById = new Map<number, { imageUrl: string | null; imageKey: string | null }>();
+    if (postIds.length > 0) {
+      const postRows = await db
+        .select({
+          id: generatedPosts.id,
+          imageUrl: generatedPosts.imageUrl,
+          imageKey: generatedPosts.imageKey,
+        })
+        .from(generatedPosts)
+        .where(inArray(generatedPosts.id, postIds));
+      for (const row of postRows) {
+        postsById.set(row.id, row);
+      }
+    }
+
+    for (const pub of publications) {
+      if (pub.imageUrl) continue;
+      const qItem = pub.queueId != null ? queueById.get(pub.queueId) : undefined;
+      if (qItem?.mediaLibraryId) {
+        const mediaUrl = mediaById.get(qItem.mediaLibraryId);
+        if (mediaUrl) pub.imageUrl = mediaUrl;
+      }
+      if (!pub.imageUrl && qItem?.generatedPostId) {
+        const post = postsById.get(qItem.generatedPostId);
+        if (post) {
+          pub.imageUrl = resolveStorageAssetUrl(post.imageUrl, post.imageKey);
+        }
+      }
+    }
+
     return res.json({
       publications,
       grouped: groupPublicationsByDay(publications),
@@ -526,7 +588,12 @@ router.get("/queue", async (req: Request, res: Response) => {
       .where(eq(autoPublishQueue.userId, userId))
       .orderBy(autoPublishQueue.scheduledFor);
 
-    return res.json({ queue });
+    return res.json({
+      queue: queue.map((item) => ({
+        ...item,
+        imageUrl: resolveStorageAssetUrl(item.imageUrl, item.imageKey),
+      })),
+    });
   } catch (error) {
     console.error("Error fetching queue:", error);
     return res.status(500).json({ error: "Failed to fetch queue" });

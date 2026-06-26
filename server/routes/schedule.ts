@@ -1,18 +1,14 @@
 import { Router, type Request, type Response } from "express";
+import { wallClockToUtc } from "@shared/scheduleTime";
 import { getDb } from "../db";
 import { autoPublishQueue, generatedPosts, mediaLibrary } from "../../drizzle/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { requireAuth } from "../_core/authMiddleware";
+import { resolvePublicUrl, resolveStorageAssetUrl } from "../_core/publicUrl";
 
 const router = Router();
 
 router.use(requireAuth);
-
-function combineDateAndTime(dateStr: string, timeStr: string): Date {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const [hours, minutes] = timeStr.split(":").map(Number);
-  return new Date(year, month - 1, day, hours, minutes, 0, 0);
-}
 
 function parseScheduledInput(body: {
   scheduledAt?: string;
@@ -24,7 +20,8 @@ function parseScheduledInput(body: {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
   if (body.date && body.time) {
-    return combineDateAndTime(body.date, body.time);
+    const parsed = wallClockToUtc(body.date, body.time);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
   return null;
 }
@@ -33,7 +30,7 @@ function mapQueueItem(item: typeof autoPublishQueue.$inferSelect) {
   return {
     id: item.id,
     content: item.content,
-    imageUrl: item.imageUrl,
+    imageUrl: resolveStorageAssetUrl(item.imageUrl, item.imageKey),
     scheduledDate: item.scheduledFor,
     status:
       item.status === "pending" || item.status === "publishing"
@@ -74,16 +71,7 @@ router.get("/", async (req: Request, res: Response) => {
 
     return res.json({
       posts: posts
-        .filter((p) => {
-          if (p.status === "cancelled") return false;
-          if (!p.generatedFrom) return false;
-          try {
-            const meta = JSON.parse(p.generatedFrom);
-            return meta.type === "manual" || meta.type === "generator" || meta.type === "auto-publish";
-          } catch {
-            return false;
-          }
-        })
+        .filter((p) => p.status !== "cancelled")
         .map(mapQueueItem),
     });
   } catch (error) {
@@ -115,7 +103,7 @@ router.post("/", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Date et heure de diffusion requises" });
   }
 
-  if (scheduledFor.getTime() <= Date.now()) {
+  if (scheduledFor.getTime() <= Date.now() - 60_000) {
     return res.status(400).json({ error: "La date de diffusion doit être dans le futur" });
   }
 
@@ -274,10 +262,12 @@ router.patch("/:id", async (req: Request, res: Response) => {
 
     const scheduledFor = parseScheduledInput(req.body);
     if (scheduledFor) {
-      if (scheduledFor.getTime() <= Date.now()) {
+      if (scheduledFor.getTime() <= Date.now() - 60_000) {
         return res.status(400).json({ error: "La date de diffusion doit être dans le futur" });
       }
       updates.scheduledFor = scheduledFor;
+    } else if (req.body.date || req.body.time || req.body.scheduledAt) {
+      return res.status(400).json({ error: "Date et heure invalides" });
     }
 
     await db

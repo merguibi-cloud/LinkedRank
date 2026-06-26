@@ -9,6 +9,7 @@ import linkedinRouter from "../routes/linkedin";
 import autoPublishRouter from "../routes/autoPublish";
 import cronRouter from "../routes/cron";
 import scheduleRouter from "../routes/schedule";
+import mediaRouter from "../routes/media";
 import stripeRouter from "../routes/stripe";
 import stripeWebhookRouter from "../routes/stripeWebhook";
 import { supabaseSessionMiddleware } from "./supabaseMiddleware";
@@ -31,6 +32,7 @@ export function registerHttpApi(app: Express): void {
   app.use("/api/auto-publish", autoPublishRouter);
   app.use("/api/cron", cronRouter);
   app.use("/api/schedule", scheduleRouter);
+  app.use("/api/media", mediaRouter);
   app.use("/api/stripe", stripeRouter);
   app.use(
     "/api/trpc",
