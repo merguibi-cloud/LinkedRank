@@ -2,17 +2,18 @@ import { ENV } from "./env";
 import { isServerlessDeployment } from "./isServerless";
 
 const DEFAULT_STORAGE_BUCKET = "media";
+const PROD_FALLBACK_URL = "https://www.linkedrank.fr";
 
 /** URL publique de l'app (jamais localhost en production). */
 export function getPublicBaseUrl(): string {
-  if (ENV.appUrl) {
+  if (ENV.appUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(ENV.appUrl)) {
     return ENV.appUrl.replace(/\/$/, "");
   }
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
-  if (ENV.isProduction) {
-    return "https://www.linkedrank.fr";
+  if (isServerlessDeployment() || ENV.isProduction) {
+    return PROD_FALLBACK_URL;
   }
   return "http://localhost:3000";
 }
@@ -44,15 +45,21 @@ export function resolvePublicUrl(url: string | null | undefined): string {
   return url;
 }
 
-function isStaleOrLocalUrl(url: string): boolean {
+function extractMediaKeyFromUrl(url: string): string | null {
+  const match = url.match(/\/api\/media\/(.+)$/i);
+  if (!match?.[1]) return null;
+  return decodeURIComponent(match[1].split("?")[0]);
+}
+
+function isLocalOrRelativeAssetUrl(url: string): boolean {
   return (
     /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(url) ||
     url.startsWith("/uploads/") ||
-    url.includes("/api/media/")
+    url.startsWith("/api/media/")
   );
 }
 
-/** URL proxy qui sert le fichier depuis Supabase ou le disque local. */
+/** URL proxy qui sert le fichier depuis Blob, Supabase ou le disque local. */
 export function buildMediaProxyUrl(fileKey: string): string {
   const segments = fileKey
     .replace(/^\/+/, "")
@@ -68,22 +75,39 @@ export function resolveStorageAssetUrl(
 ): string | null {
   const key = imageKey?.trim();
 
-  if (imageUrl && !isStaleOrLocalUrl(imageUrl)) {
-    return resolvePublicUrl(imageUrl);
+  if (imageUrl) {
+    const fromProxy = extractMediaKeyFromUrl(imageUrl);
+    if (fromProxy) {
+      return buildMediaProxyUrl(fromProxy);
+    }
+
+    if (!isLocalOrRelativeAssetUrl(imageUrl)) {
+      return resolvePublicUrl(imageUrl);
+    }
+
+    const uploadPath = imageUrl.match(/\/uploads\/(.+)$/);
+    if (uploadPath?.[1]) {
+      return buildMediaProxyUrl(decodeURIComponent(uploadPath[1]));
+    }
   }
 
   if (key) {
     return buildMediaProxyUrl(key);
   }
 
-  if (imageUrl && isStaleOrLocalUrl(imageUrl)) {
-    const pathMatch = imageUrl.match(/\/uploads\/(.+)$/);
-    if (pathMatch?.[1]) {
-      return buildMediaProxyUrl(decodeURIComponent(pathMatch[1]));
-    }
-  }
-
   return null;
+}
+
+/** Normalise les champs image avant écriture en base. */
+export function normalizeStoredImageFields(
+  imageUrl: string | null | undefined,
+  imageKey?: string | null
+): { imageUrl: string | null; imageKey: string | null } {
+  const key = imageKey?.trim() || null;
+  return {
+    imageKey: key,
+    imageUrl: resolveStorageAssetUrl(imageUrl, key),
+  };
 }
 
 export function resolvePublicUrls(urls: string[]): string[] {

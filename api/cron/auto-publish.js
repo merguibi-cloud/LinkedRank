@@ -10,11 +10,23 @@ export const config = {
 };
 
 function getQuery(req) {
-  if (req.query && typeof req.query === "object") return req.query;
+  if (req.query && typeof req.query === "object") {
+    const keys = Object.keys(req.query);
+    if (keys.length > 0) return req.query;
+  }
+
+  const rawUrl =
+    typeof req.url === "string"
+      ? req.url
+      : typeof req.url?.toString === "function"
+        ? req.url.toString()
+        : "";
+
   try {
-    const host = req.headers?.host ?? "localhost";
-    const url = new URL(req.url ?? "/", `http://${host}`);
-    return Object.fromEntries(url.searchParams.entries());
+    const parsed = rawUrl.startsWith("http")
+      ? new URL(rawUrl)
+      : new URL(rawUrl || "/", "https://www.linkedrank.fr");
+    return Object.fromEntries(parsed.searchParams.entries());
   } catch {
     return {};
   }

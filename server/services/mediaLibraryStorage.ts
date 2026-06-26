@@ -51,10 +51,13 @@ export async function saveMediaFile(
   const fileKey = `media-library/${userId}/${safeName}`;
 
   if (isServerlessDeployment() || hasCloudStorageCredentials()) {
-    await uploadCloudFile(fileKey, buffer, mimeType);
+    const cloudUrl = await uploadCloudFile(fileKey, buffer, mimeType);
     return {
       fileKey,
-      fileUrl: buildMediaProxyUrl(fileKey),
+      fileUrl:
+        cloudUrl.startsWith("http") && !cloudUrl.includes("localhost")
+          ? cloudUrl
+          : buildMediaProxyUrl(fileKey),
     };
   }
 

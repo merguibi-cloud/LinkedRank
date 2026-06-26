@@ -24,6 +24,7 @@ import { buildLearningContext, type LearningContext } from "./agentLearningServi
 import { generatePostImage } from "./postImageService";
 import { renderQuoteImage } from "./htmlToImage";
 import { projectUpcomingPublications } from "./upcomingPublications";
+import { normalizeStoredImageFields } from "../_core/publicUrl";
 import type { AutoPublishSettings } from "../../drizzle/schema";
 
 export const PREFILL_LOOKAHEAD_HOURS = 48;
@@ -518,11 +519,13 @@ export async function prefillQueueForUser(userId: number): Promise<number> {
       const { content, imageUrl, imageKey, mediaLibraryId, plan, generatedPostId } =
         await generateSmartAutoPost(userId, settings, slotId + created);
 
+      const storedImage = normalizeStoredImageFields(imageUrl, imageKey);
+
       await db.insert(autoPublishQueue).values({
         userId,
         content,
-        imageUrl,
-        imageKey: imageKey ?? null,
+        imageUrl: storedImage.imageUrl,
+        imageKey: storedImage.imageKey,
         mediaLibraryId: mediaLibraryId || null,
         generatedPostId: generatedPostId ?? null,
         scheduledFor,

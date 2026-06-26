@@ -35,6 +35,22 @@ describe("resolvePublicUrl", () => {
     expect(url).toContain("/api/media/media-library/99/photo.png");
   });
 
+  it("rewrites prod media proxy URLs from stored path", () => {
+    const url = resolveStorageAssetUrl(
+      "https://www.linkedrank.fr/api/media/media-library/1/x.png",
+      null
+    );
+    expect(url).toContain("/api/media/media-library/1/x.png");
+  });
+
+  it("rewrites localhost media proxy URLs via imageKey", () => {
+    const url = resolveStorageAssetUrl(
+      "http://localhost:3000/api/media/media-library/1/x.png",
+      "media-library/1/x.png"
+    );
+    expect(url).toContain("/api/media/media-library/1/x.png");
+  });
+
   it("keeps absolute cloud URLs unchanged", () => {
     const blob =
       "https://abc.public.blob.vercel-storage.com/media-library/1/x.png";
