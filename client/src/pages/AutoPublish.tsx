@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLinkedInConnectUrl, getLoginUrl, getSignupUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { formatDateInput, getDefaultScheduleTime, combineDateAndTime } from "@/lib/scheduleUtils";
+import { formatDateInput, getDefaultScheduleTime, combineDateAndTime, buildScheduledAtIso } from "@/lib/scheduleUtils";
 import { AI_IMAGE_FORMATS, AI_IMAGE_STYLES } from "@/lib/aiImageStyles";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
 import { GettingStartedJourney } from "@/components/GettingStartedJourney";
@@ -920,6 +920,7 @@ export default function AutoPublish() {
           imageUrl: activeImageUrl || undefined,
           date: scheduleDate,
           time: scheduleTime,
+          scheduledAt: buildScheduledAtIso(scheduleDate, scheduleTime),
           source: "auto-publish",
         }),
       });

@@ -18,6 +18,7 @@ import {
   type UserContext,
   type GenerationRequest,
 } from "./contentGenerator";
+import { resolvePublicUrl } from "../_core/publicUrl";
 
 export interface MediaItem {
   id: number;
@@ -53,7 +54,7 @@ function mapMediaRow(row: typeof mediaLibrary.$inferSelect): MediaItem {
     title: row.title,
     description: row.description,
     tags: parseTags(row.tags),
-    fileUrl: row.fileUrl,
+    fileUrl: resolvePublicUrl(row.fileUrl),
     fileKey: row.fileKey,
     fileName: row.fileName,
     mimeType: row.mimeType,
@@ -180,7 +181,12 @@ export async function uploadMedia(
   const base64Clean = input.base64Data.replace(/^data:[^;]+;base64,/, "");
   const buffer = Buffer.from(base64Clean, "base64");
 
-  const { fileUrl, fileKey } = await saveMediaFile(buffer, input.fileName, userId);
+  const { fileUrl, fileKey } = await saveMediaFile(
+    buffer,
+    input.fileName,
+    userId,
+    input.mimeType
+  );
 
   const aiAnalysis = await analyzeMediaWithAI(fileUrl, mediaType, input.title);
 

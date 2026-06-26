@@ -2,7 +2,7 @@
  * Orchestrateur auto-publication :
  * - Pré-remplit la file d'attente avant publication
  * - Varie formats, angles et visuels (pas de posts identiques)
- * - Génération réflexive (Gemini) + images (DALL-E / prompts enrichis)
+ * - Génération réflexive (Gemini) + images (Nano Banana / prompts enrichis)
  */
 
 import { and, desc, eq, inArray } from "drizzle-orm";
@@ -24,6 +24,7 @@ import { buildLearningContext, type LearningContext } from "./agentLearningServi
 import { generatePostImage } from "./postImageService";
 import { renderQuoteImage } from "./htmlToImage";
 import { projectUpcomingPublications } from "./upcomingPublications";
+import { normalizeStoredImageFields } from "../_core/publicUrl";
 import type { AutoPublishSettings } from "../../drizzle/schema";
 
 export const PREFILL_LOOKAHEAD_HOURS = 48;
@@ -77,6 +78,8 @@ export type VariationPlan = {
 export type SmartPostResult = {
   content: string;
   imageUrl: string | null;
+  imageKey?: string | null;
+  mediaLibraryId?: number | null;
   plan: VariationPlan;
   generatedPostId?: number;
 };
@@ -257,7 +260,11 @@ async function generateVariedImage(
   settings: AutoPublishSettings,
   plan: VariationPlan,
   generatedPostId?: number
-): Promise<string | null> {
+): Promise<{
+  imageUrl: string;
+  imageKey: string;
+  mediaLibraryId: number;
+} | null> {
   const topics = parseInspirationTopics(settings);
   if (!topics.includeImage) return null;
 
@@ -271,7 +278,11 @@ async function generateVariedImage(
         generatedPostId,
         suggestedMedia: `Unique visual for: ${plan.topicAngle}. Style: ${plan.aiImageStyle}. Must differ from previous posts.`,
       });
-      return result.imageUrl;
+      return {
+        imageUrl: result.imageUrl,
+        imageKey: result.imageKey,
+        mediaLibraryId: result.mediaLibraryId,
+      };
     }
 
     const lines = content.split("\n").filter((l) => l.trim().length > 15);
@@ -286,7 +297,13 @@ async function generateVariedImage(
       style: topics.imageStyle || "gradient",
       colorPalette: plan.colorPalette,
     });
-    return result?.url || null;
+    if (!result?.url) return null;
+    const keyMatch = result.url.match(/\/(generated\/[^?]+)/);
+    return {
+      imageUrl: result.url,
+      imageKey: keyMatch?.[1] ?? `generated/${Date.now()}.png`,
+      mediaLibraryId: 0,
+    };
   } catch (error) {
     console.error("[AutoPublishOrchestrator] Image generation failed:", error);
     return null;
@@ -376,7 +393,7 @@ export async function generateSmartAutoPost(
     })
     .returning({ id: generatedPosts.id });
 
-  const imageUrl = await generateVariedImage(
+  const imageAsset = await generateVariedImage(
     userId,
     content,
     settings,
@@ -384,16 +401,25 @@ export async function generateSmartAutoPost(
     saved?.id
   );
 
-  if (saved && imageUrl) {
+  if (saved && imageAsset) {
     await db
       .update(generatedPosts)
-      .set({ imageUrl, updatedAt: new Date() })
+      .set({
+        imageUrl: imageAsset.imageUrl,
+        imageKey: imageAsset.imageKey,
+        ...(imageAsset.mediaLibraryId
+          ? { mediaLibraryId: imageAsset.mediaLibraryId }
+          : {}),
+        updatedAt: new Date(),
+      })
       .where(eq(generatedPosts.id, saved.id));
   }
 
   return {
     content,
-    imageUrl,
+    imageUrl: imageAsset?.imageUrl ?? null,
+    imageKey: imageAsset?.imageKey ?? null,
+    mediaLibraryId: imageAsset?.mediaLibraryId ?? null,
     plan,
     generatedPostId: saved?.id,
   };
@@ -490,13 +516,17 @@ export async function prefillQueueForUser(userId: number): Promise<number> {
     const slotId = slotIdMatch ? Number(slotIdMatch[1]) : 0;
 
     try {
-      const { content, imageUrl, plan, generatedPostId } =
+      const { content, imageUrl, imageKey, mediaLibraryId, plan, generatedPostId } =
         await generateSmartAutoPost(userId, settings, slotId + created);
+
+      const storedImage = normalizeStoredImageFields(imageUrl, imageKey);
 
       await db.insert(autoPublishQueue).values({
         userId,
         content,
-        imageUrl,
+        imageUrl: storedImage.imageUrl,
+        imageKey: storedImage.imageKey,
+        mediaLibraryId: mediaLibraryId || null,
         generatedPostId: generatedPostId ?? null,
         scheduledFor,
         status: "pending",

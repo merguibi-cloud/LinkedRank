@@ -1,5 +1,8 @@
 import { Router, type Request, type Response } from "express";
-import { isAuthorizedCronRequest } from "../lib/cronAuth";
+import {
+  extractCronAuthFromRequest,
+  isAuthorizedCronRequest,
+} from "../lib/cronAuth";
 import {
   runAutoPublishPrefill,
   runAutoPublishTick,
@@ -8,7 +11,7 @@ import {
 const router = Router();
 
 function requireCronAuth(req: Request, res: Response): boolean {
-  if (!isAuthorizedCronRequest(req.headers.authorization)) {
+  if (!isAuthorizedCronRequest(extractCronAuthFromRequest(req))) {
     res.status(401).json({ error: "Unauthorized" });
     return false;
   }

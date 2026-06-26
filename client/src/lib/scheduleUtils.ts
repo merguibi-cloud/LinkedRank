@@ -17,6 +17,14 @@ export function combineDateAndTime(dateStr: string, timeStr: string): Date {
   return new Date(year, month - 1, day, hours, minutes, 0, 0);
 }
 
+export { buildScheduledAtIso } from "@shared/scheduleTime";
+
+/** Vérifie que la date/heure choisie est dans le futur (marge 1 min). */
+export function isScheduledInFuture(dateStr: string, timeStr: string): boolean {
+  const scheduled = combineDateAndTime(dateStr, timeStr);
+  return scheduled.getTime() > Date.now() - 60_000;
+}
+
 export function getDefaultScheduleTime(): { date: string; time: string } {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);

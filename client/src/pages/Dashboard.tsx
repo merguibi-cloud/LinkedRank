@@ -11,6 +11,7 @@ import { useLinkedInStatus } from "@/hooks/useLinkedInStatus";
 import type { UpcomingPublication } from "@/components/autopublish/UpcomingPublicationsView";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { resolveDisplayImageUrl } from "@/lib/imageUrl";
 import {
   Sparkles,
   Calendar,
@@ -345,9 +346,14 @@ export default function Dashboard() {
                         {pub.imageUrl ? (
                           <div className="w-20 sm:w-24 shrink-0">
                             <img
-                              src={pub.imageUrl}
+                              src={resolveDisplayImageUrl(pub.imageUrl) ?? pub.imageUrl}
                               alt=""
                               className="h-full min-h-[88px] w-full object-cover"
+                              onError={(e) => {
+                                const img = e.currentTarget;
+                                img.style.display = "none";
+                                img.parentElement?.classList.add("hidden");
+                              }}
                             />
                           </div>
                         ) : (
@@ -430,9 +436,12 @@ export default function Dashboard() {
                     {post.imageUrl ? (
                       <div className="aspect-[16/9] overflow-hidden bg-black/20">
                         <img
-                          src={post.imageUrl}
+                          src={resolveDisplayImageUrl(post.imageUrl) ?? post.imageUrl}
                           alt=""
                           className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
                         />
                       </div>
                     ) : (

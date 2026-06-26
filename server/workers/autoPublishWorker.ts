@@ -5,6 +5,13 @@ import { postToLinkedIn } from "../services/linkedin";
 import { getLinkedinSettings } from "../db";
 import { notifyPostPublished } from "../services/notificationService";
 import { recordPublishedPost } from "../services/agentLearningService";
+import { resolveStorageAssetUrl, normalizeStoredImageFields } from "../_core/publicUrl";
+import {
+  getDateKeyInZone,
+  getDayOfWeekInZone,
+  getTimeKeyInZone,
+  wallClockToUtc,
+} from "@shared/scheduleTime";
 import {
   prefillAllEnabledUsers,
   generateSmartAutoPost,
@@ -33,28 +40,24 @@ interface ScheduledPost {
 }
 
 /**
- * Get the day of week (0 = Sunday, 1 = Monday, etc.)
+ * Get the day of week (0 = Sunday, 1 = Monday, etc.) — Europe/Paris
  */
 function getDayOfWeek(): number {
-  return new Date().getDay();
+  return getDayOfWeekInZone();
 }
 
 /**
- * Get current time in HH:MM format
+ * Get current time in HH:MM format — Europe/Paris
  */
 function getCurrentTime(): string {
-  const now = new Date();
-  const hours = now.getHours().toString().padStart(2, "0");
-  const minutes = now.getMinutes().toString().padStart(2, "0");
-  return `${hours}:${minutes}`;
+  return getTimeKeyInZone();
 }
 
 /**
- * Get today's date string for tracking
+ * Get today's date string for tracking — Europe/Paris
  */
 function getTodayString(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}-${now.getDate().toString().padStart(2, "0")}`;
+  return getDateKeyInZone();
 }
 
 /**
@@ -119,7 +122,7 @@ async function tryClaimQueueItem(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
   id: number
 ): Promise<boolean> {
-  const result = await db
+  const claimed = await db
     .update(autoPublishQueue)
     .set({ status: "publishing", updatedAt: new Date() })
     .where(
@@ -127,10 +130,10 @@ async function tryClaimQueueItem(
         eq(autoPublishQueue.id, id),
         eq(autoPublishQueue.status, "pending")
       )
-    );
+    )
+    .returning({ id: autoPublishQueue.id });
 
-  const affectedRows = (result as unknown as { affectedRows?: number }).affectedRows ?? 0;
-  return affectedRows > 0;
+  return claimed.length > 0;
 }
 
 async function runPrefillCycle(): Promise<void> {
@@ -143,6 +146,36 @@ async function runPrefillCycle(): Promise<void> {
   } finally {
     isPrefilling = false;
   }
+}
+
+/** Repasse en pending les posts bloqués en publishing (timeout serverless). */
+async function recoverStuckPublishingItems(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  const staleBefore = new Date(Date.now() - 3 * 60 * 1000);
+  const stuck = await db
+    .select({ id: autoPublishQueue.id })
+    .from(autoPublishQueue)
+    .where(
+      and(
+        eq(autoPublishQueue.status, "publishing"),
+        lte(autoPublishQueue.updatedAt, staleBefore)
+      )
+    );
+
+  if (stuck.length === 0) return;
+
+  for (const row of stuck) {
+    await db
+      .update(autoPublishQueue)
+      .set({ status: "pending", updatedAt: new Date() })
+      .where(eq(autoPublishQueue.id, row.id));
+  }
+
+  console.log(
+    `[AutoPublish] ${stuck.length} post(s) débloqué(s) (publishing → pending)`
+  );
 }
 
 /**
@@ -175,21 +208,45 @@ async function processScheduledQueue(): Promise<void> {
 
     console.log(`[AutoPublish] Processing ${pendingPosts.length} queue item(s)`);
 
-    for (const post of pendingPosts) {
+    const batchLimit = process.env.VERCEL ? 1 : pendingPosts.length;
+
+    for (const post of pendingPosts.slice(0, batchLimit)) {
       const claimed = await tryClaimQueueItem(db, post.id);
       if (!claimed) {
         console.log(`[AutoPublish] Post ${post.id} already claimed, skipping`);
         continue;
       }
 
-      const success = await publishToLinkedIn(post.userId, post.content, post.imageUrl);
+      let success = false;
+      let errorMessage: string | null = null;
+      const resolvedImageUrl = resolveStorageAssetUrl(
+        post.imageUrl,
+        post.imageKey
+      );
+
+      try {
+        success = await publishToLinkedIn(
+          post.userId,
+          post.content,
+          resolvedImageUrl
+        );
+        if (!success) {
+          errorMessage = "Publication LinkedIn échouée";
+        }
+      } catch (error) {
+        console.error(`[AutoPublish] Post ${post.id} publish error:`, error);
+        errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Publication LinkedIn échouée";
+      }
 
       await db
         .update(autoPublishQueue)
         .set({
           status: success ? "published" : "failed",
           publishedAt: success ? new Date() : null,
-          errorMessage: success ? null : "Publication LinkedIn échouée",
+          errorMessage: success ? null : errorMessage,
           updatedAt: new Date(),
         })
         .where(eq(autoPublishQueue.id, post.id));
@@ -295,9 +352,7 @@ async function processScheduledPublications(): Promise<void> {
         continue;
       }
 
-      const slotDate = new Date();
-      const [h, m] = schedule.publishTime.split(":").map(Number);
-      slotDate.setHours(h, m, 0, 0);
+      const slotDate = wallClockToUtc(todayString, schedule.publishTime);
 
       const existingQueue = await db
         .select()
@@ -324,15 +379,23 @@ async function processScheduledPublications(): Promise<void> {
 
       try {
         console.log(`[AutoPublish] Emergency generate for user ${schedule.userId} slot ${schedule.id}`);
-        const { content, imageUrl, plan, generatedPostId } =
+        const { content, imageUrl, imageKey, plan, generatedPostId } =
           await emergencyGenerateForSlot(schedule.userId, settings, schedule.id);
 
-        const success = await publishToLinkedIn(schedule.userId, content, imageUrl);
+        const resolvedImageUrl = resolveStorageAssetUrl(imageUrl, imageKey);
+        const success = await publishToLinkedIn(
+          schedule.userId,
+          content,
+          resolvedImageUrl
+        );
+
+        const storedImage = normalizeStoredImageFields(imageUrl, imageKey);
 
         await db.insert(autoPublishQueue).values({
           userId: schedule.userId,
           content,
-          imageUrl: imageUrl || null,
+          imageUrl: storedImage.imageUrl,
+          imageKey: storedImage.imageKey,
           generatedPostId: generatedPostId ?? null,
           scheduledFor: new Date(),
           status: success ? "published" : "failed",
@@ -388,6 +451,7 @@ function cleanupOldSlots(): void {
 
 /** Exécution d'un cycle de publication (file + créneaux récurrents). */
 export async function runAutoPublishTick(): Promise<void> {
+  await recoverStuckPublishingItems();
   await processScheduledQueue();
   await processScheduledPublications();
 }

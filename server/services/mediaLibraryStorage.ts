@@ -1,8 +1,20 @@
 import fs from "fs/promises";
 import path from "path";
-import { ENV } from "../_core/env";
+import { buildMediaProxyUrl, getPublicBaseUrl } from "../_core/publicUrl";
+import { isServerlessDeployment } from "../_core/isServerless";
+import { uploadCloudFile } from "../lib/cloudStorage";
+import {
+  deleteFromSupabaseStorage,
+} from "../lib/supabaseStorage";
 
 const UPLOAD_DIR = path.resolve(process.cwd(), "uploads", "media-library");
+
+function hasCloudStorageCredentials(): boolean {
+  return (
+    Boolean(process.env.BLOB_READ_WRITE_TOKEN) ||
+    Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+  );
+}
 
 const ALLOWED_MIME_TYPES: Record<string, "image" | "video" | "document"> = {
   "image/jpeg": "image",
@@ -28,26 +40,44 @@ export function isAllowedMimeType(mimeType: string): boolean {
 export async function saveMediaFile(
   buffer: Buffer,
   fileName: string,
-  userId: number
+  userId: number,
+  mimeType = "application/octet-stream"
 ): Promise<{ fileUrl: string; fileKey: string }> {
   if (buffer.length > MAX_FILE_SIZE) {
     throw new Error("Fichier trop volumineux (max 25 Mo)");
   }
 
+  const safeName = `${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  const fileKey = `media-library/${userId}/${safeName}`;
+
+  if (isServerlessDeployment() || hasCloudStorageCredentials()) {
+    const cloudUrl = await uploadCloudFile(fileKey, buffer, mimeType);
+    return {
+      fileKey,
+      fileUrl:
+        cloudUrl.startsWith("http") && !cloudUrl.includes("localhost")
+          ? cloudUrl
+          : buildMediaProxyUrl(fileKey),
+    };
+  }
+
   const userDir = path.join(UPLOAD_DIR, String(userId));
   await fs.mkdir(userDir, { recursive: true });
-
-  const safeName = `${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
   await fs.writeFile(path.join(userDir, safeName), buffer);
 
-  const baseUrl = (ENV.appUrl || "http://localhost:3000").replace(/\/$/, "");
+  const baseUrl = getPublicBaseUrl();
   return {
-    fileKey: `media-library/${userId}/${safeName}`,
-    fileUrl: `${baseUrl}/uploads/media-library/${userId}/${safeName}`,
+    fileKey,
+    fileUrl: `${baseUrl}/api/media/${fileKey.split("/").map(encodeURIComponent).join("/")}`,
   };
 }
 
 export async function deleteMediaFile(fileKey: string): Promise<void> {
+  if (isServerlessDeployment()) {
+    await deleteFromSupabaseStorage(fileKey);
+    return;
+  }
+
   const filePath = path.resolve(process.cwd(), "uploads", fileKey);
   const uploadsRoot = path.resolve(process.cwd(), "uploads");
   if (!filePath.startsWith(uploadsRoot)) return;

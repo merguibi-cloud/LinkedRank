@@ -5,50 +5,63 @@
  * Prérequis : CRON_SECRET dans .env et sur Vercel (pnpm vercel:env)
  * Usage : node scripts/setup-external-cron.mjs
  */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, appendFileSync } from "node:fs";
 
 const ENV_FILE = ".env";
-const SITE = process.env.APP_URL || process.env.VERCEL_PROD_URL || "https://linkedrank-pi.vercel.app";
-const CRON_URL = `${SITE.replace(/\/$/, "")}/api/cron/auto-publish`;
+const SITE = process.env.APP_URL || process.env.VERCEL_PROD_URL || "https://www.linkedrank.fr";
+const BASE = SITE.replace(/\/$/, "");
 
 function getCronSecret() {
-  if (!existsSync(ENV_FILE)) {
-    console.error(".env introuvable");
-    process.exit(1);
+  if (existsSync(ENV_FILE)) {
+    const match = readFileSync(ENV_FILE, "utf8").match(/^CRON_SECRET=(.+)$/m);
+    if (match?.[1]?.trim()) return match[1].trim();
   }
-  const match = readFileSync(ENV_FILE, "utf8").match(/^CRON_SECRET=(.+)$/m);
-  if (!match?.[1]) {
-    console.error("CRON_SECRET manquant — lancez pnpm vercel:env d'abord");
-    process.exit(1);
+  if (existsSync(".env.vercel.tmp")) {
+    const match = readFileSync(".env.vercel.tmp", "utf8").match(/^CRON_SECRET=(.+)$/m);
+    if (match?.[1]?.trim()) {
+      const secret = match[1].trim();
+      if (existsSync(ENV_FILE)) {
+        appendFileSync(ENV_FILE, `\nCRON_SECRET=${secret}\n`);
+        console.log("CRON_SECRET copié depuis .env.vercel.tmp → .env\n");
+      }
+      return secret;
+    }
   }
-  return match[1].trim();
+  console.error(
+    "CRON_SECRET manquant — lancez :\n  vercel env pull .env.vercel.tmp --environment=production\n  pnpm vercel:env"
+  );
+  process.exit(1);
 }
 
 const secret = getCronSecret();
+const headerUrl = `${BASE}/api/cron/auto-publish`;
+const queryUrl = `${headerUrl}?cron_secret=${encodeURIComponent(secret)}`;
 
 console.log(`
-=== Auto-publication — cron externe (plan Vercel Hobby) ===
+=== Auto-publication — cron externe (cron-job.org) ===
 
-Le plan Hobby Vercel n'autorise qu'1 cron/jour. Pour publier à l'heure prévue,
-configurez un cron GRATUIT sur https://console.cron-job.org :
+Votre job a été désactivé car l'authentification échouait (401).
+Réactivez-le avec l'une des options ci-dessous :
 
-1. Créer un compte gratuit
-2. Create cronjob → URL :
-   ${CRON_URL}
+── Option A (recommandée) : en-tête HTTP ──
+URL : ${headerUrl}
+Méthode : GET
+Schedule : toutes les 1 à 5 minutes
+En-tête personnalisé :
+  Authorization: Bearer ${secret}
 
-3. Schedule : Every 1 minute (ou Every 5 minutes minimum recommandé)
+── Option B : secret dans l'URL ──
+URL : ${queryUrl}
+Méthode : GET
+Schedule : toutes les 1 à 5 minutes
+(Aucun en-tête requis)
 
-4. Request method : GET
-
-5. Headers (Advanced) :
-   Authorization: Bearer ${secret.slice(0, 8)}…${secret.slice(-4)}
-   (valeur complète dans votre .env → CRON_SECRET)
-
-6. Activer le job
-
-Alternative : passer au plan Vercel Pro et ajouter dans vercel.json :
-  "crons": [{ "path": "/api/cron/auto-publish", "schedule": "* * * * *" }]
+Étapes cron-job.org :
+1. Ouvrir le job "auto-publish" désactivé → Edit
+2. Coller l'URL (option A ou B)
+3. Si option A : Advanced → Request headers → Authorization = Bearer <secret>
+4. Sauvegarder puis réactiver le job
 
 Test manuel :
-  curl -H "Authorization: Bearer <CRON_SECRET>" ${CRON_URL}
+  curl -H "Authorization: Bearer ${secret}" ${headerUrl}
 `);

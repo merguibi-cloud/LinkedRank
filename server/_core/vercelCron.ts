@@ -1,10 +1,10 @@
-import { isAuthorizedCronRequest } from "../lib/cronAuth";
+import { isAuthorizedCronRequest, extractCronAuthFromRequest } from "../lib/cronAuth";
 import {
   runAutoPublishPrefill,
   runAutoPublishTick,
 } from "../workers/autoPublishWorker";
 
-export { isAuthorizedCronRequest };
+export { isAuthorizedCronRequest, extractCronAuthFromRequest };
 
 export async function runAutoPublishCron(): Promise<{ prefill: boolean }> {
   await runAutoPublishTick();

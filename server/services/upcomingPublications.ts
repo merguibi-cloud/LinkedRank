@@ -3,6 +3,8 @@ import type {
   AutoPublishSchedule,
   AutoPublishSettings,
 } from "../../drizzle/schema";
+import { wallClockToUtc } from "@shared/scheduleTime";
+import { resolveStorageAssetUrl } from "../_core/publicUrl";
 
 export type UpcomingPublicationType = "queued" | "recurring" | "one_shot";
 export type UpcomingPublicationStatus = "pending" | "projected";
@@ -30,10 +32,8 @@ function formatDateKey(date: Date): string {
 }
 
 function combineDateTime(date: Date, time: string): Date {
-  const [hours, minutes] = time.split(":").map(Number);
-  const result = new Date(date);
-  result.setHours(hours, minutes, 0, 0);
-  return result;
+  const dateKey = formatDateKey(date);
+  return wallClockToUtc(dateKey, time);
 }
 
 function formatDayLabel(date: Date, now: Date): string {
@@ -122,7 +122,7 @@ export function projectUpcomingPublications(options: {
       type,
       status: "pending",
       content: item.content,
-      imageUrl: item.imageUrl,
+      imageUrl: resolveStorageAssetUrl(item.imageUrl, item.imageKey),
       source: sourceType,
       queueId: item.id,
       dayLabel: formatDayLabel(scheduled, now),

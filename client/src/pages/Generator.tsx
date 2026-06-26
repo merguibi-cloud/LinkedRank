@@ -39,7 +39,7 @@ import {
   FileText,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { formatDateInput, getDefaultScheduleTime } from "@/lib/scheduleUtils";
+import { formatDateInput, getDefaultScheduleTime, buildScheduledAtIso } from "@/lib/scheduleUtils";
 import { isGuidedMode } from "@/lib/gettingStartedJourney";
 import { MediaLibraryPicker, MediaUploadZone } from "@/components/MediaLibraryPicker";
 import { AI_IMAGE_FORMATS, AI_IMAGE_STYLES, type AiImageFormatId, type AiImageStyleId } from "@/lib/aiImageStyles";
@@ -413,7 +413,8 @@ export default function Generator() {
           mediaLibraryId: selectedMediaId ?? undefined,
           date: scheduleDate,
           time: scheduleTime,
-          generatedPostId: isCarousel ? undefined : activePost?.id,
+          scheduledAt: buildScheduledAtIso(scheduleDate, scheduleTime),
+          generatedPostId: activePost?.id,
         }),
       });
       const data = await response.json();
