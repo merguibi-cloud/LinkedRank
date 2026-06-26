@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DEFAULT_AUTH_REDIRECT, getLoginUrl } from "@/const";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { Bot, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -43,13 +44,13 @@ export default function ResetPassword() {
       setVerifyState("ready");
     };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       if (session) markReady();
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       if (session) markReady();
     });
 
