@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
+import { IllustrationSlot } from "@/components/IllustrationSlot";
 import {
   BarChart3,
   Calendar,
@@ -170,6 +171,14 @@ export function AnalyticsOverview() {
         <CardContent>
           {stats.recentPosts.length === 0 ? (
             <div className="text-center py-8">
+              {/* Drop an image at public/images/empty-analytics.png to fill this */}
+              <IllustrationSlot
+                src="/images/empty-analytics.png"
+                icon={BarChart3}
+                alt=""
+                className="h-14 w-14 mx-auto mb-3"
+                iconClassName="h-10 w-10 mx-auto mb-3"
+              />
               <p className="text-muted-foreground text-sm mb-4">
                 Aucun contenu pour le moment
               </p>

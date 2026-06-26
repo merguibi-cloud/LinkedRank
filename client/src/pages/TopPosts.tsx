@@ -4,12 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Trophy, 
-  TrendingUp, 
-  Heart, 
-  MessageCircle, 
-  Share2, 
+import {
+  Trophy,
+  TrendingUp,
+  Heart,
+  MessageCircle,
+  Share2,
   Eye,
   ExternalLink,
   Flame,
@@ -18,8 +18,10 @@ import {
   ChevronRight,
   Sparkles,
   Users,
-  Award
+  Award,
+  SearchX
 } from "lucide-react";
+import { IllustrationSlot } from "@/components/IllustrationSlot";
 
 interface ViralPost {
   id: number;
@@ -375,42 +377,51 @@ export default function TopPosts() {
         {/* Header */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-500/20 via-red-500/20 to-pink-500/20 border border-white/10 p-8">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-500/10 via-transparent to-transparent" />
-          <div className="relative">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-orange-500 to-red-500">
-                <Flame className="w-8 h-8 text-white" />
+          <div className="relative flex items-center justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-orange-500 to-red-500">
+                  <Flame className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-white">Top Publications</h1>
+                  <p className="text-white/60">Les publications LinkedIn les plus virales de la semaine</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-3xl font-bold text-white">Top Publications</h1>
-                <p className="text-white/60">Les publications LinkedIn les plus virales de la semaine</p>
+
+              {/* Week selector */}
+              <div className="flex items-center gap-4 mt-6">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
+                  <Calendar className="w-4 h-4 text-orange-400" />
+                  <span className="text-white/80">Semaine {selectedWeek}, {selectedYear}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
+                    onClick={() => setSelectedWeek(Math.max(1, selectedWeek - 1))}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
+                    onClick={() => setSelectedWeek(Math.min(52, selectedWeek + 1))}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
-            
-            {/* Week selector */}
-            <div className="flex items-center gap-4 mt-6">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
-                <Calendar className="w-4 h-4 text-orange-400" />
-                <span className="text-white/80">Semaine {selectedWeek}, {selectedYear}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
-                  onClick={() => setSelectedWeek(Math.max(1, selectedWeek - 1))}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
-                  onClick={() => setSelectedWeek(Math.min(52, selectedWeek + 1))}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+
+            {/* Drop an image at public/images/hero-top-posts.png to fill this */}
+            <IllustrationSlot
+              src="/images/hero-top-posts.png"
+              alt=""
+              className="hidden lg:block w-56 h-36 shrink-0"
+            />
           </div>
         </div>
 
@@ -492,6 +503,22 @@ export default function TopPosts() {
         </Tabs>
 
         {/* Posts List */}
+        {filteredPosts.length === 0 ? (
+          <Card className="bg-card/50 border-white/10 backdrop-blur-sm">
+            <CardContent className="py-16 text-center">
+              {/* Drop an image at public/images/empty-top-posts.png to fill this */}
+              <IllustrationSlot
+                src="/images/empty-top-posts.png"
+                icon={SearchX}
+                alt=""
+                className="w-16 h-16 mx-auto mb-4"
+                iconClassName="w-12 h-12 mx-auto mb-4"
+              />
+              <h3 className="text-lg font-medium text-white">Aucune publication pour ce filtre</h3>
+              <p className="text-muted-foreground mt-1">Essayez une autre langue ou une autre semaine</p>
+            </CardContent>
+          </Card>
+        ) : (
         <div className="space-y-4">
           {filteredPosts.map((post, index) => (
             <Card 
@@ -586,6 +613,7 @@ export default function TopPosts() {
             </Card>
           ))}
         </div>
+        )}
 
         {/* CTA */}
         <Card className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border-white/10">
