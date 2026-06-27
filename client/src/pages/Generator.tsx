@@ -428,6 +428,10 @@ export default function Generator() {
       .finally(() => setLoadingAutoPublish(false));
   }, [workflowStep]);
 
+  const updateAutoPublishField = (key: string, value: unknown) => {
+    setAutoPublishSettingsData(prev => ({ ...(prev ?? {}), [key]: value }));
+  };
+
   const addAutoPublishSlot = () => {
     if (autoPublishScheduleSlots.some(s => s.dayOfWeek === newSlotDay && s.publishTime === newSlotTime)) {
       toast.info("Ce créneau existe déjà");
@@ -457,6 +461,13 @@ export default function Generator() {
             isEnabled: true,
             tone: autoPublishSettingsData?.tone ?? (isCarousel ? "professional" : tone),
             language: autoPublishSettingsData?.language ?? (isCarousel ? "FR" : language),
+            viralityLevel: autoPublishSettingsData?.viralityLevel ?? "medium",
+            includeEmojis: autoPublishSettingsData?.includeEmojis !== false,
+            includeHashtags: autoPublishSettingsData?.includeHashtags !== false,
+            includeCallToAction: autoPublishSettingsData?.includeCallToAction !== false,
+            sector: autoPublishSettingsData?.sector ?? "",
+            targetAudience: autoPublishSettingsData?.targetAudience ?? "",
+            personalContext: autoPublishSettingsData?.personalContext ?? "",
           },
           schedule: autoPublishScheduleSlots,
         }),
@@ -526,7 +537,8 @@ export default function Generator() {
         </div>
       </header>
 
-      <div className="container space-y-4 py-4 sm:space-y-6 sm:py-6">
+      <div className="container py-4 sm:py-6">
+      <div className="max-w-3xl mx-auto w-full space-y-4 sm:space-y-6">
         <Suspense fallback={null}>
           <GettingStartedJourney variant="compact" />
         </Suspense>
@@ -545,7 +557,7 @@ export default function Generator() {
         <LinkedInConnectBanner />
 
         {!contentType ? (
-          <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
+          <div className="grid sm:grid-cols-2 gap-4">
             <button
               type="button"
               onClick={() => setContentType("post")}
@@ -619,7 +631,7 @@ export default function Generator() {
             </div>
 
         {/* Only the current step's content is shown — never two at once */}
-        <div className="max-w-2xl mx-auto w-full space-y-4">
+        <div className="w-full space-y-4">
           {workflowStep === "configure" && !activePost && (
             <Tabs defaultValue="generate" className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-card/50">
@@ -1240,13 +1252,108 @@ export default function Generator() {
                         </Button>
                       </div>
 
-                      <Link
-                        href="/auto-publish"
-                        className="text-xs text-violet-light hover:underline flex items-center gap-1"
-                      >
-                        <Settings2 className="w-3 h-3" />
-                        Configuration avancée (secteur, ton, inspirations, image...)
-                      </Link>
+                      <div className="space-y-4 pt-2 border-t border-border">
+                        <Label className="flex items-center gap-2 text-sm">
+                          <Settings2 className="w-4 h-4 text-violet-light" />
+                          Préférences de contenu pour les publications automatiques
+                        </Label>
+
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Secteur d&apos;activité</Label>
+                            <Input
+                              placeholder="Ex: Tech & Startups"
+                              value={String(autoPublishSettingsData?.sector ?? "")}
+                              onChange={e => updateAutoPublishField("sector", e.target.value)}
+                              className="bg-background/50"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Audience cible</Label>
+                            <Input
+                              placeholder="Ex: Entrepreneurs, Marketeurs..."
+                              value={String(autoPublishSettingsData?.targetAudience ?? "")}
+                              onChange={e => updateAutoPublishField("targetAudience", e.target.value)}
+                              className="bg-background/50"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid sm:grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Ton</Label>
+                            <Select
+                              value={String(autoPublishSettingsData?.tone ?? "professional")}
+                              onValueChange={v => updateAutoPublishField("tone", v)}
+                            >
+                              <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="professional">Professionnel</SelectItem>
+                                <SelectItem value="casual">Décontracté</SelectItem>
+                                <SelectItem value="inspirational">Inspirant</SelectItem>
+                                <SelectItem value="educational">Éducatif</SelectItem>
+                                <SelectItem value="provocative">Provocateur</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Langue</Label>
+                            <Select
+                              value={String(autoPublishSettingsData?.language ?? "FR")}
+                              onValueChange={v => updateAutoPublishField("language", v)}
+                            >
+                              <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FR">Français</SelectItem>
+                                <SelectItem value="EN">Anglais</SelectItem>
+                                <SelectItem value="AR">Arabe</SelectItem>
+                                <SelectItem value="ES">Espagnol</SelectItem>
+                                <SelectItem value="DE">Allemand</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Viralité</Label>
+                            <Select
+                              value={String(autoPublishSettingsData?.viralityLevel ?? "medium")}
+                              onValueChange={v => updateAutoPublishField("viralityLevel", v)}
+                            >
+                              <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="low">Conservateur</SelectItem>
+                                <SelectItem value="medium">Équilibré</SelectItem>
+                                <SelectItem value="high">Viral</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-4">
+                          {([
+                            { key: "includeEmojis", label: "Emojis" },
+                            { key: "includeHashtags", label: "Hashtags" },
+                            { key: "includeCallToAction", label: "Call-to-action" },
+                          ] as const).map(option => (
+                            <label key={option.key} className="flex items-center gap-2 text-sm">
+                              <Switch
+                                checked={autoPublishSettingsData?.[option.key] !== false}
+                                onCheckedChange={checked => updateAutoPublishField(option.key, checked)}
+                              />
+                              {option.label}
+                            </label>
+                          ))}
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Contexte personnel (optionnel)</Label>
+                          <Textarea
+                            placeholder="Ex: Je suis CEO d'une startup SaaS B2B, 10 ans d'expérience en marketing digital..."
+                            value={String(autoPublishSettingsData?.personalContext ?? "")}
+                            onChange={e => updateAutoPublishField("personalContext", e.target.value)}
+                            className="bg-background/50 min-h-[80px]"
+                          />
+                        </div>
+                      </div>
                     </>
                   )}
 
@@ -1317,6 +1424,7 @@ export default function Generator() {
         </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );
