@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLinkedInConnectUrl, getLoginUrl, getSignupUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { formatDateInput, getDefaultScheduleTime, combineDateAndTime, buildScheduledAtIso } from "@/lib/scheduleUtils";
+import { formatDateInput, getDefaultScheduleTime, combineDateAndTime, buildScheduledAtIso, formatDisplayDate, getDayOfWeekFromDate } from "@/lib/scheduleUtils";
 import { AI_IMAGE_FORMATS, AI_IMAGE_STYLES } from "@/lib/aiImageStyles";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
 import { GettingStartedJourney } from "@/components/GettingStartedJourney";
@@ -169,21 +169,6 @@ const COLOR_PALETTES = [
   { id: "slate", name: "Ardoise", primary: "#64748B", secondary: "#475569", bg: "from-slate-600 to-slate-800" },
   { id: "gold", name: "Or", primary: "#EAB308", secondary: "#CA8A04", bg: "from-yellow-500 to-amber-600" },
 ];
-
-function formatDisplayDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function getDayOfWeekFromDate(dateStr: string): number {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(y, m - 1, d).getDay();
-}
 
 interface ScheduleSlot {
   dayOfWeek: number;
@@ -460,7 +445,13 @@ export default function AutoPublish() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ settings: settingsToSave, schedule: scheduleToSave }),
+        body: JSON.stringify({
+          settings: {
+            ...settingsToSave,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
+          schedule: scheduleToSave,
+        }),
       });
 
       if (response.ok) {

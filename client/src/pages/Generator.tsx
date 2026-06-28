@@ -48,6 +48,7 @@ import { isGuidedMode } from "@/lib/gettingStartedJourney";
 import { MediaLibraryPicker, MediaUploadZone } from "@/components/MediaLibraryPicker";
 import { AI_IMAGE_FORMATS, AI_IMAGE_STYLES, type AiImageFormatId, type AiImageStyleId } from "@/lib/aiImageStyles";
 import { CAROUSEL_STYLES, CAROUSEL_SLIDE_COUNTS, type CarouselStyleId } from "@/lib/carouselOptions";
+import { buildScheduledAtIso, combineDateAndTime, formatDateInput, formatDisplayDate, getDayOfWeekFromDate } from "@/lib/scheduleUtils";
 
 const GettingStartedJourney = lazy(() =>
   import("@/components/GettingStartedJourney").then((m) => ({
@@ -70,9 +71,28 @@ interface AutoPublishSlot {
   dayOfWeek: number;
   publishTime: string;
   isActive: boolean;
+  publishDate?: string | null;
 }
 
 const DAY_NAMES = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+
+// Date exacte si le créneau en a une, sinon la prochaine occurrence du jour récurrent choisi.
+function getNextOccurrence(slot: AutoPublishSlot): Date {
+  if (slot.publishDate) {
+    return combineDateAndTime(slot.publishDate, slot.publishTime);
+  }
+  const [hours, minutes] = slot.publishTime.split(":").map(Number);
+  const now = new Date();
+  for (let i = 0; i < 8; i++) {
+    const candidate = new Date(now);
+    candidate.setDate(now.getDate() + i);
+    candidate.setHours(hours, minutes, 0, 0);
+    if (candidate.getDay() === slot.dayOfWeek && candidate.getTime() > now.getTime()) {
+      return candidate;
+    }
+  }
+  return now;
+}
 
 type WorkflowStep =
   | "configure"
@@ -128,7 +148,9 @@ export default function Generator() {
   const [autoPublishScheduleSlots, setAutoPublishScheduleSlots] = useState<AutoPublishSlot[]>([]);
   const [loadingAutoPublish, setLoadingAutoPublish] = useState(false);
   const [savingAutoPublish, setSavingAutoPublish] = useState(false);
+  const [newSlotMode, setNewSlotMode] = useState<"recurring" | "date">("recurring");
   const [newSlotDay, setNewSlotDay] = useState(1);
+  const [newSlotDate, setNewSlotDate] = useState(formatDateInput(new Date()));
   const [newSlotTime, setNewSlotTime] = useState("09:00");
   const [imageSource, setImageSource] = useState<"ai" | "library">("library");
   const [selectedMediaId, setSelectedMediaId] = useState<number | null>(null);
@@ -413,6 +435,43 @@ export default function Generator() {
     }
   };
 
+  const handleSchedulePost = async (date: string, time: string) => {
+    if (!user) { toast.error("Connectez-vous pour planifier"); return; }
+    setPublishing(true);
+    try {
+      const response = await fetch("/api/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          content: editedContent,
+          imageUrl: imageUrl ?? undefined,
+          generatedPostId: isCarousel ? undefined : activePost?.id,
+          date,
+          time,
+          scheduledAt: buildScheduledAtIso(date, time),
+        }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success(`Post planifié pour le ${formatDisplayDate(date)} à ${time}`);
+        if (activePost && !isCarousel) {
+          syncPostAssets(activePost.id, "scheduled");
+        }
+        setWorkflowStep("configure");
+        setActivePost(null);
+        setCarouselImageUrls([]);
+        setCarouselSlideIndex(0);
+      } else {
+        toast.error(data.error || "Erreur lors de la planification");
+      }
+    } catch {
+      toast.error("Erreur lors de la planification");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   // Charge la config d'automatisation existante quand on entre dans l'étape 4,
   // pour ne jamais écraser des préférences déjà définies depuis /auto-publish.
   useEffect(() => {
@@ -433,13 +492,25 @@ export default function Generator() {
   };
 
   const addAutoPublishSlot = () => {
-    if (autoPublishScheduleSlots.some(s => s.dayOfWeek === newSlotDay && s.publishTime === newSlotTime)) {
+    if (newSlotMode === "date" && !newSlotDate) {
+      toast.error("Sélectionnez une date");
+      return;
+    }
+    const dayOfWeek = newSlotMode === "date" ? getDayOfWeekFromDate(newSlotDate) : newSlotDay;
+    const publishDate = newSlotMode === "date" ? newSlotDate : null;
+
+    if (autoPublishScheduleSlots.some(
+      s => s.dayOfWeek === dayOfWeek && s.publishTime === newSlotTime && (s.publishDate ?? null) === publishDate
+    )) {
       toast.info("Ce créneau existe déjà");
       return;
     }
     setAutoPublishScheduleSlots(prev =>
-      [...prev, { dayOfWeek: newSlotDay, publishTime: newSlotTime, isActive: true }].sort(
-        (a, b) => a.dayOfWeek - b.dayOfWeek || a.publishTime.localeCompare(b.publishTime)
+      [...prev, { dayOfWeek, publishTime: newSlotTime, isActive: true, publishDate }].sort(
+        (a, b) =>
+          (a.publishDate ?? "").localeCompare(b.publishDate ?? "") ||
+          a.dayOfWeek - b.dayOfWeek ||
+          a.publishTime.localeCompare(b.publishTime)
       )
     );
   };
@@ -468,6 +539,7 @@ export default function Generator() {
             sector: autoPublishSettingsData?.sector ?? "",
             targetAudience: autoPublishSettingsData?.targetAudience ?? "",
             personalContext: autoPublishSettingsData?.personalContext ?? "",
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           },
           schedule: autoPublishScheduleSlots,
         }),
@@ -492,6 +564,14 @@ export default function Generator() {
   const visibleSteps = STEPS.filter(
     s => s.id !== "configure-automation" || publishMode === "schedule"
   );
+  // Dès que l'automatisation est choisie, ce post n'est plus publié immédiatement :
+  // il est planifié pour la prochaine occurrence du créneau configuré (date précise
+  // ou prochain jour récurrent). Pour publier maintenant, l'utilisateur ne doit pas
+  // activer l'automatisation à l'étape 3.
+  const upcomingOccurrence = autoPublishScheduleSlots
+    .filter(s => s.isActive)
+    .map(s => ({ date: formatDateInput(getNextOccurrence(s)), time: s.publishTime }))
+    .sort((a, b) => combineDateAndTime(a.date, a.time).getTime() - combineDateAndTime(b.date, b.time).getTime())[0];
   const stepIndex = visibleSteps.findIndex(s => s.id === workflowStep);
 
   if (!user) {
@@ -599,8 +679,8 @@ export default function Generator() {
               <ArrowLeft className="w-3 h-3" /> Changer de type de contenu
             </button>
 
-            {/* Stepper — défilement horizontal sur mobile */}
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide snap-x snap-mandatory sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+            {/* Stepper — défilement horizontal sur mobile, contenu dans les marges de la page */}
+            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory sm:flex-wrap sm:overflow-visible">
               {visibleSteps.map((step, i) => {
                 const Icon = step.icon;
                 const isActive = step.id === workflowStep;
@@ -613,7 +693,7 @@ export default function Generator() {
                       if (i === 0 || activePost) setWorkflowStep(step.id);
                     }}
                     disabled={i > 0 && !activePost}
-                    className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
+                    className={`flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm ${
                       isActive
                         ? "bg-violet text-white"
                         : isDone
@@ -872,15 +952,17 @@ export default function Generator() {
                       Idée visuelle : {activePost.suggestedMedia}
                     </p>
                   )}
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(editedContent, activePost.id)}>
-                      {copiedId === activePost.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    </Button>
-                    {!isCarousel && (
-                      <Button variant="outline" size="sm" onClick={handleSave} disabled={savePostMutation.isPending}>
-                        <Save className="w-3 h-3 mr-1" /> Sauvegarder
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => copyToClipboard(editedContent, activePost.id)}>
+                        {copiedId === activePost.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                       </Button>
-                    )}
+                      {!isCarousel && (
+                        <Button variant="outline" size="sm" onClick={handleSave} disabled={savePostMutation.isPending}>
+                          <Save className="w-3 h-3 mr-1" /> Sauvegarder
+                        </Button>
+                      )}
+                    </div>
                     <Button className="flex-1 btn-gradient" onClick={() => setWorkflowStep("image")}>
                       Suivant : Créer le visuel <ChevronRight className="w-4 h-4 ml-1" />
                     </Button>
@@ -1210,14 +1292,19 @@ export default function Generator() {
                           <div className="space-y-2">
                             {autoPublishScheduleSlots.map((slot, i) => (
                               <div
-                                key={`${slot.dayOfWeek}-${slot.publishTime}`}
-                                className="flex items-center justify-between rounded-lg border border-border bg-background/50 px-3 py-2"
+                                key={`${slot.publishDate ?? "recurring"}-${slot.dayOfWeek}-${slot.publishTime}`}
+                                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2"
                               >
-                                <span className="text-sm flex items-center gap-2">
-                                  <Calendar className="w-3.5 h-3.5 text-violet-light" />
-                                  {DAY_NAMES[slot.dayOfWeek]} à {slot.publishTime}
+                                <span className="min-w-0 flex-1 text-sm flex items-center gap-2 capitalize">
+                                  <Calendar className="w-3.5 h-3.5 text-violet-light shrink-0" />
+                                  <span className="truncate">
+                                    {slot.publishDate
+                                      ? formatDisplayDate(slot.publishDate)
+                                      : `Chaque ${DAY_NAMES[slot.dayOfWeek].toLowerCase()}`}{" "}
+                                    à {slot.publishTime}
+                                  </span>
                                 </span>
-                                <Button variant="ghost" size="sm" onClick={() => removeAutoPublishSlot(i)}>
+                                <Button variant="ghost" size="sm" className="shrink-0" onClick={() => removeAutoPublishSlot(i)}>
                                   <Trash2 className="w-3.5 h-3.5 text-destructive" />
                                 </Button>
                               </div>
@@ -1226,30 +1313,68 @@ export default function Generator() {
                         )}
                       </div>
 
-                      <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-                        <div className="space-y-1 flex-1">
-                          <Label className="text-xs">Jour</Label>
-                          <Select value={String(newSlotDay)} onValueChange={v => setNewSlotDay(Number(v))}>
-                            <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {DAY_NAMES.map((name, id) => (
-                                <SelectItem key={id} value={String(id)}>{name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                      <div className="space-y-2">
+                        <div className="flex gap-2 p-1 rounded-lg bg-background/50 border border-border max-w-md">
+                          <button
+                            type="button"
+                            onClick={() => setNewSlotMode("recurring")}
+                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                              newSlotMode === "recurring" ? "bg-violet text-white" : "text-muted-foreground hover:text-white"
+                            }`}
+                          >
+                            <Repeat className="w-3.5 h-3.5" /> Chaque semaine
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewSlotMode("date")}
+                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                              newSlotMode === "date" ? "bg-violet text-white" : "text-muted-foreground hover:text-white"
+                            }`}
+                          >
+                            <Calendar className="w-3.5 h-3.5" /> Date précise
+                          </button>
                         </div>
-                        <div className="space-y-1 flex-1">
-                          <Label className="text-xs">Heure</Label>
-                          <Input
-                            type="time"
-                            value={newSlotTime}
-                            onChange={e => setNewSlotTime(e.target.value)}
-                            className="bg-background/50 [color-scheme:dark]"
-                          />
+
+                        <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                          <div className="space-y-1 flex-1">
+                            {newSlotMode === "recurring" ? (
+                              <>
+                                <Label className="text-xs">Jour</Label>
+                                <Select value={String(newSlotDay)} onValueChange={v => setNewSlotDay(Number(v))}>
+                                  <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {DAY_NAMES.map((name, id) => (
+                                      <SelectItem key={id} value={String(id)}>{name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            ) : (
+                              <>
+                                <Label className="text-xs">Date</Label>
+                                <Input
+                                  type="date"
+                                  value={newSlotDate}
+                                  min={formatDateInput(new Date())}
+                                  onChange={e => setNewSlotDate(e.target.value)}
+                                  className="bg-background/50 [color-scheme:dark]"
+                                />
+                              </>
+                            )}
+                          </div>
+                          <div className="space-y-1 flex-1">
+                            <Label className="text-xs">Heure</Label>
+                            <Input
+                              type="time"
+                              value={newSlotTime}
+                              onChange={e => setNewSlotTime(e.target.value)}
+                              className="bg-background/50 [color-scheme:dark]"
+                            />
+                          </div>
+                          <Button type="button" variant="outline" className="border-violet/40" onClick={addAutoPublishSlot}>
+                            <Plus className="w-4 h-4 mr-1" /> Ajouter
+                          </Button>
                         </div>
-                        <Button type="button" variant="outline" className="border-violet/40" onClick={addAutoPublishSlot}>
-                          <Plus className="w-4 h-4 mr-1" /> Ajouter
-                        </Button>
                       </div>
 
                       <div className="space-y-4 pt-2 border-t border-border">
@@ -1384,8 +1509,8 @@ export default function Generator() {
                     Étape 5 — Publier
                   </CardTitle>
                   <CardDescription>
-                    {publishMode === "schedule"
-                      ? "Votre automatisation récurrente est active — ce post est publié immédiatement"
+                    {upcomingOccurrence
+                      ? `Ce post sera planifié pour le ${formatDisplayDate(upcomingOccurrence.date)} à ${upcomingOccurrence.time}`
                       : "Votre post sera publié immédiatement sur LinkedIn"}
                   </CardDescription>
                 </CardHeader>
@@ -1411,11 +1536,21 @@ export default function Generator() {
                     </Button>
                     <Button
                       className="flex-1 bg-[#0077B5] hover:bg-[#006699]"
-                      onClick={handlePublish}
+                      onClick={() =>
+                        upcomingOccurrence
+                          ? handleSchedulePost(upcomingOccurrence.date, upcomingOccurrence.time)
+                          : handlePublish()
+                      }
                       disabled={publishing}
                     >
-                      {publishing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Linkedin className="w-4 h-4 mr-2" />}
-                      Publier sur LinkedIn
+                      {publishing ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : upcomingOccurrence ? (
+                        <Calendar className="w-4 h-4 mr-2" />
+                      ) : (
+                        <Linkedin className="w-4 h-4 mr-2" />
+                      )}
+                      {upcomingOccurrence ? "Planifier" : "Publier sur LinkedIn"}
                     </Button>
                   </div>
                 </CardContent>

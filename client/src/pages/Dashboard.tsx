@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLinkedInConnectUrl, getSignupUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { GettingStartedJourney } from "@/components/GettingStartedJourney";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
 import { useGettingStartedJourney } from "@/hooks/useGettingStartedJourney";
@@ -16,6 +16,7 @@ import {
   Sparkles,
   Calendar,
   ArrowRight,
+  ArrowLeft,
   Copy,
   Send,
   Loader2,
@@ -37,6 +38,7 @@ type GeneratedPost = {
   theme: string | null;
   status: string | null;
   imageUrl: string | null;
+  mediaLibraryId: number | null;
   createdAt: Date | string;
   publishedAt: Date | string | null;
   scheduledAt: Date | string | null;
@@ -47,6 +49,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   saved: { label: "Enregistré", className: "bg-blue-500/15 text-blue-300" },
   scheduled: { label: "Planifié", className: "bg-amber-500/15 text-amber-300" },
   published: { label: "Publié", className: "bg-emerald-500/15 text-emerald-300" },
+  failed: { label: "Échec", className: "bg-red-500/15 text-red-300" },
 };
 
 function PostStatusBadge({ status }: { status: string | null }) {
@@ -79,6 +82,7 @@ function formatDateTime(date: string) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const { showJourney } = useGettingStartedJourney();
   const { status: linkedInStatus, loading: linkedInLoading } = useLinkedInStatus();
   const [publishingPostId, setPublishingPostId] = useState<number | null>(null);
@@ -86,11 +90,42 @@ export default function Dashboard() {
   const [upcoming, setUpcoming] = useState<UpcomingPublication[]>([]);
   const [upcomingLoading, setUpcomingLoading] = useState(true);
   const [autoEnabled, setAutoEnabled] = useState(false);
+  const [postsPage, setPostsPage] = useState(0);
+  const POSTS_PAGE_SIZE = 6;
 
   const { data: postsData, isLoading: postsLoading } = trpc.generator.myPosts.useQuery(
-    { limit: 12, offset: 0 },
+    { limit: POSTS_PAGE_SIZE, offset: postsPage * POSTS_PAGE_SIZE },
     { enabled: !!user }
   );
+
+  // Counted independently of the current page so the stat cards stay accurate
+  // regardless of pagination.
+  const { data: publishedCountData } = trpc.generator.myPosts.useQuery(
+    { limit: 1, offset: 0, status: "published" },
+    { enabled: !!user }
+  );
+  const { data: scheduledCountData } = trpc.generator.myPosts.useQuery(
+    { limit: 1, offset: 0, status: "scheduled" },
+    { enabled: !!user }
+  );
+
+  const loadUpcoming = async (cancelledRef?: { current: boolean }) => {
+    try {
+      const res = await fetch("/api/auto-publish/upcoming?days=14", {
+        credentials: "include",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!cancelledRef?.current) {
+        setUpcoming(data.publications ?? []);
+        setAutoEnabled(!!data.meta?.isEnabled);
+      }
+    } catch {
+      if (!cancelledRef?.current) setUpcoming([]);
+    } finally {
+      if (!cancelledRef?.current) setUpcomingLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -98,36 +133,23 @@ export default function Dashboard() {
       return;
     }
 
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/auto-publish/upcoming?days=14", {
-          credentials: "include",
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled) {
-          setUpcoming(data.publications ?? []);
-          setAutoEnabled(!!data.meta?.isEnabled);
-        }
-      } catch {
-        if (!cancelled) setUpcoming([]);
-      } finally {
-        if (!cancelled) setUpcomingLoading(false);
-      }
-    })();
+    const cancelledRef = { current: false };
+    void loadUpcoming(cancelledRef);
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, [user?.id]);
 
   const posts = (postsData?.posts ?? []) as GeneratedPost[];
-  const totalPosts = postsData?.total ?? posts.length;
+  // Postgres COUNT(*) comes back as a string via the driver (bigint-safe) — coerce to Number
+  // or "3" + 9 silently becomes "39" instead of 12.
+  const totalPosts = Number(postsData?.total ?? posts.length);
+  const totalPostsPages = Math.max(1, Math.ceil(totalPosts / POSTS_PAGE_SIZE));
 
   const stats = useMemo(() => {
-    const published = posts.filter((p) => p.status === "published").length;
-    const scheduled = posts.filter((p) => p.status === "scheduled").length;
+    const published = Number(publishedCountData?.total ?? 0);
+    const scheduled = Number(scheduledCountData?.total ?? 0);
     const upcomingCount = upcoming.filter(
       (p) => new Date(p.scheduledFor).getTime() > Date.now()
     ).length;
@@ -138,7 +160,7 @@ export default function Dashboard() {
       scheduled: scheduled + upcomingCount,
       autoEnabled,
     };
-  }, [posts, totalPosts, upcoming, autoEnabled]);
+  }, [totalPosts, publishedCountData, scheduledCountData, upcoming, autoEnabled]);
 
   const upcomingSorted = useMemo(
     () =>
@@ -147,8 +169,7 @@ export default function Dashboard() {
         .sort(
           (a, b) =>
             new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime()
-        )
-        .slice(0, 6),
+        ),
     [upcoming]
   );
 
@@ -192,6 +213,46 @@ export default function Dashboard() {
     } finally {
       setPublishingPostId(null);
     }
+  };
+
+  const openInGenerator = (draft: {
+    id: number;
+    title?: string | null;
+    content: string;
+    imageUrl?: string | null;
+    mediaId?: number | null;
+  }) => {
+    sessionStorage.setItem(
+      "linkedrank-draft-post",
+      JSON.stringify({
+        id: draft.id,
+        title: draft.title ?? "",
+        content: draft.content,
+        hashtags: [],
+        imageUrl: draft.imageUrl ?? undefined,
+        mediaId: draft.mediaId ?? undefined,
+      })
+    );
+    setLocation("/generate");
+  };
+
+  const handleEditPost = (post: GeneratedPost) => {
+    openInGenerator({
+      id: post.id,
+      title: post.title,
+      content: post.content,
+      imageUrl: post.imageUrl,
+      mediaId: post.mediaLibraryId,
+    });
+  };
+
+  const handleEditUpcoming = (pub: UpcomingPublication) => {
+    if (pub.generatedPostId == null || !pub.content) return;
+    openInGenerator({
+      id: pub.generatedPostId,
+      content: pub.content,
+      imageUrl: pub.imageUrl,
+    });
   };
 
   if (!user) {
@@ -333,14 +394,21 @@ export default function Dashboard() {
                 <Loader2 className="w-6 h-6 animate-spin text-violet-light" />
               </div>
             ) : upcomingSorted.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1 -mr-1">
                 {upcomingSorted.map((pub) => {
                   const TypeIcon =
                     pub.type === "recurring" ? Bot : pub.type === "one_shot" ? Calendar : FileText;
+                  const editable = pub.generatedPostId != null && !!pub.content;
                   return (
                     <div
                       key={pub.id}
-                      className="rounded-xl border border-white/10 bg-card/50 overflow-hidden hover:border-violet/25 transition-colors"
+                      className={cn(
+                        "rounded-xl border border-white/10 bg-card/50 overflow-hidden transition-colors",
+                        editable
+                          ? "hover:border-violet/25 cursor-pointer"
+                          : "hover:border-violet/25"
+                      )}
+                      onClick={editable ? () => handleEditUpcoming(pub) : undefined}
                     >
                       <div className="flex gap-0">
                         {pub.imageUrl ? (
@@ -427,11 +495,12 @@ export default function Dashboard() {
                 <Loader2 className="w-6 h-6 animate-spin text-violet-light" />
               </div>
             ) : posts.length > 0 ? (
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {posts.map((post) => (
                   <article
                     key={post.id}
-                    className="rounded-xl border border-white/10 bg-card/50 overflow-hidden hover:border-violet/25 transition-all group"
+                    className="rounded-xl border border-white/10 bg-card/50 overflow-hidden hover:border-violet/25 transition-all group cursor-pointer"
+                    onClick={() => handleEditPost(post)}
                   >
                     {post.imageUrl ? (
                       <div className="aspect-[16/9] overflow-hidden bg-black/20">
@@ -472,7 +541,7 @@ export default function Dashboard() {
                           variant="ghost"
                           size="sm"
                           className="text-muted-foreground hover:text-white h-8 px-2"
-                          onClick={() => handleCopy(post.content, post.id)}
+                          onClick={(e) => { e.stopPropagation(); handleCopy(post.content, post.id); }}
                         >
                           {copiedPostId === post.id ? (
                             <Check className="w-4 h-4 text-emerald-400" />
@@ -485,7 +554,7 @@ export default function Dashboard() {
                             variant="ghost"
                             size="sm"
                             className="text-muted-foreground hover:text-[#0077B5] h-8 px-2"
-                            onClick={() => handlePublish(post)}
+                            onClick={(e) => { e.stopPropagation(); handlePublish(post); }}
                             disabled={publishingPostId === post.id}
                           >
                             {publishingPostId === post.id ? (
@@ -513,6 +582,34 @@ export default function Dashboard() {
                     Créer mon premier post
                   </Button>
                 </Link>
+              </div>
+            )}
+
+            {!postsLoading && totalPostsPages > 1 && (
+              <div className="flex items-center justify-between pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/10"
+                  onClick={() => setPostsPage((p) => Math.max(0, p - 1))}
+                  disabled={postsPage === 0}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  Précédent
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {postsPage + 1} / {totalPostsPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/10"
+                  onClick={() => setPostsPage((p) => Math.min(totalPostsPages - 1, p + 1))}
+                  disabled={postsPage >= totalPostsPages - 1}
+                >
+                  Suivant
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
               </div>
             )}
           </section>

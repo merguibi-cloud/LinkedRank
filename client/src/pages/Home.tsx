@@ -198,10 +198,10 @@ export default function Home() {
             <div className="mt-8 flex w-full max-w-sm flex-col items-stretch justify-center gap-3 sm:mt-10 sm:max-w-none sm:flex-row sm:items-center">
               {user ? (
                 <>
-                  <Link href="/agents">
+                  <Link href="/generate">
                     <Button className="btn-gradient h-12 w-full px-8 text-base sm:h-14 sm:w-auto sm:px-10 sm:text-lg">
-                      <Brain className="mr-2 h-5 w-5" />
-                      Mes Agents IA
+                      <PenTool className="mr-2 h-5 w-5" />
+                      Créer un post
                     </Button>
                   </Link>
                   <Link href="/dashboard">
@@ -596,10 +596,10 @@ export default function Home() {
 
               <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 {user ? (
-                  <Link href="/agents">
+                  <Link href="/generate">
                     <Button className="btn-gradient h-14 px-10 text-lg">
-                      <Brain className="mr-2 h-5 w-5" />
-                      Accéder à mes Agents
+                      <PenTool className="mr-2 h-5 w-5" />
+                      Créer un post
                     </Button>
                   </Link>
                 ) : (
@@ -645,7 +645,6 @@ export default function Home() {
               <ul className="space-y-3">
                 <li><Link href="/generate" className="text-sm text-muted-foreground hover:text-white transition-colors">Générateur IA</Link></li>
                 <li><Link href="/auto-publish" className="text-sm text-muted-foreground hover:text-white transition-colors">Auto-Publication</Link></li>
-                <li><Link href="/agents" className="text-sm text-muted-foreground hover:text-white transition-colors">Agents IA</Link></li>
                 <li><Link href="/analytics/advanced" className="text-sm text-muted-foreground hover:text-white transition-colors">Analytics</Link></li>
               </ul>
             </div>
