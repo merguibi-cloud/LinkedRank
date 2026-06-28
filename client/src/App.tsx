@@ -197,8 +197,8 @@ function App() {
         <UserProfileProvider>
           <LinkedInStatusProvider>
           <TooltipProvider>
-            <Toaster 
-              position={isMobile ? "top-center" : "bottom-center"}
+            <Toaster
+              position={isMobile ? "top-center" : "top-right"}
               toastOptions={{
                 style: {
                   background: 'oklch(0.14 0.02 280)',

@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
-import { ToolsQuickNav } from "@/components/tools/ToolsQuickNav";
+import { IllustrationSlot } from "@/components/IllustrationSlot";
 import { AnalyticsOverview } from "@/components/tools/AnalyticsOverview";
 
 // Types
@@ -254,27 +254,34 @@ export default function Analytics() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-              <BarChart3 className="h-7 w-7 text-primary" />
-              Analytics Avancés
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Vos données réelles et outils d&apos;analyse pour optimiser LinkedIn
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Link href="/auto-publish">
-              <Button variant="outline" size="sm" className="border-violet/30 text-violet-light">
-                <Zap className="h-4 w-4 mr-1" />
-                Auto-publication
-              </Button>
-            </Link>
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet/20 via-rose/10 to-transparent border border-white/10 p-8">
+          <div className="relative flex items-center justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-violet to-rose">
+                  <BarChart3 className="h-7 w-7 text-white" />
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white">Analytics Avancés</h1>
+              </div>
+              <p className="text-muted-foreground mt-1">
+                Vos données réelles et outils d&apos;analyse pour optimiser LinkedIn
+              </p>
+              <Link href="/auto-publish">
+                <Button variant="outline" size="sm" className="border-violet/30 text-violet-light mt-4">
+                  <Zap className="h-4 w-4 mr-1" />
+                  Auto-publication
+                </Button>
+              </Link>
+            </div>
+
+            {/* Drop an image at public/images/hero-analytics.png to fill this */}
+            <IllustrationSlot
+              src="/images/hero-analytics.png"
+              alt=""
+              className="hidden lg:block w-56 h-36 shrink-0"
+            />
           </div>
         </div>
-
-        <ToolsQuickNav />
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="space-y-4">
           <TabsList className="bg-muted/50 flex-wrap h-auto gap-1">

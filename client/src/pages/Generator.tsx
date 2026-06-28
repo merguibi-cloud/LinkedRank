@@ -9,9 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
+import { IllustrationSlot } from "@/components/IllustrationSlot";
 import {
   Sparkles,
   Copy,
@@ -32,18 +34,21 @@ import {
   ChevronLeft,
   SkipForward,
   Calendar,
-  Clock,
   FolderOpen,
   Zap,
   Layers,
   FileText,
+  Repeat,
+  Plus,
+  Trash2,
+  Settings2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { formatDateInput, getDefaultScheduleTime, buildScheduledAtIso } from "@/lib/scheduleUtils";
 import { isGuidedMode } from "@/lib/gettingStartedJourney";
 import { MediaLibraryPicker, MediaUploadZone } from "@/components/MediaLibraryPicker";
 import { AI_IMAGE_FORMATS, AI_IMAGE_STYLES, type AiImageFormatId, type AiImageStyleId } from "@/lib/aiImageStyles";
 import { CAROUSEL_STYLES, CAROUSEL_SLIDE_COUNTS, type CarouselStyleId } from "@/lib/carouselOptions";
+import { buildScheduledAtIso, combineDateAndTime, formatDateInput, formatDisplayDate, getDayOfWeekFromDate } from "@/lib/scheduleUtils";
 
 const GettingStartedJourney = lazy(() =>
   import("@/components/GettingStartedJourney").then((m) => ({
@@ -62,6 +67,33 @@ type Post = {
 
 type ContentType = "post" | "carousel";
 
+interface AutoPublishSlot {
+  dayOfWeek: number;
+  publishTime: string;
+  isActive: boolean;
+  publishDate?: string | null;
+}
+
+const DAY_NAMES = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+
+// Date exacte si le créneau en a une, sinon la prochaine occurrence du jour récurrent choisi.
+function getNextOccurrence(slot: AutoPublishSlot): Date {
+  if (slot.publishDate) {
+    return combineDateAndTime(slot.publishDate, slot.publishTime);
+  }
+  const [hours, minutes] = slot.publishTime.split(":").map(Number);
+  const now = new Date();
+  for (let i = 0; i < 8; i++) {
+    const candidate = new Date(now);
+    candidate.setDate(now.getDate() + i);
+    candidate.setHours(hours, minutes, 0, 0);
+    if (candidate.getDay() === slot.dayOfWeek && candidate.getTime() > now.getTime()) {
+      return candidate;
+    }
+  }
+  return now;
+}
+
 type WorkflowStep =
   | "configure"
   | "image"
@@ -69,12 +101,12 @@ type WorkflowStep =
   | "configure-automation"
   | "publish";
 
-const STEPS: { id: WorkflowStep; label: string; icon: typeof Lightbulb }[] = [
-  { id: "configure", label: "Configurer", icon: Lightbulb },
-  { id: "image", label: "Créer le visuel", icon: ImageIcon },
-  { id: "choose-automation", label: "Choisir l'automatisation", icon: Zap },
-  { id: "configure-automation", label: "Configurer l'automatisation", icon: Calendar },
-  { id: "publish", label: "Publier", icon: Send },
+const STEPS: { id: WorkflowStep; number: number; label: string; icon: typeof Lightbulb }[] = [
+  { id: "configure", number: 1, label: "Configurer", icon: Lightbulb },
+  { id: "image", number: 2, label: "Créer le visuel", icon: ImageIcon },
+  { id: "choose-automation", number: 3, label: "Choisir l'automatisation", icon: Zap },
+  { id: "configure-automation", number: 4, label: "Configurer l'automatisation", icon: Repeat },
+  { id: "publish", number: 5, label: "Publier", icon: Send },
 ];
 
 export default function Generator() {
@@ -114,9 +146,14 @@ export default function Generator() {
   const [imagePrompt, setImagePrompt] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishMode, setPublishMode] = useState<"now" | "schedule">("now");
-  const [scheduleDate, setScheduleDate] = useState(getDefaultScheduleTime().date);
-  const [scheduleTime, setScheduleTime] = useState(getDefaultScheduleTime().time);
-  const [scheduling, setScheduling] = useState(false);
+  const [autoPublishSettingsData, setAutoPublishSettingsData] = useState<Record<string, unknown> | null>(null);
+  const [autoPublishScheduleSlots, setAutoPublishScheduleSlots] = useState<AutoPublishSlot[]>([]);
+  const [loadingAutoPublish, setLoadingAutoPublish] = useState(false);
+  const [savingAutoPublish, setSavingAutoPublish] = useState(false);
+  const [newSlotMode, setNewSlotMode] = useState<"recurring" | "date">("recurring");
+  const [newSlotDay, setNewSlotDay] = useState(1);
+  const [newSlotDate, setNewSlotDate] = useState(formatDateInput(new Date()));
+  const [newSlotTime, setNewSlotTime] = useState("09:00");
   const [imageSource, setImageSource] = useState<"ai" | "library">("library");
   const [selectedMediaId, setSelectedMediaId] = useState<number | null>(null);
   const [mediaSuggestionsApplied, setMediaSuggestionsApplied] = useState(false);
@@ -409,9 +446,9 @@ export default function Generator() {
     }
   };
 
-  const handleSchedule = async () => {
+  const handleSchedulePost = async (date: string, time: string) => {
     if (!user) { toast.error("Connectez-vous pour planifier"); return; }
-    setScheduling(true);
+    setPublishing(true);
     try {
       const response = await fetch("/api/schedule", {
         method: "POST",
@@ -425,15 +462,15 @@ export default function Generator() {
           pdfUrl: isCarousel ? (carouselPdfUrl ?? undefined) : undefined,
           pdfKey: isCarousel ? (carouselPdfKey ?? undefined) : undefined,
           documentTitle: isCarousel ? (activePost?.title ?? carouselTopic) : undefined,
-          date: scheduleDate,
-          time: scheduleTime,
-          scheduledAt: buildScheduledAtIso(scheduleDate, scheduleTime),
-          generatedPostId: activePost?.id,
+          generatedPostId: isCarousel ? undefined : activePost?.id,
+          date,
+          time,
+          scheduledAt: buildScheduledAtIso(date, time),
         }),
       });
       const data = await response.json();
       if (response.ok && data.success) {
-        toast.success("Post planifié ! Il sera publié automatiquement.");
+        toast.success(`Post planifié pour le ${formatDisplayDate(date)} à ${time}`);
         if (activePost && !isCarousel) {
           syncPostAssets(activePost.id, "scheduled");
         }
@@ -449,12 +486,111 @@ export default function Generator() {
     } catch {
       toast.error("Erreur lors de la planification");
     } finally {
-      setScheduling(false);
+      setPublishing(false);
+    }
+  };
+
+  // Charge la config d'automatisation existante quand on entre dans l'étape 4,
+  // pour ne jamais écraser des préférences déjà définies depuis /auto-publish.
+  useEffect(() => {
+    if (workflowStep !== "configure-automation") return;
+    setLoadingAutoPublish(true);
+    fetch("/api/auto-publish/settings", { credentials: "include" })
+      .then(r => r.json())
+      .then(data => {
+        setAutoPublishSettingsData(data.settings ?? null);
+        setAutoPublishScheduleSlots(data.schedule ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingAutoPublish(false));
+  }, [workflowStep]);
+
+  const updateAutoPublishField = (key: string, value: unknown) => {
+    setAutoPublishSettingsData(prev => ({ ...(prev ?? {}), [key]: value }));
+  };
+
+  const addAutoPublishSlot = () => {
+    if (newSlotMode === "date" && !newSlotDate) {
+      toast.error("Sélectionnez une date");
+      return;
+    }
+    const dayOfWeek = newSlotMode === "date" ? getDayOfWeekFromDate(newSlotDate) : newSlotDay;
+    const publishDate = newSlotMode === "date" ? newSlotDate : null;
+
+    if (autoPublishScheduleSlots.some(
+      s => s.dayOfWeek === dayOfWeek && s.publishTime === newSlotTime && (s.publishDate ?? null) === publishDate
+    )) {
+      toast.info("Ce créneau existe déjà");
+      return;
+    }
+    setAutoPublishScheduleSlots(prev =>
+      [...prev, { dayOfWeek, publishTime: newSlotTime, isActive: true, publishDate }].sort(
+        (a, b) =>
+          (a.publishDate ?? "").localeCompare(b.publishDate ?? "") ||
+          a.dayOfWeek - b.dayOfWeek ||
+          a.publishTime.localeCompare(b.publishTime)
+      )
+    );
+  };
+
+  const removeAutoPublishSlot = (index: number) => {
+    setAutoPublishScheduleSlots(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleEnableAutomation = async () => {
+    setSavingAutoPublish(true);
+    try {
+      const response = await fetch("/api/auto-publish/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          settings: {
+            ...autoPublishSettingsData,
+            isEnabled: true,
+            tone: autoPublishSettingsData?.tone ?? (isCarousel ? "professional" : tone),
+            language: autoPublishSettingsData?.language ?? (isCarousel ? "FR" : language),
+            viralityLevel: autoPublishSettingsData?.viralityLevel ?? "medium",
+            includeEmojis: autoPublishSettingsData?.includeEmojis !== false,
+            includeHashtags: autoPublishSettingsData?.includeHashtags !== false,
+            includeCallToAction: autoPublishSettingsData?.includeCallToAction !== false,
+            sector: autoPublishSettingsData?.sector ?? "",
+            targetAudience: autoPublishSettingsData?.targetAudience ?? "",
+            personalContext: autoPublishSettingsData?.personalContext ?? "",
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
+          schedule: autoPublishScheduleSlots,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        toast.error(data.error || "Erreur lors de l'activation de l'automatisation");
+        return;
+      }
+      toast.success("Automatisation activée !");
+      setWorkflowStep("publish");
+    } catch {
+      toast.error("Erreur lors de l'activation de l'automatisation");
+    } finally {
+      setSavingAutoPublish(false);
     }
   };
 
   const isLoading = generateMutation.isPending || generateBatchMutation.isPending;
-  const stepIndex = STEPS.findIndex(s => s.id === workflowStep);
+  // "Configurer l'automatisation" only exists in the flow when automation is
+  // actually toggled on — otherwise step 3 goes straight to step 5.
+  const visibleSteps = STEPS.filter(
+    s => s.id !== "configure-automation" || publishMode === "schedule"
+  );
+  // Dès que l'automatisation est choisie, ce post n'est plus publié immédiatement :
+  // il est planifié pour la prochaine occurrence du créneau configuré (date précise
+  // ou prochain jour récurrent). Pour publier maintenant, l'utilisateur ne doit pas
+  // activer l'automatisation à l'étape 3.
+  const upcomingOccurrence = autoPublishScheduleSlots
+    .filter(s => s.isActive)
+    .map(s => ({ date: formatDateInput(getNextOccurrence(s)), time: s.publishTime }))
+    .sort((a, b) => combineDateAndTime(a.date, a.time).getTime() - combineDateAndTime(b.date, b.time).getTime())[0];
+  const stepIndex = visibleSteps.findIndex(s => s.id === workflowStep);
 
   if (!user) {
     return (
@@ -499,7 +635,8 @@ export default function Generator() {
         </div>
       </header>
 
-      <div className="container space-y-4 py-4 sm:space-y-6 sm:py-6">
+      <div className="container py-4 sm:py-6">
+      <div className="max-w-3xl mx-auto w-full space-y-4 sm:space-y-6">
         <Suspense fallback={null}>
           <GettingStartedJourney variant="compact" />
         </Suspense>
@@ -518,7 +655,7 @@ export default function Generator() {
         <LinkedInConnectBanner />
 
         {!contentType ? (
-          <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
+          <div className="grid sm:grid-cols-2 gap-4">
             <button
               type="button"
               onClick={() => setContentType("post")}
@@ -560,9 +697,9 @@ export default function Generator() {
               <ArrowLeft className="w-3 h-3" /> Changer de type de contenu
             </button>
 
-            {/* Stepper — défilement horizontal sur mobile */}
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide snap-x snap-mandatory sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-              {STEPS.map((step, i) => {
+            {/* Stepper — défilement horizontal sur mobile, contenu dans les marges de la page */}
+            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory sm:flex-wrap sm:overflow-visible">
+              {visibleSteps.map((step, i) => {
                 const Icon = step.icon;
                 const isActive = step.id === workflowStep;
                 const isDone = i < stepIndex;
@@ -574,7 +711,7 @@ export default function Generator() {
                       if (i === 0 || activePost) setWorkflowStep(step.id);
                     }}
                     disabled={i > 0 && !activePost}
-                    className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
+                    className={`flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm ${
                       isActive
                         ? "bg-violet text-white"
                         : isDone
@@ -584,16 +721,16 @@ export default function Generator() {
                   >
                     <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     <span className="sm:hidden">{step.label}</span>
-                    <span className="hidden sm:inline">{i + 1}. {step.label}</span>
-                    {i < STEPS.length - 1 && <ChevronRight className="w-3 h-3 opacity-50 hidden sm:block" />}
+                    <span className="hidden sm:inline">{step.number}. {step.label}</span>
+                    {i < visibleSteps.length - 1 && <ChevronRight className="w-3 h-3 opacity-50 hidden sm:block" />}
                   </button>
                 );
               })}
             </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Left: Config (always visible on configure step, collapsed otherwise) */}
-          <div className={`space-y-4 ${workflowStep !== "configure" ? "lg:opacity-60" : ""}`}>
+        {/* Only the current step's content is shown — never two at once */}
+        <div className="w-full space-y-4">
+          {workflowStep === "configure" && !activePost && (
             <Tabs defaultValue="generate" className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-card/50">
                 <TabsTrigger value="generate">Paramètres</TabsTrigger>
@@ -780,52 +917,28 @@ export default function Generator() {
                 <ProfileForm profile={profile} />
               </TabsContent>
             </Tabs>
-          </div>
+          )}
 
-          {/* Right: Workflow steps */}
-          <div className="space-y-4">
-            {workflowStep === "configure" && !activePost && isCarousel && (
-              <Card className="bg-card/30 border-dashed border-violet/30">
-                <CardContent className="py-16 text-center">
-                  <Layers className="w-12 h-12 mx-auto mb-4 text-violet-light/50" />
-                  <p className="text-muted-foreground mb-2">Configurez votre carrousel et générez-le</p>
-                  <p className="text-xs text-muted-foreground">Le parcours vous guidera ensuite : relecture → visuels → automatisation → publication</p>
-                </CardContent>
-              </Card>
-            )}
+          {workflowStep === "configure" && !activePost && !isCarousel && generatedPosts.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-medium text-muted-foreground">Posts récents — cliquez pour continuer</h2>
+              {generatedPosts.map(post => (
+                <Card key={post.id} className="bg-card/50 border-violet/30 cursor-pointer hover:border-violet/40 transition-colors" onClick={() => startWorkflow(post)}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">{post.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground line-clamp-3">{post.content}</p>
+                    <Button size="sm" variant="ghost" className="mt-2 text-violet-light" onClick={e => { e.stopPropagation(); startWorkflow(post); }}>
+                      Continuer <ChevronRight className="w-3 h-3 ml-1" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
-            {workflowStep === "configure" && !activePost && !isCarousel && (
-              <>
-                {generatedPosts.length === 0 ? (
-                  <Card className="bg-card/30 border-dashed border-violet/30">
-                    <CardContent className="py-16 text-center">
-                      <Sparkles className="w-12 h-12 mx-auto mb-4 text-violet-light/50" />
-                      <p className="text-muted-foreground mb-2">Commencez par configurer et générer un post</p>
-                      <p className="text-xs text-muted-foreground">Le parcours vous guidera ensuite : relecture → image → automatisation → publication</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="space-y-3">
-                    <h2 className="text-sm font-medium text-muted-foreground">Posts récents — cliquez pour continuer</h2>
-                    {generatedPosts.map(post => (
-                      <Card key={post.id} className="bg-card/50 border-violet/30 cursor-pointer hover:border-violet/40 transition-colors" onClick={() => startWorkflow(post)}>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base">{post.title}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground line-clamp-3">{post.content}</p>
-                          <Button size="sm" variant="ghost" className="mt-2 text-violet-light" onClick={e => { e.stopPropagation(); startWorkflow(post); }}>
-                            Continuer <ChevronRight className="w-3 h-3 ml-1" />
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {workflowStep === "configure" && activePost && (
+          {workflowStep === "configure" && activePost && (
               <Card className="bg-card/50 border-violet/30">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -857,15 +970,17 @@ export default function Generator() {
                       Idée visuelle : {activePost.suggestedMedia}
                     </p>
                   )}
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(editedContent, activePost.id)}>
-                      {copiedId === activePost.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    </Button>
-                    {!isCarousel && (
-                      <Button variant="outline" size="sm" onClick={handleSave} disabled={savePostMutation.isPending}>
-                        <Save className="w-3 h-3 mr-1" /> Sauvegarder
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => copyToClipboard(editedContent, activePost.id)}>
+                        {copiedId === activePost.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                       </Button>
-                    )}
+                      {!isCarousel && (
+                        <Button variant="outline" size="sm" onClick={handleSave} disabled={savePostMutation.isPending}>
+                          <Save className="w-3 h-3 mr-1" /> Sauvegarder
+                        </Button>
+                      )}
+                    </div>
                     <Button className="flex-1 btn-gradient" onClick={() => setWorkflowStep("image")}>
                       Suivant : Créer le visuel <ChevronRight className="w-4 h-4 ml-1" />
                     </Button>
@@ -1124,40 +1239,32 @@ export default function Generator() {
                     <Zap className="w-5 h-5 text-violet-light" />
                     Étape 3 — Choisir l&apos;automatisation
                   </CardTitle>
-                  <CardDescription>Publiez immédiatement ou planifiez la diffusion</CardDescription>
+                  <CardDescription>Voulez-vous activer la publication automatique récurrente ?</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <PostPreviewCard
-                    title={activePost.title}
-                    content={editedContent}
-                    hashtags={editedHashtags}
-                    imageUrl={imageUrl}
-                  />
-
-                  <div className="flex gap-2 p-1 rounded-lg bg-background/50 border border-border">
-                    <Button
-                      type="button"
-                      variant={publishMode === "now" ? "secondary" : "ghost"}
-                      className="flex-1"
-                      onClick={() => setPublishMode("now")}
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Publier maintenant
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={publishMode === "schedule" ? "secondary" : "ghost"}
-                      className="flex-1"
-                      onClick={() => setPublishMode("schedule")}
-                    >
-                      <Calendar className="w-4 h-4 mr-2" />
-                      Planifier
-                    </Button>
+                  <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-background/50 p-4">
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium">Automatisation récurrente</p>
+                      <p className="text-xs text-muted-foreground">
+                        {publishMode === "schedule"
+                          ? "Configurez vos créneaux récurrents à l'étape suivante"
+                          : "Désactivée : ce post sera simplement publié immédiatement"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={publishMode === "schedule"}
+                      onCheckedChange={checked => setPublishMode(checked ? "schedule" : "now")}
+                    />
                   </div>
 
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={() => setWorkflowStep("image")}>← Retour</Button>
-                    <Button className="flex-1 btn-gradient" onClick={() => setWorkflowStep("configure-automation")}>
+                    <Button
+                      className="flex-1 btn-gradient"
+                      onClick={() =>
+                        setWorkflowStep(publishMode === "schedule" ? "configure-automation" : "publish")
+                      }
+                    >
                       Continuer <ChevronRight className="w-4 h-4 ml-1" />
                     </Button>
                   </div>
@@ -1169,55 +1276,244 @@ export default function Generator() {
               <Card className="bg-card/50 border-violet/30">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-violet-light" />
+                    <Repeat className="w-5 h-5 text-violet-light" />
                     Étape 4 — Configurer l&apos;automatisation
                   </CardTitle>
                   <CardDescription>
-                    {publishMode === "schedule"
-                      ? "Choisissez la date et l'heure de diffusion"
-                      : "Rien à configurer pour une publication immédiate"}
+                    Définissez les créneaux récurrents auxquels LinkedRank publiera automatiquement
+                    des posts ou carrousels pour vous
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {publishMode === "schedule" ? (
-                    <div className="grid sm:grid-cols-2 gap-4 p-4 rounded-lg border border-violet/30 bg-violet/5">
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> Date de diffusion
-                        </Label>
-                        <Input
-                          type="date"
-                          value={scheduleDate}
-                          min={formatDateInput(new Date())}
-                          onChange={e => setScheduleDate(e.target.value)}
-                          className="bg-background/50 [color-scheme:dark]"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Heure
-                        </Label>
-                        <Input
-                          type="time"
-                          value={scheduleTime}
-                          onChange={e => setScheduleTime(e.target.value)}
-                          className="bg-background/50 [color-scheme:dark]"
-                        />
-                      </div>
+                  {loadingAutoPublish ? (
+                    <div className="py-10 text-center">
+                      <Loader2 className="w-6 h-6 mx-auto animate-spin text-violet-light" />
                     </div>
                   ) : (
-                    <div className="py-6 text-center border border-dashed border-violet/30 rounded-lg bg-violet/5">
-                      <Send className="w-8 h-8 mx-auto mb-2 text-violet-light/60" />
-                      <p className="text-sm text-muted-foreground">
-                        Aucune configuration nécessaire — votre post sera publié immédiatement à l&apos;étape suivante.
-                      </p>
-                    </div>
+                    <>
+                      <div className="space-y-2">
+                        <Label>Vos créneaux récurrents</Label>
+                        {autoPublishScheduleSlots.length === 0 ? (
+                          <div className="py-8 text-center border border-dashed border-violet/30 rounded-lg bg-violet/5">
+                            {/* Drop an image at public/images/empty-automation-slots.png to fill this */}
+                            <IllustrationSlot
+                              src="/images/empty-automation-slots.png"
+                              icon={Repeat}
+                              alt=""
+                              className="h-10 w-10 mx-auto mb-2"
+                              iconClassName="h-8 w-8 mx-auto mb-2 text-violet-light/60"
+                            />
+                            <p className="text-sm text-muted-foreground">
+                              Aucun créneau — ajoutez-en au moins un pour activer l&apos;automatisation
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {autoPublishScheduleSlots.map((slot, i) => (
+                              <div
+                                key={`${slot.publishDate ?? "recurring"}-${slot.dayOfWeek}-${slot.publishTime}`}
+                                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2"
+                              >
+                                <span className="min-w-0 flex-1 text-sm flex items-center gap-2 capitalize">
+                                  <Calendar className="w-3.5 h-3.5 text-violet-light shrink-0" />
+                                  <span className="truncate">
+                                    {slot.publishDate
+                                      ? formatDisplayDate(slot.publishDate)
+                                      : `Chaque ${DAY_NAMES[slot.dayOfWeek].toLowerCase()}`}{" "}
+                                    à {slot.publishTime}
+                                  </span>
+                                </span>
+                                <Button variant="ghost" size="sm" className="shrink-0" onClick={() => removeAutoPublishSlot(i)}>
+                                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex gap-2 p-1 rounded-lg bg-background/50 border border-border max-w-md">
+                          <button
+                            type="button"
+                            onClick={() => setNewSlotMode("recurring")}
+                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                              newSlotMode === "recurring" ? "bg-violet text-white" : "text-muted-foreground hover:text-white"
+                            }`}
+                          >
+                            <Repeat className="w-3.5 h-3.5" /> Chaque semaine
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewSlotMode("date")}
+                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                              newSlotMode === "date" ? "bg-violet text-white" : "text-muted-foreground hover:text-white"
+                            }`}
+                          >
+                            <Calendar className="w-3.5 h-3.5" /> Date précise
+                          </button>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                          <div className="space-y-1 flex-1">
+                            {newSlotMode === "recurring" ? (
+                              <>
+                                <Label className="text-xs">Jour</Label>
+                                <Select value={String(newSlotDay)} onValueChange={v => setNewSlotDay(Number(v))}>
+                                  <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {DAY_NAMES.map((name, id) => (
+                                      <SelectItem key={id} value={String(id)}>{name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            ) : (
+                              <>
+                                <Label className="text-xs">Date</Label>
+                                <Input
+                                  type="date"
+                                  value={newSlotDate}
+                                  min={formatDateInput(new Date())}
+                                  onChange={e => setNewSlotDate(e.target.value)}
+                                  className="bg-background/50 [color-scheme:dark]"
+                                />
+                              </>
+                            )}
+                          </div>
+                          <div className="space-y-1 flex-1">
+                            <Label className="text-xs">Heure</Label>
+                            <Input
+                              type="time"
+                              value={newSlotTime}
+                              onChange={e => setNewSlotTime(e.target.value)}
+                              className="bg-background/50 [color-scheme:dark]"
+                            />
+                          </div>
+                          <Button type="button" variant="outline" className="border-violet/40" onClick={addAutoPublishSlot}>
+                            <Plus className="w-4 h-4 mr-1" /> Ajouter
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 pt-2 border-t border-border">
+                        <Label className="flex items-center gap-2 text-sm">
+                          <Settings2 className="w-4 h-4 text-violet-light" />
+                          Préférences de contenu pour les publications automatiques
+                        </Label>
+
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Secteur d&apos;activité</Label>
+                            <Input
+                              placeholder="Ex: Tech & Startups"
+                              value={String(autoPublishSettingsData?.sector ?? "")}
+                              onChange={e => updateAutoPublishField("sector", e.target.value)}
+                              className="bg-background/50"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Audience cible</Label>
+                            <Input
+                              placeholder="Ex: Entrepreneurs, Marketeurs..."
+                              value={String(autoPublishSettingsData?.targetAudience ?? "")}
+                              onChange={e => updateAutoPublishField("targetAudience", e.target.value)}
+                              className="bg-background/50"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid sm:grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Ton</Label>
+                            <Select
+                              value={String(autoPublishSettingsData?.tone ?? "professional")}
+                              onValueChange={v => updateAutoPublishField("tone", v)}
+                            >
+                              <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="professional">Professionnel</SelectItem>
+                                <SelectItem value="casual">Décontracté</SelectItem>
+                                <SelectItem value="inspirational">Inspirant</SelectItem>
+                                <SelectItem value="educational">Éducatif</SelectItem>
+                                <SelectItem value="provocative">Provocateur</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Langue</Label>
+                            <Select
+                              value={String(autoPublishSettingsData?.language ?? "FR")}
+                              onValueChange={v => updateAutoPublishField("language", v)}
+                            >
+                              <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FR">Français</SelectItem>
+                                <SelectItem value="EN">Anglais</SelectItem>
+                                <SelectItem value="AR">Arabe</SelectItem>
+                                <SelectItem value="ES">Espagnol</SelectItem>
+                                <SelectItem value="DE">Allemand</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Viralité</Label>
+                            <Select
+                              value={String(autoPublishSettingsData?.viralityLevel ?? "medium")}
+                              onValueChange={v => updateAutoPublishField("viralityLevel", v)}
+                            >
+                              <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="low">Conservateur</SelectItem>
+                                <SelectItem value="medium">Équilibré</SelectItem>
+                                <SelectItem value="high">Viral</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-4">
+                          {([
+                            { key: "includeEmojis", label: "Emojis" },
+                            { key: "includeHashtags", label: "Hashtags" },
+                            { key: "includeCallToAction", label: "Call-to-action" },
+                          ] as const).map(option => (
+                            <label key={option.key} className="flex items-center gap-2 text-sm">
+                              <Switch
+                                checked={autoPublishSettingsData?.[option.key] !== false}
+                                onCheckedChange={checked => updateAutoPublishField(option.key, checked)}
+                              />
+                              {option.label}
+                            </label>
+                          ))}
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Contexte personnel (optionnel)</Label>
+                          <Textarea
+                            placeholder="Ex: Je suis CEO d'une startup SaaS B2B, 10 ans d'expérience en marketing digital..."
+                            value={String(autoPublishSettingsData?.personalContext ?? "")}
+                            onChange={e => updateAutoPublishField("personalContext", e.target.value)}
+                            className="bg-background/50 min-h-[80px]"
+                          />
+                        </div>
+                      </div>
+                    </>
                   )}
 
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={() => setWorkflowStep("choose-automation")}>← Retour</Button>
-                    <Button className="flex-1 btn-gradient" onClick={() => setWorkflowStep("publish")}>
-                      Continuer <ChevronRight className="w-4 h-4 ml-1" />
+                    <Button
+                      className="flex-1 btn-gradient"
+                      onClick={handleEnableAutomation}
+                      disabled={savingAutoPublish || loadingAutoPublish || autoPublishScheduleSlots.length === 0}
+                    >
+                      {savingAutoPublish ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <Zap className="w-4 h-4 mr-1" />
+                      )}
+                      Activer et continuer
                     </Button>
                   </div>
                 </CardContent>
@@ -1232,9 +1528,9 @@ export default function Generator() {
                     Étape 5 — Publier
                   </CardTitle>
                   <CardDescription>
-                    {publishMode === "now"
-                      ? "Votre post sera publié immédiatement sur LinkedIn"
-                      : `Planifié pour le ${scheduleDate} à ${scheduleTime}`}
+                    {upcomingOccurrence
+                      ? `Ce post sera planifié pour le ${formatDisplayDate(upcomingOccurrence.date)} à ${upcomingOccurrence.time}`
+                      : "Votre post sera publié immédiatement sur LinkedIn"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1246,34 +1542,43 @@ export default function Generator() {
                   />
 
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setWorkflowStep("configure-automation")}>← Retour</Button>
-                    {publishMode === "now" ? (
-                      <Button
-                        className="flex-1 bg-[#0077B5] hover:bg-[#006699]"
-                        onClick={handlePublish}
-                        disabled={publishing}
-                      >
-                        {publishing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Linkedin className="w-4 h-4 mr-2" />}
-                        Publier sur LinkedIn
-                      </Button>
-                    ) : (
-                      <Button
-                        className="flex-1 btn-gradient"
-                        onClick={handleSchedule}
-                        disabled={scheduling}
-                      >
-                        {scheduling ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Calendar className="w-4 h-4 mr-2" />}
-                        Planifier la publication
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setWorkflowStep(
+                          publishMode === "schedule" ? "configure-automation" : "choose-automation"
+                        )
+                      }
+                    >
+                      ← Retour
+                    </Button>
+                    <Button
+                      className="flex-1 bg-[#0077B5] hover:bg-[#006699]"
+                      onClick={() =>
+                        upcomingOccurrence
+                          ? handleSchedulePost(upcomingOccurrence.date, upcomingOccurrence.time)
+                          : handlePublish()
+                      }
+                      disabled={publishing}
+                    >
+                      {publishing ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : upcomingOccurrence ? (
+                        <Calendar className="w-4 h-4 mr-2" />
+                      ) : (
+                        <Linkedin className="w-4 h-4 mr-2" />
+                      )}
+                      {upcomingOccurrence ? "Planifier" : "Publier sur LinkedIn"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             )}
-          </div>
         </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );

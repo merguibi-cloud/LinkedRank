@@ -418,7 +418,11 @@ export const autoPublishSettings = pgTable("auto_publish_settings", {
   // Additional context
   personalContext: text("personalContext"), // User's business context for personalization
   avoidTopics: text("avoidTopics"), // JSON array of topics to avoid
-  
+
+  // IANA timezone (e.g. "Africa/Casablanca") captured from the user's browser when
+  // saving settings — recurring schedule day/time matching uses this, not a hardcoded zone.
+  timezone: varchar("timezone", { length: 64 }),
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

@@ -3,7 +3,12 @@ import type {
   AutoPublishSchedule,
   AutoPublishSettings,
 } from "../../drizzle/schema";
-import { wallClockToUtc } from "@shared/scheduleTime";
+import {
+  DEFAULT_SCHEDULE_TIMEZONE,
+  getDateKeyInZone,
+  getDayOfWeekInZone,
+  wallClockToUtc,
+} from "@shared/scheduleTime";
 import { resolveStorageAssetUrl } from "../_core/publicUrl";
 
 export type UpcomingPublicationType = "queued" | "recurring" | "one_shot";
@@ -18,6 +23,7 @@ export interface UpcomingPublication {
   imageUrl: string | null;
   source: string | null;
   queueId: number | null;
+  generatedPostId: number | null;
   dayLabel: string;
   timeLabel: string;
   relativeLabel: string;
@@ -31,9 +37,9 @@ function formatDateKey(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function combineDateTime(date: Date, time: string): Date {
-  const dateKey = formatDateKey(date);
-  return wallClockToUtc(dateKey, time);
+function combineDateTime(date: Date, time: string, timeZone: string): Date {
+  const dateKey = getDateKeyInZone(date, timeZone);
+  return wallClockToUtc(dateKey, time, timeZone);
 }
 
 function formatDayLabel(date: Date, now: Date): string {
@@ -125,6 +131,7 @@ export function projectUpcomingPublications(options: {
       imageUrl: resolveStorageAssetUrl(item.imageUrl, item.imageKey),
       source: sourceType,
       queueId: item.id,
+      generatedPostId: item.generatedPostId ?? null,
       dayLabel: formatDayLabel(scheduled, now),
       timeLabel: scheduled.toLocaleTimeString("fr-FR", {
         hour: "2-digit",
@@ -141,12 +148,14 @@ export function projectUpcomingPublications(options: {
     );
   }
 
+  const timeZone = settings.timezone || DEFAULT_SCHEDULE_TIMEZONE;
+
   for (let offset = 0; offset <= days; offset++) {
     const date = new Date(now);
     date.setHours(0, 0, 0, 0);
     date.setDate(date.getDate() + offset);
-    const dateKey = formatDateKey(date);
-    const dayOfWeek = date.getDay();
+    const dateKey = getDateKeyInZone(date, timeZone);
+    const dayOfWeek = getDayOfWeekInZone(date, timeZone);
 
     for (const slot of schedule) {
       if (!slot.isActive) continue;
@@ -157,7 +166,7 @@ export function projectUpcomingPublications(options: {
         continue;
       }
 
-      const scheduledFor = combineDateTime(date, slot.publishTime);
+      const scheduledFor = combineDateTime(date, slot.publishTime, timeZone);
       if (scheduledFor <= now || scheduledFor > end) continue;
       if (isSlotCoveredByQueue(scheduledFor, queue)) continue;
 
@@ -174,6 +183,7 @@ export function projectUpcomingPublications(options: {
         imageUrl: null,
         source: "auto_recurring",
         queueId: null,
+        generatedPostId: null,
         dayLabel: formatDayLabel(scheduledFor, now),
         timeLabel: scheduledFor.toLocaleTimeString("fr-FR", {
           hour: "2-digit",

@@ -13,7 +13,7 @@ import {
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
-import { ToolsQuickNav } from "@/components/tools/ToolsQuickNav";
+import { IllustrationSlot } from "@/components/IllustrationSlot";
 import { useLocation } from "wouter";
 
 interface GeneratedCarousel {
@@ -79,23 +79,35 @@ export default function Carousels() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <ToolsQuickNav />
         <LinkedInConnectBanner />
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-              <Layers className="h-7 w-7 text-primary" />
-              Mes carrousels
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Retrouvez vos carrousels générés — créez-en un nouveau depuis le générateur unifié
-            </p>
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet/20 via-rose/10 to-transparent border border-white/10 p-8">
+          <div className="relative flex items-center justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-violet to-rose">
+                  <Layers className="h-7 w-7 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white">Mes carrousels</h1>
+                  <p className="text-muted-foreground mt-1">
+                    Retrouvez vos carrousels générés — créez-en un nouveau depuis le générateur unifié
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => setLocation("/generate")} className="btn-gradient gap-2 mt-4">
+                <Plus className="h-4 w-4" />
+                Créer un carrousel
+              </Button>
+            </div>
+
+            {/* Drop an image at public/images/hero-carousels.png to fill this */}
+            <IllustrationSlot
+              src="/images/hero-carousels.png"
+              alt=""
+              className="hidden lg:block w-56 h-36 shrink-0"
+            />
           </div>
-          <Button onClick={() => setLocation("/generate")} className="btn-gradient gap-2">
-            <Plus className="h-4 w-4" />
-            Créer un carrousel
-          </Button>
         </div>
 
         {isLoadingCarousels ? (
@@ -155,7 +167,14 @@ export default function Carousels() {
         ) : (
           <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
             <CardContent className="py-12 text-center">
-              <Layers className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+              {/* Drop an image at public/images/empty-carousels.png to fill this */}
+              <IllustrationSlot
+                src="/images/empty-carousels.png"
+                icon={Layers}
+                alt=""
+                className="h-16 w-16 mx-auto mb-4"
+                iconClassName="h-12 w-12 mx-auto mb-4"
+              />
               <h3 className="text-lg font-medium">Aucun carrousel</h3>
               <p className="text-muted-foreground mt-1 mb-4">
                 Créez votre premier carrousel LinkedIn

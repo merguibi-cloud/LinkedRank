@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLinkedInConnectUrl, getLoginUrl, getSignupUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { formatDateInput, getDefaultScheduleTime, combineDateAndTime, buildScheduledAtIso } from "@/lib/scheduleUtils";
+import { formatDateInput, getDefaultScheduleTime, combineDateAndTime, buildScheduledAtIso, formatDisplayDate, getDayOfWeekFromDate } from "@/lib/scheduleUtils";
 import { AI_IMAGE_FORMATS, AI_IMAGE_STYLES } from "@/lib/aiImageStyles";
 import { LinkedInConnectBanner } from "@/components/LinkedInConnectBanner";
 import { GettingStartedJourney } from "@/components/GettingStartedJourney";
@@ -78,13 +78,12 @@ const DAYS = [
   { id: 6, name: "Sam", fullName: "Samedi" },
 ];
 
-// Time slots
-const TIME_SLOTS = [
-  "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30",
-  "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
-  "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
-  "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30",
-];
+// Time slots — every half hour, full 24h range
+const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => {
+  const hours = Math.floor(i / 2).toString().padStart(2, "0");
+  const minutes = i % 2 === 0 ? "00" : "30";
+  return `${hours}:${minutes}`;
+});
 
 // Sectors
 const SECTORS = [
@@ -170,21 +169,6 @@ const COLOR_PALETTES = [
   { id: "slate", name: "Ardoise", primary: "#64748B", secondary: "#475569", bg: "from-slate-600 to-slate-800" },
   { id: "gold", name: "Or", primary: "#EAB308", secondary: "#CA8A04", bg: "from-yellow-500 to-amber-600" },
 ];
-
-function formatDisplayDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function getDayOfWeekFromDate(dateStr: string): number {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(y, m - 1, d).getDay();
-}
 
 interface ScheduleSlot {
   dayOfWeek: number;
@@ -461,7 +445,13 @@ export default function AutoPublish() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ settings: settingsToSave, schedule: scheduleToSave }),
+        body: JSON.stringify({
+          settings: {
+            ...settingsToSave,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
+          schedule: scheduleToSave,
+        }),
       });
 
       if (response.ok) {
