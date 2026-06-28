@@ -160,8 +160,8 @@ export default function Navbar() {
                           onMouseEnter={() => handleSubmenuEnter(item.label)}
                           onMouseLeave={handleSubmenuLeave}
                         >
-                          <div className="w-72 rounded-xl border border-white/10 bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden">
-                            <div className="p-2">
+                          <div className="w-72 max-h-[min(28rem,calc(100dvh-5.5rem))] rounded-xl border border-white/10 bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col">
+                            <div className="p-2 overflow-y-auto overscroll-contain">
                               {item.submenu.map((subItem) => (
                                 <Link
                                   key={subItem.href}

@@ -6,8 +6,10 @@
  */
 
 import puppeteer from "puppeteer";
+import { PDFDocument } from "pdf-lib";
 import { storagePut } from "../storage";
 import { generateImageBuffer } from "../_core/imageGeneration";
+import { resolvePublicUrl } from "../_core/publicUrl";
 import { generateLinkedInPost } from "./ai";
 
 // Carousel slide types
@@ -42,7 +44,11 @@ export interface GeneratedCarousel {
   slides: CarouselSlide[];
   imageUrls: string[];
   pdfUrl?: string;
+  pdfKey?: string;
 }
+
+const CAROUSEL_PAGE_WIDTH = 1080;
+const CAROUSEL_PAGE_HEIGHT = 1350;
 
 // Color palettes for different styles
 const COLOR_PALETTES = {
@@ -652,20 +658,103 @@ export async function renderCarouselToImages(
   }
 }
 
+async function fetchSlideBytes(url: string): Promise<Uint8Array> {
+  const resolved = resolvePublicUrl(url);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+    try {
+      const response = await fetch(resolved, {
+        signal: controller.signal,
+        headers: { "User-Agent": "LinkedRank-Carousel-PDF/1.0" },
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return new Uint8Array(await response.arrayBuffer());
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (attempt === 3) throw error;
+      await new Promise((r) => setTimeout(r, 1000 * attempt));
+    }
+  }
+  throw new Error("Failed to fetch slide");
+}
+
+/**
+ * Assemble carousel slide images into a multi-page PDF for LinkedIn document posts.
+ */
+export async function buildCarouselPdfFromImages(
+  imageUrls: string[],
+  topic?: string
+): Promise<{ pdfUrl: string; pdfKey: string }> {
+  if (imageUrls.length === 0) {
+    throw new Error("No slides to export as PDF");
+  }
+
+  console.log("[CarouselGenerator] Building PDF from", imageUrls.length, "slides");
+  const pdfDoc = await PDFDocument.create();
+
+  for (let i = 0; i < imageUrls.length; i++) {
+    const bytes = await fetchSlideBytes(imageUrls[i]);
+    const page = pdfDoc.addPage([CAROUSEL_PAGE_WIDTH, CAROUSEL_PAGE_HEIGHT]);
+    const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
+    const image = isPng
+      ? await pdfDoc.embedPng(bytes)
+      : await pdfDoc.embedJpg(bytes);
+    const scale = Math.max(
+      CAROUSEL_PAGE_WIDTH / image.width,
+      CAROUSEL_PAGE_HEIGHT / image.height
+    );
+    const width = image.width * scale;
+    const height = image.height * scale;
+    page.drawImage(image, {
+      x: (CAROUSEL_PAGE_WIDTH - width) / 2,
+      y: (CAROUSEL_PAGE_HEIGHT - height) / 2,
+      width,
+      height,
+    });
+  }
+
+  if (topic) {
+    pdfDoc.setTitle(topic.slice(0, 120));
+  }
+
+  const pdfBytes = await pdfDoc.save();
+  const fileName = `carousels/${Date.now()}_carousel.pdf`;
+  const result = await storagePut(
+    fileName,
+    Buffer.from(pdfBytes),
+    "application/pdf"
+  );
+  console.log("[CarouselGenerator] PDF uploaded:", result.url);
+  return { pdfUrl: result.url, pdfKey: result.key };
+}
+
 /**
  * Generate a complete carousel
  */
 export async function generateCarousel(
   config: CarouselConfig
 ): Promise<GeneratedCarousel> {
-  // Generate content
   const slides = await generateCarouselContent(config.topic, config.slideCount);
-  
-  // Render to images
   const imageUrls = await renderCarouselToImages(slides, config);
-  
+
+  let pdfUrl: string | undefined;
+  let pdfKey: string | undefined;
+  try {
+    const pdf = await buildCarouselPdfFromImages(imageUrls, config.topic);
+    pdfUrl = pdf.pdfUrl;
+    pdfKey = pdf.pdfKey;
+  } catch (error) {
+    console.error("[CarouselGenerator] PDF generation failed:", error);
+  }
+
   return {
     slides,
     imageUrls,
+    pdfUrl,
+    pdfKey,
   };
 }
