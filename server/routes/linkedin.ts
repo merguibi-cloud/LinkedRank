@@ -11,6 +11,7 @@ import {
   requireAuth,
 } from "../_core/authMiddleware";
 import { getLinkedInRedirectUri } from "../_core/linkedinRedirect";
+import { resolveStorageAssetUrl } from "../_core/publicUrl";
 import { resolveAppUser } from "../_core/supabase";
 import {
   getLinkedInAuthUrl,
@@ -263,7 +264,10 @@ async function publishForUser(
   content: string,
   imageUrl?: string,
   hashtags?: string[],
-  generatedPostId?: number
+  generatedPostId?: number,
+  pdfUrl?: string,
+  documentTitle?: string,
+  pdfKey?: string
 ) {
   const settings = await getLinkedinSettings(userId);
 
@@ -293,11 +297,17 @@ async function publishForUser(
     fullContent = `${content}\n\n${hashtagString}`;
   }
 
+  const resolvedPdfUrl = pdfUrl
+    ? resolveStorageAssetUrl(pdfUrl, pdfKey) ?? pdfUrl
+    : undefined;
+
   const result = await postToLinkedIn(
     settings.accessToken,
     settings.linkedinUserId,
     fullContent,
-    imageUrl
+    resolvedPdfUrl
+      ? { pdfUrl: resolvedPdfUrl, documentTitle: documentTitle || content.slice(0, 80) }
+      : imageUrl
   );
 
   if (result.success) {
@@ -339,7 +349,7 @@ async function publishForUser(
 router.post("/publish", requireAuth, async (req, res) => {
   try {
     const { userId } = req as AuthenticatedRequest;
-    const { content, hashtags, imageUrl, generatedPostId } = req.body;
+    const { content, hashtags, imageUrl, generatedPostId, pdfUrl, pdfKey, documentTitle } = req.body;
 
     if (!content) {
       return res.status(400).json({ error: "Content is required" });
@@ -350,7 +360,10 @@ router.post("/publish", requireAuth, async (req, res) => {
       content,
       imageUrl,
       hashtags,
-      generatedPostId ? Number(generatedPostId) : undefined
+      generatedPostId ? Number(generatedPostId) : undefined,
+      pdfUrl,
+      documentTitle,
+      pdfKey
     );
     return res.status(result.status).json(result.body);
   } catch (error) {

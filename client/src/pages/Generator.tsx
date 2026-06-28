@@ -93,6 +93,8 @@ export default function Generator() {
   const [carouselStyle, setCarouselStyle] = useState<CarouselStyleId>("modern");
   const [carouselAuthorTitle, setCarouselAuthorTitle] = useState("");
   const [carouselImageUrls, setCarouselImageUrls] = useState<string[]>([]);
+  const [carouselPdfUrl, setCarouselPdfUrl] = useState<string | null>(null);
+  const [carouselPdfKey, setCarouselPdfKey] = useState<string | null>(null);
   const [carouselSlideIndex, setCarouselSlideIndex] = useState(0);
 
   const [theme, setTheme] = useState("");
@@ -252,9 +254,7 @@ export default function Generator() {
     onError: (error) => toast.error(`Erreur: ${error.message}`),
   });
 
-  // Un carrousel est généré en un seul appel (texte + visuels des slides déjà
-  // prêts) — on le traite ensuite comme un post normal pour l'édition,
-  // l'automatisation et la publication, avec la 1ère slide comme image.
+  // Un carrousel est généré en un seul appel (texte + visuels + PDF pour LinkedIn).
   const generateCarouselMutation = trpc.carousels.generate.useMutation({
     onSuccess: (data) => {
       const caption = data.slides
@@ -266,6 +266,8 @@ export default function Generator() {
         .slice(0, 2800);
 
       setCarouselImageUrls(data.imageUrls);
+      setCarouselPdfUrl(data.pdfUrl ?? null);
+      setCarouselPdfKey(data.pdfKey ?? null);
       setCarouselSlideIndex(0);
       setActivePost({
         id: data.id,
@@ -279,7 +281,11 @@ export default function Generator() {
       setImageKey(null);
       setImagePrompt(null);
       setSelectedMediaId(null);
-      toast.success(`Carrousel généré ! ${data.slides.length} slides créées.`);
+      toast.success(
+        data.pdfUrl
+          ? `Carrousel généré ! ${data.slides.length} slides + PDF prêt pour LinkedIn.`
+          : `Carrousel généré ! ${data.slides.length} slides créées.`
+      );
     },
     onError: (error) => toast.error(`Erreur: ${error.message}`),
   });
@@ -371,7 +377,10 @@ export default function Generator() {
         body: JSON.stringify({
           content: editedContent,
           hashtags: editedHashtags,
-          imageUrl: imageUrl ?? undefined,
+          imageUrl: isCarousel ? undefined : (imageUrl ?? undefined),
+          pdfUrl: isCarousel ? (carouselPdfUrl ?? undefined) : undefined,
+          pdfKey: isCarousel ? (carouselPdfKey ?? undefined) : undefined,
+          documentTitle: isCarousel ? (activePost?.title ?? carouselTopic) : undefined,
           generatedPostId: isCarousel ? undefined : activePost?.id,
         }),
       });
@@ -384,6 +393,8 @@ export default function Generator() {
         setWorkflowStep("configure");
         setActivePost(null);
         setCarouselImageUrls([]);
+        setCarouselPdfUrl(null);
+        setCarouselPdfKey(null);
         setCarouselSlideIndex(0);
       } else if (data.error?.includes("LinkedIn not connected")) {
         toast.info("Connectez LinkedIn pour publier");
@@ -411,6 +422,9 @@ export default function Generator() {
           imageUrl: imageUrl ?? undefined,
           imageKey: imageKey ?? undefined,
           mediaLibraryId: selectedMediaId ?? undefined,
+          pdfUrl: isCarousel ? (carouselPdfUrl ?? undefined) : undefined,
+          pdfKey: isCarousel ? (carouselPdfKey ?? undefined) : undefined,
+          documentTitle: isCarousel ? (activePost?.title ?? carouselTopic) : undefined,
           date: scheduleDate,
           time: scheduleTime,
           scheduledAt: buildScheduledAtIso(scheduleDate, scheduleTime),
@@ -426,6 +440,8 @@ export default function Generator() {
         setWorkflowStep("configure");
         setActivePost(null);
         setCarouselImageUrls([]);
+        setCarouselPdfUrl(null);
+        setCarouselPdfKey(null);
         setCarouselSlideIndex(0);
       } else {
         toast.error(data.error || "Erreur lors de la planification");
@@ -1070,6 +1086,7 @@ export default function Generator() {
                       </div>
                       <p className="text-xs text-center text-muted-foreground">
                         Slide {carouselSlideIndex + 1} / {carouselImageUrls.length}
+                        {carouselPdfUrl && " · PDF prêt pour LinkedIn"}
                       </p>
                       <div className="flex gap-2 overflow-x-auto pb-1">
                         {carouselImageUrls.map((url, index) => (

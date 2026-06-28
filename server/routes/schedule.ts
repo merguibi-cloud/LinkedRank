@@ -82,7 +82,7 @@ router.get("/", async (req: Request, res: Response) => {
 
 router.post("/", async (req: Request, res: Response) => {
   const userId = (req as Request & { userId: number }).userId;
-  const { content, imageUrl, generatedPostId, mediaLibraryId, imageKey, source } = req.body as {
+  const { content, imageUrl, generatedPostId, mediaLibraryId, imageKey, source, pdfUrl, pdfKey, documentTitle } = req.body as {
     content?: string;
     imageUrl?: string;
     imageKey?: string;
@@ -92,6 +92,9 @@ router.post("/", async (req: Request, res: Response) => {
     date?: string;
     time?: string;
     source?: string;
+    pdfUrl?: string;
+    pdfKey?: string;
+    documentTitle?: string;
   };
 
   if (!content?.trim()) {
@@ -160,10 +163,19 @@ router.post("/", async (req: Request, res: Response) => {
     const generatedFrom = JSON.stringify({
       type: source === "auto-publish"
         ? "auto-publish"
-        : generatedPostId
-          ? "generator"
-          : "manual",
+        : pdfUrl
+          ? "carousel"
+          : generatedPostId
+            ? "generator"
+            : "manual",
       postId: generatedPostId ?? null,
+      ...(pdfUrl
+        ? {
+            pdfUrl,
+            pdfKey: pdfKey ?? null,
+            documentTitle: documentTitle ?? null,
+          }
+        : {}),
     });
 
     const [result] = await db

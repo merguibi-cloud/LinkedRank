@@ -79,7 +79,13 @@ function isTimeMatch(scheduledTime: string, currentTime: string): boolean {
 /**
  * Publish a post to LinkedIn for a user
  */
-async function publishToLinkedIn(userId: number, content: string, imageUrl?: string | null): Promise<boolean> {
+async function publishToLinkedIn(
+  userId: number,
+  content: string,
+  imageUrl?: string | null,
+  pdfUrl?: string | null,
+  documentTitle?: string | null
+): Promise<boolean> {
   try {
     // Get user's LinkedIn settings (access token)
     const linkedinSettings = await getLinkedinSettings(userId);
@@ -89,16 +95,26 @@ async function publishToLinkedIn(userId: number, content: string, imageUrl?: str
       return false;
     }
 
-    // Post to LinkedIn with image if available
+    const media = pdfUrl
+      ? {
+          pdfUrl,
+          documentTitle: documentTitle || content.slice(0, 80),
+        }
+      : imageUrl || undefined;
+
     const result = await postToLinkedIn(
       linkedinSettings.accessToken,
       linkedinSettings.linkedinUserId || "",
       content,
-      imageUrl || undefined
+      media
     );
 
     if (result.success) {
-      console.log(`[AutoPublish] Successfully published post for user ${userId}${imageUrl ? ' with image' : ''}`);
+      console.log(
+        `[AutoPublish] Successfully published post for user ${userId}${
+          pdfUrl ? " with PDF carousel" : imageUrl ? " with image" : ""
+        }`
+      );
       const preview = content.slice(0, 80).replace(/\n/g, " ");
       await notifyPostPublished(userId, preview);
       await recordPublishedPost(userId, {
@@ -224,11 +240,32 @@ async function processScheduledQueue(): Promise<void> {
         post.imageKey
       );
 
+      let resolvedPdfUrl: string | undefined;
+      let documentTitle: string | undefined;
+      if (post.generatedFrom) {
+        try {
+          const meta = JSON.parse(post.generatedFrom) as {
+            pdfUrl?: string;
+            pdfKey?: string;
+            documentTitle?: string;
+          };
+          if (meta.pdfUrl) {
+            resolvedPdfUrl =
+              resolveStorageAssetUrl(meta.pdfUrl, meta.pdfKey) ?? undefined;
+            documentTitle = meta.documentTitle;
+          }
+        } catch {
+          /* ignore malformed metadata */
+        }
+      }
+
       try {
         success = await publishToLinkedIn(
           post.userId,
           post.content,
-          resolvedImageUrl
+          resolvedPdfUrl ? null : resolvedImageUrl,
+          resolvedPdfUrl,
+          documentTitle
         );
         if (!success) {
           errorMessage = "Publication LinkedIn échouée";

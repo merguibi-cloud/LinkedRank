@@ -2,7 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { signOutSupabase } from "./_core/supabase";
-import { resolvePublicUrls, resolveStorageAssetUrl } from "./_core/publicUrl";
+import { resolvePublicUrl, resolvePublicUrls, resolveStorageAssetUrl } from "./_core/publicUrl";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
@@ -51,8 +51,9 @@ import {
   isOnboardingComplete,
 } from "./services/voiceOnboardingService";
 import { generatePostImage } from "./services/postImageService";
-import { userProfiles, generatedPosts, linkedinInfluencers } from "../drizzle/schema";
-import { eq, desc, sql, like, or, and } from "drizzle-orm";
+import { userProfiles, generatedPosts, linkedinInfluencers, viralPosts } from "../drizzle/schema";
+import { eq, desc, asc, sql, like, or, and } from "drizzle-orm";
+import { VIRAL_POSTS_FALLBACK } from "./data/viralPostsFallback";
 import { canUserPerformAction, getRemainingUsage } from "./services/subscriptionLimits";
 import {
   uploadMedia,
@@ -762,6 +763,55 @@ export const appRouter = router({
     }),
   }),
 
+  viralPosts: router({
+    list: publicProcedure
+      .input(
+        z.object({
+          weekNumber: z.number().optional(),
+          year: z.number().optional(),
+          language: z.enum(["all", "FR", "EN"]).optional().default("all"),
+          limit: z.number().min(1).max(50).optional().default(20),
+        })
+      )
+      .query(async ({ input }) => {
+        const db = await getDb();
+        const conditions = [];
+
+        if (input.weekNumber) {
+          conditions.push(eq(viralPosts.weekNumber, input.weekNumber));
+        }
+        if (input.year) {
+          conditions.push(eq(viralPosts.year, input.year));
+        }
+        if (input.language !== "all") {
+          conditions.push(eq(viralPosts.language, input.language));
+        }
+
+        if (db) {
+          const rows = await db
+            .select()
+            .from(viralPosts)
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(asc(viralPosts.rank), desc(viralPosts.likes))
+            .limit(input.limit);
+
+          if (rows.length > 0) {
+            return { posts: rows, source: "database" as const };
+          }
+        }
+
+        let fallback = [...VIRAL_POSTS_FALLBACK];
+        if (input.language !== "all") {
+          fallback = fallback.filter((post) => post.language === input.language);
+        }
+
+        return {
+          posts: fallback.slice(0, input.limit),
+          source: "fallback" as const,
+        };
+      }),
+  }),
+
   // Agents router
   agents: router({
     // Get all agents for current user
@@ -1001,6 +1051,8 @@ export const appRouter = router({
           topic: input.topic,
           slides: JSON.stringify(result.slides),
           previewImages: JSON.stringify(result.imageUrls),
+          pdfUrl: result.pdfUrl ?? null,
+          pdfKey: result.pdfKey ?? null,
           status: "ready",
         }).returning({ id: generatedCarousels.id });
 
@@ -1008,6 +1060,8 @@ export const appRouter = router({
           id: saved.id,
           slides: result.slides,
           imageUrls: resolvePublicUrls(result.imageUrls),
+          pdfUrl: result.pdfUrl ? resolvePublicUrl(result.pdfUrl) : undefined,
+          pdfKey: result.pdfKey,
         };
       }),
 
@@ -1034,6 +1088,7 @@ export const appRouter = router({
           previewImages: resolvePublicUrls(
             c.previewImages ? JSON.parse(c.previewImages) : []
           ),
+          pdfUrl: c.pdfUrl ? resolvePublicUrl(c.pdfUrl) : undefined,
         }));
       }),
 
@@ -1060,6 +1115,7 @@ export const appRouter = router({
           previewImages: resolvePublicUrls(
             carousel.previewImages ? JSON.parse(carousel.previewImages) : []
           ),
+          pdfUrl: carousel.pdfUrl ? resolvePublicUrl(carousel.pdfUrl) : undefined,
         };
       }),
 

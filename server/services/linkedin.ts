@@ -21,7 +21,37 @@ import { ENV } from "../_core/env";
 const LINKEDIN_AUTH_URL = "https://www.linkedin.com/oauth/v2/authorization";
 const LINKEDIN_TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken";
 const LINKEDIN_API_URL = "https://api.linkedin.com/v2";
+const LINKEDIN_REST_API_URL = "https://api.linkedin.com/rest";
 const LINKEDIN_USERINFO_URL = "https://api.linkedin.com/v2/userinfo";
+/** Version REST LinkedIn (YYYYMM) — requis pour Documents / Posts API */
+const DEFAULT_LINKEDIN_API_VERSION = "202606";
+
+function resolveLinkedInApiVersion(): string {
+  const raw = process.env.LINKEDIN_API_VERSION?.trim();
+  if (!raw) return DEFAULT_LINKEDIN_API_VERSION;
+  // Format attendu : YYYYMM (6 chiffres). YYYYMMDD → tronquer.
+  if (/^\d{6}$/.test(raw)) return raw;
+  if (/^\d{8}$/.test(raw)) return raw.slice(0, 6);
+  console.warn(
+    `[LinkedIn] LINKEDIN_API_VERSION invalide "${raw}", utilisation de ${DEFAULT_LINKEDIN_API_VERSION}`
+  );
+  return DEFAULT_LINKEDIN_API_VERSION;
+}
+
+const LINKEDIN_API_VERSION = resolveLinkedInApiVersion();
+
+function linkedInRestHeaders(accessToken: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+    "X-Restli-Protocol-Version": "2.0.0",
+    "Linkedin-Version": LINKEDIN_API_VERSION,
+  };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export interface LinkedInTokens {
   accessToken: string;
@@ -42,6 +72,20 @@ export interface LinkedInPostResult {
   success: boolean;
   postId?: string;
   error?: string;
+}
+
+export interface LinkedInPostMediaOptions {
+  imageUrl?: string;
+  pdfUrl?: string;
+  documentTitle?: string;
+}
+
+function normalizePostMedia(
+  media?: string | LinkedInPostMediaOptions
+): LinkedInPostMediaOptions {
+  if (!media) return {};
+  if (typeof media === "string") return { imageUrl: media };
+  return media;
 }
 
 /**
@@ -174,10 +218,233 @@ export async function getLinkedInProfile(
   return profile;
 }
 
-/**
- * Register an image upload with LinkedIn
- * Returns the upload URL and asset URN
- */
+async function initializeDocumentUpload(
+  accessToken: string,
+  authorId: string
+): Promise<{ uploadUrl: string; documentUrn: string }> {
+  const response = await fetch(
+    `${LINKEDIN_REST_API_URL}/documents?action=initializeUpload`,
+    {
+      method: "POST",
+      headers: linkedInRestHeaders(accessToken),
+      body: JSON.stringify({
+        initializeUploadRequest: {
+          owner: `urn:li:person:${authorId}`,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to initialize document upload: ${error}`);
+  }
+
+  const data = await response.json();
+  const uploadUrl = data.value?.uploadUrl as string | undefined;
+  const documentUrn = data.value?.document as string | undefined;
+
+  if (!uploadUrl || !documentUrn) {
+    throw new Error("No upload URL or document URN returned from LinkedIn");
+  }
+
+  return { uploadUrl, documentUrn };
+}
+
+async function waitForDocumentReady(
+  accessToken: string,
+  documentUrn: string
+): Promise<void> {
+  const encodedUrn = encodeURIComponent(documentUrn);
+
+  for (let attempt = 1; attempt <= 12; attempt++) {
+    const response = await fetch(
+      `${LINKEDIN_REST_API_URL}/documents/${encodedUrn}`,
+      { headers: linkedInRestHeaders(accessToken) }
+    );
+
+    if (!response.ok) {
+      console.warn("[LinkedIn] Document status check failed:", await response.text());
+      await sleep(1500);
+      continue;
+    }
+
+    const doc = (await response.json()) as { status?: string };
+    console.log(`[LinkedIn] Document status (attempt ${attempt}):`, doc.status);
+
+    if (doc.status === "AVAILABLE") return;
+    if (doc.status === "PROCESSING_FAILED") {
+      throw new Error("LinkedIn document processing failed");
+    }
+
+    await sleep(1500);
+  }
+
+  console.warn("[LinkedIn] Document not AVAILABLE yet, attempting post anyway");
+}
+
+async function postDocumentCarouselToLinkedIn(
+  accessToken: string,
+  authorId: string,
+  content: string,
+  documentUrn: string,
+  documentTitle: string
+): Promise<LinkedInPostResult> {
+  const title = (documentTitle || "Carrousel LinkedIn").slice(0, 200);
+
+  const response = await fetch(`${LINKEDIN_REST_API_URL}/posts`, {
+    method: "POST",
+    headers: linkedInRestHeaders(accessToken),
+    body: JSON.stringify({
+      author: `urn:li:person:${authorId}`,
+      commentary: content,
+      visibility: "PUBLIC",
+      distribution: {
+        feedDistribution: "MAIN_FEED",
+        targetEntities: [],
+        thirdPartyDistributionChannels: [],
+      },
+      content: {
+        media: {
+          title,
+          id: documentUrn,
+        },
+      },
+      lifecycleState: "PUBLISHED",
+      isReshareDisabledByAuthor: false,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    return { success: false, error: `Failed to post document: ${error}` };
+  }
+
+  const postId =
+    response.headers.get("x-restli-id") ||
+    response.headers.get("x-linkedin-id") ||
+    undefined;
+
+  return { success: true, postId };
+}
+
+async function publishPdfCarousel(
+  accessToken: string,
+  authorId: string,
+  content: string,
+  pdfUrl: string,
+  documentTitle?: string
+): Promise<LinkedInPostResult> {
+  console.log("[LinkedIn] PDF URL provided, uploading via Documents API...");
+  const { uploadUrl, documentUrn } = await initializeDocumentUpload(
+    accessToken,
+    authorId
+  );
+  await uploadDocumentToLinkedIn(accessToken, uploadUrl, pdfUrl);
+  console.log("[LinkedIn] PDF uploaded, document URN:", documentUrn);
+  await waitForDocumentReady(accessToken, documentUrn);
+  return postDocumentCarouselToLinkedIn(
+    accessToken,
+    authorId,
+    content,
+    documentUrn,
+    documentTitle || "Carrousel LinkedIn"
+  );
+}
+
+async function downloadRemoteFile(
+  fileUrl: string,
+  logLabel: string
+): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+  console.log(`[LinkedIn] Downloading ${logLabel} from:`, fileUrl);
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+      const response = await fetch(fileUrl, {
+        signal: controller.signal,
+        headers: { "User-Agent": "LinkedIn-Media-Upload/1.0" },
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to download ${logLabel}: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const buffer = await response.arrayBuffer();
+      const contentType =
+        response.headers.get("content-type") ||
+        (logLabel === "document" ? "application/pdf" : "image/png");
+      console.log(
+        `[LinkedIn] ${logLabel} downloaded (${buffer.byteLength} bytes, ${contentType})`
+      );
+      return { buffer, contentType };
+    } catch (downloadError) {
+      console.error(`[LinkedIn] ${logLabel} download attempt ${attempt} failed:`, downloadError);
+      if (attempt === 3) {
+        throw new Error(
+          `Failed to download ${logLabel} after 3 attempts: ${downloadError}`
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+    }
+  }
+
+  throw new Error(`Failed to download ${logLabel}`);
+}
+
+async function uploadBytesToLinkedIn(
+  accessToken: string,
+  uploadUrl: string,
+  buffer: ArrayBuffer,
+  contentType: string,
+  logLabel: string
+): Promise<void> {
+  console.log(`[LinkedIn] Uploading ${logLabel} to LinkedIn...`);
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": contentType,
+        },
+        body: buffer,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.text();
+        throw new Error(
+          `LinkedIn ${logLabel} upload failed: ${uploadResponse.status} - ${error}`
+        );
+      }
+
+      console.log(`[LinkedIn] ${logLabel} uploaded successfully to LinkedIn`);
+      return;
+    } catch (uploadError) {
+      console.error(`[LinkedIn] ${logLabel} upload attempt ${attempt} failed:`, uploadError);
+      if (attempt === 3) {
+        throw new Error(
+          `Failed to upload ${logLabel} to LinkedIn after 3 attempts: ${uploadError}`
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+    }
+  }
+}
+
 async function registerImageUpload(
   accessToken: string,
   authorId: string
@@ -211,8 +478,11 @@ async function registerImageUpload(
   }
 
   const data = await response.json();
-  const uploadMechanism = data.value?.uploadMechanism?.["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"];
-  
+  const uploadMechanism =
+    data.value?.uploadMechanism?.[
+      "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
+    ];
+
   if (!uploadMechanism?.uploadUrl) {
     throw new Error("No upload URL returned from LinkedIn");
   }
@@ -223,119 +493,68 @@ async function registerImageUpload(
   };
 }
 
-/**
- * Upload an image to LinkedIn
- */
 async function uploadImageToLinkedIn(
   accessToken: string,
   uploadUrl: string,
   imageUrl: string
 ): Promise<void> {
-  // Download the image from the URL with timeout and retry
-  console.log("[LinkedIn] Downloading image from:", imageUrl);
-  
-  let imageBuffer: ArrayBuffer;
-  let contentType = "image/png";
-  
-  // Try to download with retries
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-      
-      const imageResponse = await fetch(imageUrl, {
-        signal: controller.signal,
-        headers: {
-          "User-Agent": "LinkedIn-Image-Upload/1.0",
-        },
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!imageResponse.ok) {
-        throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
-      }
+  const { buffer, contentType } = await downloadRemoteFile(imageUrl, "image");
+  await uploadBytesToLinkedIn(accessToken, uploadUrl, buffer, contentType, "image");
+}
 
-      imageBuffer = await imageResponse.arrayBuffer();
-      contentType = imageResponse.headers.get("content-type") || "image/png";
-      console.log(`[LinkedIn] Image downloaded successfully (${imageBuffer.byteLength} bytes, ${contentType})`);
-      break;
-    } catch (downloadError) {
-      console.error(`[LinkedIn] Download attempt ${attempt} failed:`, downloadError);
-      if (attempt === 3) {
-        throw new Error(`Failed to download image after 3 attempts: ${downloadError}`);
-      }
-      // Wait before retry
-      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-    }
-  }
-
-  // Upload to LinkedIn with retry
-  console.log("[LinkedIn] Uploading image to LinkedIn...");
-  
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for upload
-      
-      const uploadResponse = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": contentType,
-        },
-        body: imageBuffer!,
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-
-      if (!uploadResponse.ok) {
-        const error = await uploadResponse.text();
-        throw new Error(`LinkedIn upload failed: ${uploadResponse.status} - ${error}`);
-      }
-      
-      console.log("[LinkedIn] Image uploaded successfully to LinkedIn");
-      return;
-    } catch (uploadError) {
-      console.error(`[LinkedIn] Upload attempt ${attempt} failed:`, uploadError);
-      if (attempt === 3) {
-        throw new Error(`Failed to upload image to LinkedIn after 3 attempts: ${uploadError}`);
-      }
-      // Wait before retry
-      await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-    }
-  }
+async function uploadDocumentToLinkedIn(
+  accessToken: string,
+  uploadUrl: string,
+  pdfUrl: string
+): Promise<void> {
+  const { buffer, contentType } = await downloadRemoteFile(pdfUrl, "document");
+  await uploadBytesToLinkedIn(
+    accessToken,
+    uploadUrl,
+    buffer,
+    contentType.includes("pdf") ? contentType : "application/pdf",
+    "document"
+  );
 }
 
 /**
- * Post content to LinkedIn with optional image
- * Uses the UGC Post API (User Generated Content)
+ * Post content to LinkedIn with optional image or PDF carousel document.
+ * Uses the UGC Post API (User Generated Content).
  */
 export async function postToLinkedIn(
   accessToken: string,
   authorId: string,
   content: string,
-  imageUrl?: string
+  media?: string | LinkedInPostMediaOptions
 ): Promise<LinkedInPostResult> {
   try {
-    let mediaAsset: string | null = null;
+    const { imageUrl, pdfUrl, documentTitle } = normalizePostMedia(media);
 
-    // If there's an image, upload it first - this is REQUIRED if image is provided
+    if (pdfUrl) {
+      return await publishPdfCarousel(
+        accessToken,
+        authorId,
+        content,
+        pdfUrl,
+        documentTitle
+      );
+    }
+
+    let mediaAsset: string | null = null;
+    let shareMediaCategory: "NONE" | "IMAGE" = "NONE";
+    let mediaPayload: Record<string, unknown>[] | undefined;
+
     if (imageUrl) {
-      console.log("[LinkedIn] Image URL provided, uploading is required...");
-      console.log("[LinkedIn] Registering image upload...");
+      console.log("[LinkedIn] Image URL provided, uploading...");
       const { uploadUrl, asset } = await registerImageUpload(accessToken, authorId);
-      
-      console.log("[LinkedIn] Uploading image to LinkedIn servers...");
       await uploadImageToLinkedIn(accessToken, uploadUrl, imageUrl);
-      
       mediaAsset = asset;
+      shareMediaCategory = "IMAGE";
+      mediaPayload = [{ status: "READY", media: mediaAsset }];
       console.log("[LinkedIn] Image uploaded successfully, asset:", asset);
     }
 
-    // Build the post payload
-    const postPayload: any = {
+    const postPayload: Record<string, unknown> = {
       author: `urn:li:person:${authorId}`,
       lifecycleState: "PUBLISHED",
       specificContent: {
@@ -343,7 +562,8 @@ export async function postToLinkedIn(
           shareCommentary: {
             text: content,
           },
-          shareMediaCategory: mediaAsset ? "IMAGE" : "NONE",
+          shareMediaCategory,
+          ...(mediaPayload ? { media: mediaPayload } : {}),
         },
       },
       visibility: {
@@ -351,17 +571,7 @@ export async function postToLinkedIn(
       },
     };
 
-    // Add media if we have an uploaded asset
-    if (mediaAsset) {
-      postPayload.specificContent["com.linkedin.ugc.ShareContent"].media = [
-        {
-          status: "READY",
-          media: mediaAsset,
-        },
-      ];
-    }
-
-    console.log("[LinkedIn] Posting to LinkedIn...");
+    console.log("[LinkedIn] Posting to LinkedIn (ugcPosts)...");
     const response = await fetch(`${LINKEDIN_API_URL}/ugcPosts`, {
       method: "POST",
       headers: {
