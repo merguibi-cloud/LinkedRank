@@ -29,6 +29,7 @@ export interface UpcomingPublication {
   imageUrl: string | null;
   source: string | null;
   queueId: number | null;
+  generatedPostId: number | null;
   dayLabel: string;
   timeLabel: string;
   relativeLabel: string;

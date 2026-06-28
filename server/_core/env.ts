@@ -23,10 +23,9 @@ export const ENV = {
     process.env.OPENAI_API_KEY ??
     process.env.BUILT_IN_FORGE_API_KEY ??
     "",
-  llmModel:
-    process.env.GEMINI_MODEL ??
-    process.env.OPENAI_MODEL ??
-    (process.env.GEMINI_API_KEY ? "gemini-2.5-flash" : "gpt-4o"),
+  llmModel: process.env.GEMINI_API_KEY
+    ? process.env.GEMINI_MODEL ?? "gemini-2.5-flash"
+    : process.env.OPENAI_MODEL ?? "gpt-4o",
   openaiImageModel: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1",
   geminiImageModel:
     process.env.GEMINI_IMAGE_MODEL ?? "gemini-2.5-flash-image",
@@ -34,10 +33,9 @@ export const ENV = {
     process.env.IMAGE_PROVIDER ??
     (process.env.GEMINI_API_KEY ? "gemini" : "openai"),
   /** @deprecated use llmModel */
-  openaiModel:
-    process.env.GEMINI_MODEL ??
-    process.env.OPENAI_MODEL ??
-    (process.env.GEMINI_API_KEY ? "gemini-2.5-flash" : "gpt-4o"),
+  openaiModel: process.env.GEMINI_API_KEY
+    ? process.env.GEMINI_MODEL ?? "gemini-2.5-flash"
+    : process.env.OPENAI_MODEL ?? "gpt-4o",
   supabaseUrl:
     process.env.SUPABASE_URL ??
     process.env.VITE_SUPABASE_URL ??

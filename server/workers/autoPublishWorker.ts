@@ -1,12 +1,13 @@
 import { getDb } from "../db";
 import { autoPublishSettings, autoPublishSchedule, autoPublishQueue, generatedPosts } from "../../drizzle/schema";
-import { eq, and, lte } from "drizzle-orm";
+import { eq, and, lte, inArray } from "drizzle-orm";
 import { postToLinkedIn } from "../services/linkedin";
 import { getLinkedinSettings } from "../db";
 import { notifyPostPublished } from "../services/notificationService";
 import { recordPublishedPost } from "../services/agentLearningService";
 import { resolveStorageAssetUrl, normalizeStoredImageFields } from "../_core/publicUrl";
 import {
+  DEFAULT_SCHEDULE_TIMEZONE,
   getDateKeyInZone,
   getDayOfWeekInZone,
   getTimeKeyInZone,
@@ -40,21 +41,8 @@ interface ScheduledPost {
 }
 
 /**
- * Get the day of week (0 = Sunday, 1 = Monday, etc.) — Europe/Paris
- */
-function getDayOfWeek(): number {
-  return getDayOfWeekInZone();
-}
-
-/**
- * Get current time in HH:MM format — Europe/Paris
- */
-function getCurrentTime(): string {
-  return getTimeKeyInZone();
-}
-
-/**
- * Get today's date string for tracking — Europe/Paris
+ * Get today's date string for in-memory dedup tracking — Europe/Paris (reference zone only,
+ * used solely to garbage-collect the publishedSlots Set, not for actual schedule matching).
  */
 function getTodayString(): string {
   return getDateKeyInZone();
@@ -179,6 +167,27 @@ async function recoverStuckPublishingItems(): Promise<void> {
 }
 
 /**
+ * Keep a generatedPosts row's status in sync with its queue item's outcome.
+ * Uses the generatedPostId column — the auto_recurring path's generatedFrom JSON
+ * only carries slotId, not postId, so parsing generatedFrom alone misses these.
+ */
+async function syncGeneratedPostStatus(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  generatedPostId: number | null | undefined,
+  success: boolean
+): Promise<void> {
+  if (!generatedPostId) return;
+  await db
+    .update(generatedPosts)
+    .set({
+      status: success ? "published" : "failed",
+      publishedAt: success ? new Date() : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(generatedPosts.id, generatedPostId));
+}
+
+/**
  * Publish posts scheduled for a specific date/time
  */
 async function processScheduledQueue(): Promise<void> {
@@ -251,23 +260,7 @@ async function processScheduledQueue(): Promise<void> {
         })
         .where(eq(autoPublishQueue.id, post.id));
 
-      if (post.generatedFrom) {
-        try {
-          const meta = JSON.parse(post.generatedFrom);
-          if (meta.postId) {
-            await db
-              .update(generatedPosts)
-              .set({
-                status: success ? "published" : "failed",
-                publishedAt: success ? new Date() : null,
-                updatedAt: new Date(),
-              })
-              .where(eq(generatedPosts.id, meta.postId));
-          }
-        } catch {
-          /* ignore malformed metadata */
-        }
-      }
+      await syncGeneratedPostStatus(db, post.generatedPostId, success);
 
       console.log(
         `[AutoPublish] Scheduled post ${post.id} ${success ? "published" : "failed"} for user ${post.userId}`
@@ -294,29 +287,52 @@ async function processScheduledPublications(): Promise<void> {
     return;
   }
 
-  const currentDay = getDayOfWeek();
-  const currentTime = getCurrentTime();
-  const todayString = getTodayString();
-
-  console.log(`[AutoPublish] Checking schedules at ${currentTime} (day ${currentDay}, date ${todayString})`);
+  const now = new Date();
 
   try {
-    // Get all active schedules for the current day
+    // Day/time matching depends on each user's own timezone, so we can't pre-filter by
+    // a single global "current day" here — fetch all active schedules and check per-user.
     const schedules = await db
       .select()
       .from(autoPublishSchedule)
+      .where(eq(autoPublishSchedule.isActive, true));
+
+    if (schedules.length === 0) {
+      isProcessingRecurring = false;
+      return;
+    }
+
+    const userIds = Array.from(new Set(schedules.map((s) => s.userId)));
+    const settingsRows = await db
+      .select()
+      .from(autoPublishSettings)
       .where(
         and(
-          eq(autoPublishSchedule.dayOfWeek, currentDay),
-          eq(autoPublishSchedule.isActive, true)
+          inArray(autoPublishSettings.userId, userIds),
+          eq(autoPublishSettings.isEnabled, true)
         )
       );
+    const settingsByUser = new Map(settingsRows.map((s) => [s.userId, s]));
 
-    console.log(`[AutoPublish] Found ${schedules.length} active schedules for today`);
+    console.log(
+      `[AutoPublish] Checking ${schedules.length} active schedule(s) across ${settingsByUser.size} enabled user(s)`
+    );
 
     for (const schedule of schedules) {
+      const settings = settingsByUser.get(schedule.userId);
+      if (!settings) {
+        continue;
+      }
+
+      const timeZone = settings.timezone || DEFAULT_SCHEDULE_TIMEZONE;
+      const currentDay = getDayOfWeekInZone(now, timeZone);
+      const currentTime = getTimeKeyInZone(now, timeZone);
+      const todayString = getDateKeyInZone(now, timeZone);
+
       // One-time slot: only on the exact date
-      if (schedule.publishDate && schedule.publishDate !== todayString) {
+      if (schedule.publishDate) {
+        if (schedule.publishDate !== todayString) continue;
+      } else if (schedule.dayOfWeek !== currentDay) {
         continue;
       }
 
@@ -326,33 +342,16 @@ async function processScheduledPublications(): Promise<void> {
       }
 
       // Create unique slot key to prevent duplicates
-      const slotKey = `${schedule.userId}-${currentDay}-${schedule.publishTime}-${todayString}`;
-      
+      const slotKey = `${schedule.userId}-${schedule.dayOfWeek}-${schedule.publishTime}-${todayString}`;
+
       if (publishedSlots.has(slotKey)) {
         console.log(`[AutoPublish] Slot ${slotKey} already processed, skipping`);
         continue;
       }
 
-      console.log(`[AutoPublish] Processing slot for user ${schedule.userId} at ${schedule.publishTime}`);
+      console.log(`[AutoPublish] Processing slot for user ${schedule.userId} at ${schedule.publishTime} (${timeZone})`);
 
-      // Get user's auto-publish settings
-      const [settings] = await db
-        .select()
-        .from(autoPublishSettings)
-        .where(
-          and(
-            eq(autoPublishSettings.userId, schedule.userId),
-            eq(autoPublishSettings.isEnabled, true)
-          )
-        )
-        .limit(1);
-
-      if (!settings) {
-        console.log(`[AutoPublish] User ${schedule.userId} has auto-publish disabled or no settings`);
-        continue;
-      }
-
-      const slotDate = wallClockToUtc(todayString, schedule.publishTime);
+      const slotDate = wallClockToUtc(todayString, schedule.publishTime, timeZone);
 
       const existingQueue = await db
         .select()
@@ -409,6 +408,8 @@ async function processScheduledPublications(): Promise<void> {
           errorMessage: success ? null : "Publication LinkedIn échouée",
         });
 
+        await syncGeneratedPostStatus(db, generatedPostId, success);
+
         console.log(`[AutoPublish] Post ${success ? "published" : "failed"} for user ${schedule.userId}`);
 
         if (schedule.publishDate && success) {
@@ -451,9 +452,13 @@ function cleanupOldSlots(): void {
 
 /** Exécution d'un cycle de publication (file + créneaux récurrents). */
 export async function runAutoPublishTick(): Promise<void> {
-  await recoverStuckPublishingItems();
-  await processScheduledQueue();
-  await processScheduledPublications();
+  try {
+    await recoverStuckPublishingItems();
+    await processScheduledQueue();
+    await processScheduledPublications();
+  } catch (error) {
+    console.error("[AutoPublish] Tick error:", error);
+  }
 }
 
 /** Remplit la file d'attente pour tous les utilisateurs actifs. */

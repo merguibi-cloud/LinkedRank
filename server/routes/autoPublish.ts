@@ -141,6 +141,7 @@ router.post("/settings", async (req: Request, res: Response) => {
       personalContext: settings.personalContext as string,
       inspirationCreators,
       inspirationTopics,
+      ...(settings.timezone ? { timezone: settings.timezone as string } : {}),
     };
 
     if (existingSettings.length > 0) {

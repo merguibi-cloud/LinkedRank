@@ -34,3 +34,18 @@ export function getDefaultScheduleTime(): { date: string; time: string } {
     time: "09:00",
   };
 }
+
+export function formatDisplayDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+export function getDayOfWeekFromDate(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
