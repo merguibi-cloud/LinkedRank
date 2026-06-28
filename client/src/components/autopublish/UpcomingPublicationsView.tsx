@@ -10,6 +10,7 @@ import {
   Bot,
   Trash2,
   AlertCircle,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -103,6 +104,9 @@ export function UpcomingPublicationsView({
   const [publications, setPublications] = useState<UpcomingPublication[]>([]);
   const [meta, setMeta] = useState<UpcomingMeta | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(new Set());
+  const markImageBroken = (id: string) =>
+    setBrokenImageIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
 
   const loadUpcoming = useCallback(async () => {
     setLoading(true);
@@ -429,16 +433,18 @@ export function UpcomingPublicationsView({
                           </p>
                         )}
 
-                        {item.imageUrl && (
+                        {item.imageUrl && !brokenImageIds.has(item.id) ? (
                           <img
                             src={resolveDisplayImageUrl(item.imageUrl) ?? item.imageUrl}
                             alt=""
                             className="mt-2 h-16 w-24 rounded-lg object-cover border border-white/10"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).style.display = "none";
-                            }}
+                            onError={() => markImageBroken(item.id)}
                           />
-                        )}
+                        ) : item.imageUrl ? (
+                          <div className="mt-2 h-16 w-24 rounded-lg border border-white/10 bg-white/5 flex items-center justify-center">
+                            <ImageIcon className="h-5 w-5 text-muted-foreground/50" />
+                          </div>
+                        ) : null}
                       </div>
 
                       {item.queueId && item.status === "pending" && (

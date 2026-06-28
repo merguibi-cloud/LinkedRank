@@ -1,13 +1,12 @@
 import fs from "fs/promises";
 import path from "path";
-import { ENV } from "./_core/env";
 import { isServerlessDeployment } from "./_core/isServerless";
 import { getPublicBaseUrl } from "./_core/publicUrl";
 import {
   uploadToSupabaseStorage,
   getStorageBucket,
+  getAdminClient,
 } from "./lib/supabaseStorage";
-import { createClient } from "@supabase/supabase-js";
 
 type StorageConfig = { baseUrl: string; apiKey: string };
 
@@ -120,14 +119,7 @@ export async function storageGet(
   const key = normalizeKey(relKey);
 
   if (isServerlessDeployment()) {
-    const url = ENV.supabaseUrl;
-    const serviceKey = ENV.supabaseServiceRoleKey;
-    if (!url || !serviceKey) {
-      throw new Error("SUPABASE_SERVICE_ROLE_KEY requise pour le stockage cloud");
-    }
-    const supabase = createClient(url, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabase = getAdminClient();
     const { data } = supabase.storage.from(getStorageBucket()).getPublicUrl(key);
     return { key, url: data.publicUrl };
   }

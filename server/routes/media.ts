@@ -1,13 +1,12 @@
 import { Router, type Request, type Response } from "express";
 import fs from "node:fs";
 import path from "node:path";
-import { createClient } from "@supabase/supabase-js";
 import { head } from "@vercel/blob";
 import { eq } from "drizzle-orm";
 import { ENV } from "../_core/env";
 import { getDb } from "../db";
 import { mediaLibrary } from "../../drizzle/schema";
-import { getStorageBucket } from "../lib/supabaseStorage";
+import { getAdminClient, getStorageBucket } from "../lib/supabaseStorage";
 
 const router = Router();
 
@@ -66,9 +65,7 @@ router.use(async (req: Request, res: Response) => {
 
   if (ENV.supabaseUrl && ENV.supabaseServiceRoleKey) {
     try {
-      const supabase = createClient(ENV.supabaseUrl, ENV.supabaseServiceRoleKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
+      const supabase = getAdminClient();
       const { data, error } = await supabase.storage
         .from(getStorageBucket())
         .download(fileKey);

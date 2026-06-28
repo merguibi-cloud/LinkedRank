@@ -233,7 +233,11 @@ async function processScheduledQueue(): Promise<void> {
 
     console.log(`[AutoPublish] Processing ${pendingPosts.length} queue item(s)`);
 
-    const batchLimit = process.env.VERCEL ? 1 : pendingPosts.length;
+    // On Vercel each cron tick runs as a single serverless invocation with a maxDuration
+    // ceiling, so we cap the batch rather than draining the whole queue in one go —
+    // tunable via env without a redeploy if the queue regularly backs up.
+    const VERCEL_BATCH_LIMIT = Number(process.env.AUTO_PUBLISH_BATCH_LIMIT) || 10;
+    const batchLimit = process.env.VERCEL ? VERCEL_BATCH_LIMIT : pendingPosts.length;
 
     for (const post of pendingPosts.slice(0, batchLimit)) {
       const claimed = await tryClaimQueueItem(db, post.id);
