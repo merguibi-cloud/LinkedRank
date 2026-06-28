@@ -1,9 +1,14 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import WebSocket from "ws";
 import { ENV } from "../_core/env";
 
 const DEFAULT_BUCKET = "media";
 
-function getAdminClient(): SupabaseClient {
+// Node < 22 has no native WebSocket, which the Supabase client requires at construction
+// time even when only Storage is used (same workaround as server/_core/supabase.ts).
+const realtimeTransport = typeof globalThis.WebSocket === "undefined" ? WebSocket : undefined;
+
+export function getAdminClient(): SupabaseClient {
   const url = ENV.supabaseUrl;
   const key = ENV.supabaseServiceRoleKey;
 
@@ -15,6 +20,7 @@ function getAdminClient(): SupabaseClient {
 
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
+    realtime: realtimeTransport ? { transport: realtimeTransport as never } : undefined,
   });
 }
 

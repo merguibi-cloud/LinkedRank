@@ -14,8 +14,28 @@ import stripeRouter from "../routes/stripe";
 import stripeWebhookRouter from "../routes/stripeWebhook";
 import { supabaseSessionMiddleware } from "./supabaseMiddleware";
 
+// Filet de sécurité global : sans ça, une rejection non gérée n'importe où
+// (ex. un blip de connexion DB transitoire) fait crasher tout le process Node,
+// coupant toutes les requêtes en cours sur cette instance — pas seulement celle
+// qui a échoué. On loggue pour la visibilité (monitoring) plutôt que de laisser
+// crasher silencieusement.
+let processGuardsRegistered = false;
+function registerProcessGuards(): void {
+  if (processGuardsRegistered) return;
+  processGuardsRegistered = true;
+
+  process.on("unhandledRejection", (reason) => {
+    console.error("[Process] Unhandled promise rejection:", reason);
+  });
+  process.on("uncaughtException", (error) => {
+    console.error("[Process] Uncaught exception:", error);
+  });
+}
+
 /** Routes HTTP /api sans Vite ni fichiers statiques (Vercel serverless). */
 export function registerHttpApi(app: Express): void {
+  registerProcessGuards();
+
   app.use(
     "/api/stripe/webhook",
     express.raw({ type: "application/json" }),
@@ -40,6 +60,18 @@ export function registerHttpApi(app: Express): void {
       router: appRouter,
       createContext,
     })
+  );
+
+  // Filet de sécurité Express : si une route synchrone lance une erreur non
+  // interceptée par son propre try/catch, on répond en 500 au lieu de laisser
+  // Express planter le process (doit être enregistré en dernier).
+  app.use(
+    (err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      console.error("[Express] Unhandled route error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
   );
 }
 

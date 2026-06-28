@@ -90,13 +90,18 @@ router.get("/config", (_req, res) => {
  * Check if LinkedIn is configured and connected for the current user
  */
 router.get("/status", requireAuth, async (req, res) => {
-  const { userId } = req as AuthenticatedRequest;
-  const settings = await getLinkedinSettings(userId);
+  try {
+    const { userId } = req as AuthenticatedRequest;
+    const settings = await getLinkedinSettings(userId);
 
-  res.json({
-    configured: isLinkedInConfigured(),
-    ...formatLinkedInStatus(settings),
-  });
+    res.json({
+      configured: isLinkedInConfigured(),
+      ...formatLinkedInStatus(settings),
+    });
+  } catch (error) {
+    console.error("LinkedIn status error:", error);
+    res.status(500).json({ error: "Failed to fetch LinkedIn status" });
+  }
 });
 
 /**

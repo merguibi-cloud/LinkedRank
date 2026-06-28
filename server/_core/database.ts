@@ -1,10 +1,15 @@
 import postgres, { type Options } from "postgres";
 
-/** Options requises pour Supabase PgBouncer (pooler transaction, port 6543). */
+/**
+ * Options requises pour Supabase PgBouncer (pooler transaction, port 6543).
+ * En serverless, chaque invocation crée son propre pool : mieux vaut beaucoup de pools
+ * légers (max bas) que peu de pools larges qui épuisent vite le budget de connexions
+ * du pooler partagé. idle_timeout bas pour relâcher les connexions rapidement entre pics.
+ */
 export const POSTGRES_POOL_OPTIONS: Options<Record<string, never>> = {
   prepare: false,
-  max: process.env.NODE_ENV === "production" ? 5 : 3,
-  idle_timeout: 20,
+  max: process.env.NODE_ENV === "production" ? 2 : 3,
+  idle_timeout: 10,
   connect_timeout: 15,
   max_lifetime: 60 * 30,
 };

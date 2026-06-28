@@ -92,6 +92,12 @@ export default function Dashboard() {
   const [autoEnabled, setAutoEnabled] = useState(false);
   const [postsPage, setPostsPage] = useState(0);
   const POSTS_PAGE_SIZE = 6;
+  // Tracks images that failed to load (e.g. legacy localhost-only URLs from before
+  // cloud storage was configured) so we can swap in the placeholder instead of a
+  // blank box.
+  const [brokenImageIds, setBrokenImageIds] = useState<Set<number | string>>(new Set());
+  const markImageBroken = (id: number | string) =>
+    setBrokenImageIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
 
   const { data: postsData, isLoading: postsLoading } = trpc.generator.myPosts.useQuery(
     { limit: POSTS_PAGE_SIZE, offset: postsPage * POSTS_PAGE_SIZE },
@@ -411,17 +417,13 @@ export default function Dashboard() {
                       onClick={editable ? () => handleEditUpcoming(pub) : undefined}
                     >
                       <div className="flex gap-0">
-                        {pub.imageUrl ? (
+                        {pub.imageUrl && !brokenImageIds.has(pub.id) ? (
                           <div className="w-20 sm:w-24 shrink-0">
                             <img
                               src={resolveDisplayImageUrl(pub.imageUrl) ?? pub.imageUrl}
                               alt=""
                               className="h-full min-h-[88px] w-full object-cover"
-                              onError={(e) => {
-                                const img = e.currentTarget;
-                                img.style.display = "none";
-                                img.parentElement?.classList.add("hidden");
-                              }}
+                              onError={() => markImageBroken(pub.id)}
                             />
                           </div>
                         ) : (
@@ -502,15 +504,13 @@ export default function Dashboard() {
                     className="rounded-xl border border-white/10 bg-card/50 overflow-hidden hover:border-violet/25 transition-all group cursor-pointer"
                     onClick={() => handleEditPost(post)}
                   >
-                    {post.imageUrl ? (
+                    {post.imageUrl && !brokenImageIds.has(post.id) ? (
                       <div className="aspect-[16/9] overflow-hidden bg-black/20">
                         <img
                           src={resolveDisplayImageUrl(post.imageUrl) ?? post.imageUrl}
                           alt=""
                           className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
+                          onError={() => markImageBroken(post.id)}
                         />
                       </div>
                     ) : (
