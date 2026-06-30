@@ -4,6 +4,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { signOutSupabase } from "./_core/supabase";
 import { resolvePublicUrl, resolvePublicUrls, resolveStorageAssetUrl } from "./_core/publicUrl";
 import { systemRouter } from "./_core/systemRouter";
+import { checkRateLimit } from "./_core/rateLimit";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { hashPassword, verifyPassword } from "./services/password";
@@ -254,6 +255,14 @@ export const appRouter = router({
           throw new Error(limitCheck.reason || "Limite de génération atteinte. Passez à un plan supérieur pour continuer.");
         }
 
+        const rateLimit = await checkRateLimit(userId, "ai_generation");
+        if (!rateLimit.allowed) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Trop de générations en peu de temps. Réessayez dans quelques minutes.",
+          });
+        }
+
         // Get user profile for context
         const profileResult = await db
           .select()
@@ -330,6 +339,14 @@ export const appRouter = router({
         const limitCheck = await canUserPerformAction(userId, "ai_generation");
         if (!limitCheck.allowed) {
           throw new Error(limitCheck.reason || "Limite de génération atteinte. Passez à un plan supérieur pour continuer.");
+        }
+
+        const rateLimit = await checkRateLimit(userId, "ai_generation", input.count);
+        if (!rateLimit.allowed) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Trop de générations en peu de temps. Réessayez dans quelques minutes.",
+          });
         }
 
         // Get user profile for context
@@ -1030,6 +1047,14 @@ export const appRouter = router({
         includeSwipeIndicator: z.boolean().optional().default(true),
       }))
       .mutation(async ({ ctx, input }) => {
+        const rateLimit = await checkRateLimit(ctx.user.id, "ai_generation");
+        if (!rateLimit.allowed) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Trop de générations en peu de temps. Réessayez dans quelques minutes.",
+          });
+        }
+
         const config: CarouselConfig = {
           topic: input.topic,
           slideCount: input.slideCount,
