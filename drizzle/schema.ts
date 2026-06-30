@@ -6,6 +6,7 @@ import {
   timestamp,
   varchar,
   boolean,
+  index,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -922,3 +923,21 @@ export const mediaLibrary = pgTable("media_library", {
 
 export type MediaLibraryItem = typeof mediaLibrary.$inferSelect;
 export type InsertMediaLibraryItem = typeof mediaLibrary.$inferInsert;
+
+/**
+ * Sliding-window rate-limit hits — one row per call to a guarded endpoint
+ * (AI generation, LinkedIn publish). Enforced globally across all serverless
+ * instances since it lives in Postgres, not in-process memory.
+ */
+export const rateLimitHits = pgTable(
+  "rate_limit_hits",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("userId").notNull(),
+    bucket: varchar("bucket", { length: 64 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("rate_limit_hits_user_bucket_idx").on(table.userId, table.bucket, table.createdAt)]
+);
+
+export type RateLimitHit = typeof rateLimitHits.$inferSelect;

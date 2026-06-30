@@ -12,6 +12,7 @@ import {
 } from "../_core/authMiddleware";
 import { getLinkedInRedirectUri } from "../_core/linkedinRedirect";
 import { resolveStorageAssetUrl } from "../_core/publicUrl";
+import { checkRateLimit } from "../_core/rateLimit";
 import { resolveAppUser } from "../_core/supabase";
 import {
   getLinkedInAuthUrl,
@@ -360,6 +361,13 @@ router.post("/publish", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Content is required" });
     }
 
+    const rateLimit = await checkRateLimit(userId, "linkedin_publish");
+    if (!rateLimit.allowed) {
+      return res.status(429).json({
+        error: "Trop de publications en peu de temps. Réessayez dans quelques minutes.",
+      });
+    }
+
     const result = await publishForUser(
       userId,
       content,
@@ -387,6 +395,13 @@ router.post("/post", requireAuth, async (req, res) => {
 
     if (!content) {
       return res.status(400).json({ error: "Content is required" });
+    }
+
+    const rateLimit = await checkRateLimit(userId, "linkedin_publish");
+    if (!rateLimit.allowed) {
+      return res.status(429).json({
+        error: "Trop de publications en peu de temps. Réessayez dans quelques minutes.",
+      });
     }
 
     const result = await publishForUser(
