@@ -68,6 +68,14 @@ export function buildMediaProxyUrl(fileKey: string): string {
   return `${getPublicBaseUrl()}/api/media/${segments.join("/")}`;
 }
 
+/** In production (Vercel + Supabase), serve directly from the CDN. In dev, use the local proxy. */
+function resolveFileUrl(key: string): string {
+  if (isServerlessDeployment() && ENV.supabaseUrl) {
+    return resolvePublicUrlForKey(key);
+  }
+  return buildMediaProxyUrl(key);
+}
+
 /** Résout imageUrl + repli sur imageKey si l'URL est absente ou invalide. */
 export function resolveStorageAssetUrl(
   imageUrl: string | null | undefined,
@@ -78,7 +86,7 @@ export function resolveStorageAssetUrl(
   if (imageUrl) {
     const fromProxy = extractMediaKeyFromUrl(imageUrl);
     if (fromProxy) {
-      return buildMediaProxyUrl(fromProxy);
+      return resolveFileUrl(fromProxy);
     }
 
     if (!isLocalOrRelativeAssetUrl(imageUrl)) {
@@ -87,12 +95,12 @@ export function resolveStorageAssetUrl(
 
     const uploadPath = imageUrl.match(/\/uploads\/(.+)$/);
     if (uploadPath?.[1]) {
-      return buildMediaProxyUrl(decodeURIComponent(uploadPath[1]));
+      return resolveFileUrl(decodeURIComponent(uploadPath[1]));
     }
   }
 
   if (key) {
-    return buildMediaProxyUrl(key);
+    return resolveFileUrl(key);
   }
 
   return null;
