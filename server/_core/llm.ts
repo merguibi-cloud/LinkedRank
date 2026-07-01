@@ -363,7 +363,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     return res;
   };
 
-  const response = await callApi(resolveApiUrl(), ENV.forgeApiKey, ENV.llmModel);
+  let response = await callApi(resolveApiUrl(), ENV.forgeApiKey, ENV.llmModel);
+  // Retry transient server errors before considering provider fallback
+  for (let retry = 1; retry < 3 && (response.status === 502 || response.status === 503 || response.status === 504); retry++) {
+    await new Promise<void>(r => setTimeout(r, 1000 * retry));
+    response = await callApi(resolveApiUrl(), ENV.forgeApiKey, ENV.llmModel);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();

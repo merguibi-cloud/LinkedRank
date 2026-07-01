@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
 import { ENV } from "../_core/env";
+import { withRetry, isTransientError } from "../_core/retry";
 
 const DEFAULT_BUCKET = "media";
 
@@ -36,14 +37,16 @@ export async function uploadToSupabaseStorage(
   const supabase = getAdminClient();
   const bucket = getStorageBucket();
 
-  const { error } = await supabase.storage.from(bucket).upload(fileKey, buffer, {
-    contentType: mimeType,
-    upsert: true,
-  });
-
-  if (error) {
-    throw new Error(`Upload Supabase échoué : ${error.message}`);
-  }
+  await withRetry(
+    async () => {
+      const { error } = await supabase.storage.from(bucket).upload(fileKey, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+      if (error) throw new Error(error.message);
+    },
+    { attempts: 3, baseDelayMs: 500, shouldRetry: isTransientError }
+  );
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(fileKey);
   return data.publicUrl;
