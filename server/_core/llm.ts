@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { withCircuitBreaker } from "./retry";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -300,7 +301,7 @@ const normalizeResponseFormat = ({
   };
 };
 
-export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+async function invokeLLMCore(params: InvokeParams): Promise<InvokeResult> {
   assertApiKey();
 
   const {
@@ -404,4 +405,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   }
 
   return (await response.json()) as InvokeResult;
+}
+
+export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  return withCircuitBreaker("llm", () => invokeLLMCore(params));
 }
