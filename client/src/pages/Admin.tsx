@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Link } from "wouter";
+import { Link, Redirect } from "wouter";
 import {
   Users, FileText, BarChart3, AlertTriangle, Sparkles,
   XCircle, TrendingUp, RefreshCw, CheckCircle2, Linkedin,
@@ -38,7 +38,9 @@ export default function Admin() {
 
   const setRole = trpc.admin.setRole.useMutation({ onSuccess: () => refetchStats() });
 
-  if (!user || user.role !== "admin") {
+  if (!user) return <Redirect to="/login" />;
+
+  if (user.role !== "admin") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center max-w-sm">
