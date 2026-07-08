@@ -1,144 +1,94 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
 import {
-  Users,
-  FileText,
-  Settings,
-  BarChart3,
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  Eye,
-  Download,
-  Upload,
-  RefreshCw,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  TrendingUp,
-  Globe,
-  Sparkles,
+  Users, FileText, BarChart3, AlertTriangle, Sparkles,
+  XCircle, TrendingUp, RefreshCw, CheckCircle2, Linkedin,
+  HardDrive, Zap, Clock,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
-type AdminTab = "overview" | "creators" | "posts" | "content" | "settings";
+type Tab = "overview" | "users" | "autopublish" | "spend";
+
+function formatBytes(mb: number) {
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
+  return `${mb} MB`;
+}
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const h = Math.floor(diff / 3_600_000);
+  const d = Math.floor(h / 24);
+  if (d > 0) return `il y a ${d}j`;
+  if (h > 0) return `il y a ${h}h`;
+  return "récemment";
+}
 
 export default function Admin() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [search, setSearch] = useState("");
 
-  // Fetch data
-  const { data: creatorsData } = trpc.influencers.list.useQuery({ limit: 100 });
-  const { data: postsData } = trpc.posts.list.useQuery({ limit: 100 });
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = trpc.admin.stats.useQuery();
+  const { data: userList, isLoading: usersLoading } = trpc.admin.users.useQuery();
+  const { data: failures } = trpc.admin.autopublishFailures.useQuery();
+  const { data: spendData } = trpc.admin.spend.useQuery();
 
-  // Check if user is admin (you would implement proper role checking)
-  const isAdmin = user?.email?.includes("youssef") || user?.email?.includes("admin");
+  const setRole = trpc.admin.setRole.useMutation({ onSuccess: () => refetchStats() });
 
-  if (!user || !isAdmin) {
+  if (!user || user.role !== "admin") {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="container py-20 text-center">
-          <div className="max-w-md mx-auto">
-            <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-red-500/20 flex items-center justify-center">
-              <XCircle className="w-8 h-8 text-red-400" />
-            </div>
-            <h1 className="text-2xl font-bold text-white mb-4">Accès refusé</h1>
-            <p className="text-muted-foreground mb-8">
-              Vous n'avez pas les permissions nécessaires pour accéder à cette page.
-            </p>
-            <Link href="/">
-              <Button variant="outline">Retour à l'accueil</Button>
-            </Link>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center max-w-sm">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-red-500/20 flex items-center justify-center">
+            <XCircle className="w-8 h-8 text-red-400" />
           </div>
+          <h1 className="text-2xl font-bold text-white mb-3">Accès refusé</h1>
+          <p className="text-muted-foreground mb-6">Vous n'avez pas les droits administrateur.</p>
+          <Link href="/"><Button variant="outline">Retour à l'accueil</Button></Link>
         </div>
       </div>
     );
   }
 
-  const tabs = [
+  const tabs: { id: Tab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: "overview", label: "Vue d'ensemble", icon: BarChart3 },
-    { id: "creators", label: "Créateurs", icon: Users },
-    { id: "posts", label: "Posts", icon: FileText },
-    { id: "content", label: "Top Contenus", icon: Sparkles },
-    { id: "settings", label: "Paramètres", icon: Settings },
+    { id: "users", label: `Utilisateurs${userList ? ` (${userList.length})` : ""}`, icon: Users },
+    { id: "autopublish", label: `Auto-publish${stats ? ` · ${stats.autoPublish.failed} échecs` : ""}`, icon: AlertTriangle },
+    { id: "spend", label: "Coûts IA", icon: Zap },
   ];
 
-  const stats = [
-    {
-      label: "Créateurs",
-      value: creatorsData?.influencers?.length || 0,
-      change: "+5 cette semaine",
-      icon: Users,
-      color: "violet",
-    },
-    {
-      label: "Posts en base",
-      value: postsData?.posts?.length || 0,
-      change: "+23 cette semaine",
-      icon: FileText,
-      color: "rose",
-    },
-    {
-      label: "Utilisateurs actifs",
-      value: "1,234",
-      change: "+12% ce mois",
-      icon: TrendingUp,
-      color: "emerald",
-    },
-    {
-      label: "Pays couverts",
-      value: "15",
-      change: "+3 ce mois",
-      icon: Globe,
-      color: "blue",
-    },
-  ];
+  const filteredUsers = (userList ?? []).filter(u =>
+    !search || u.email?.toLowerCase().includes(search.toLowerCase()) || u.name?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container py-8">
+      <div className="container py-8 max-w-7xl">
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Administration</h1>
-            <p className="text-muted-foreground">
-              Gérez les créateurs, les contenus et les paramètres de la plateforme.
-            </p>
+            <h1 className="text-3xl font-bold text-white mb-1">Administration</h1>
+            <p className="text-muted-foreground text-sm">LinkedRank — tableau de bord interne</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" className="border-white/10">
-              <Download className="w-4 h-4 mr-2" />
-              Exporter
-            </Button>
-            <Button className="btn-gradient">
-              <Plus className="w-4 h-4 mr-2" />
-              Ajouter
-            </Button>
-          </div>
+          <Button variant="outline" className="border-white/10 gap-2" onClick={() => refetchStats()}>
+            <RefreshCw className="w-4 h-4" />
+            Actualiser
+          </Button>
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-2 mb-8 border-b border-white/10 pb-4">
-          {tabs.map((tab) => (
+        <div className="flex items-center gap-1 mb-8 border-b border-white/10 pb-4">
+          {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as AdminTab)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${
                 activeTab === tab.id
-                  ? "bg-violet/20 text-violet-light"
+                  ? "bg-violet-500/20 text-violet-300 font-medium"
                   : "text-muted-foreground hover:text-white hover:bg-white/5"
               }`}
             >
@@ -148,374 +98,276 @@ export default function Admin() {
           ))}
         </div>
 
-        {/* Overview Tab */}
+        {/* ── OVERVIEW ── */}
         {activeTab === "overview" && (
           <div className="space-y-8">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {stats.map((stat) => (
-                <div
-                  key={stat.label}
-                  className="p-6 rounded-2xl border border-white/10 bg-card/50 backdrop-blur-sm"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        stat.color === "violet"
-                          ? "bg-violet/20 text-violet-light"
-                          : stat.color === "rose"
-                          ? "bg-rose/20 text-rose"
-                          : stat.color === "emerald"
-                          ? "bg-emerald-500/20 text-emerald-400"
-                          : "bg-blue-500/20 text-blue-400"
-                      }`}
-                    >
-                      <stat.icon className="w-5 h-5" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-white mb-1">{stat.value}</div>
-                  <div className="text-sm text-muted-foreground">{stat.label}</div>
-                  <div className="text-xs text-emerald-400 mt-2 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" />
-                    {stat.change}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Recent Activity */}
-            <div className="grid lg:grid-cols-2 gap-8">
-              <div className="p-6 rounded-2xl border border-white/10 bg-card/50">
-                <h3 className="text-lg font-semibold text-white mb-4">
-                  Créateurs récents
-                </h3>
-                <div className="space-y-3">
-                  {creatorsData?.influencers?.slice(0, 5).map((creator: any) => (
-                    <div
-                      key={creator.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-white/5"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet to-rose flex items-center justify-center text-white font-semibold">
-                          {creator.name?.charAt(0) || "?"}
-                        </div>
-                        <div>
-                          <div className="font-medium text-white">{creator.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {creator.country}
-                          </div>
-                        </div>
+            {statsLoading ? (
+              <p className="text-muted-foreground">Chargement...</p>
+            ) : stats ? (
+              <>
+                {/* Stat cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    {
+                      label: "Utilisateurs total",
+                      value: stats.users.total,
+                      sub: `${stats.users.active7d} actifs (7j)`,
+                      icon: Users,
+                      color: "violet",
+                    },
+                    {
+                      label: "Générations IA",
+                      value: stats.generations.total,
+                      sub: `+${stats.generations.last7d} cette semaine`,
+                      icon: Sparkles,
+                      color: "rose",
+                    },
+                    {
+                      label: "Publications réussies",
+                      value: stats.autoPublish.published,
+                      sub: `${stats.autoPublish.failed} échecs`,
+                      icon: CheckCircle2,
+                      color: "emerald",
+                    },
+                    {
+                      label: "Stockage",
+                      value: formatBytes(stats.storage.mb),
+                      sub: `${stats.storage.files} fichiers`,
+                      icon: HardDrive,
+                      color: "blue",
+                    },
+                  ].map(card => (
+                    <div key={card.label} className="p-5 rounded-2xl border border-white/10 bg-card/50">
+                      <div className={`w-9 h-9 rounded-xl mb-3 flex items-center justify-center ${
+                        card.color === "violet" ? "bg-violet-500/20 text-violet-300" :
+                        card.color === "rose" ? "bg-rose-500/20 text-rose-400" :
+                        card.color === "emerald" ? "bg-emerald-500/20 text-emerald-400" :
+                        "bg-blue-500/20 text-blue-400"
+                      }`}>
+                        <card.icon className="w-5 h-5" />
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {(creator.followers / 1000).toFixed(0)}K
+                      <div className="text-2xl font-bold text-white mb-0.5">{card.value}</div>
+                      <div className="text-xs text-muted-foreground">{card.label}</div>
+                      <div className="text-xs text-white/40 mt-1">{card.sub}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Secondary stats row */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { label: "Inscrits (24h)", value: stats.users.last24h, icon: TrendingUp },
+                    { label: "Inscrits (7j)", value: stats.users.last7d, icon: TrendingUp },
+                    { label: "Générations (24h)", value: stats.generations.last24h, icon: Sparkles },
+                    { label: "Carousels générés", value: stats.carousels, icon: FileText },
+                  ].map(s => (
+                    <div key={s.label} className="p-4 rounded-xl border border-white/10 bg-white/[0.02] flex items-center gap-3">
+                      <s.icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div>
+                        <div className="text-xl font-semibold text-white">{s.value}</div>
+                        <div className="text-xs text-muted-foreground">{s.label}</div>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
 
-              <div className="p-6 rounded-2xl border border-white/10 bg-card/50">
-                <h3 className="text-lg font-semibold text-white mb-4">
-                  Actions rapides
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant="outline"
-                    className="h-auto py-4 flex-col border-white/10"
-                  >
-                    <Upload className="w-5 h-5 mb-2" />
-                    <span className="text-sm">Importer créateurs</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-auto py-4 flex-col border-white/10"
-                  >
-                    <RefreshCw className="w-5 h-5 mb-2" />
-                    <span className="text-sm">Sync LinkedIn</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-auto py-4 flex-col border-white/10"
-                  >
-                    <Plus className="w-5 h-5 mb-2" />
-                    <span className="text-sm">Ajouter post</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-auto py-4 flex-col border-white/10"
-                  >
-                    <BarChart3 className="w-5 h-5 mb-2" />
-                    <span className="text-sm">Voir analytics</span>
-                  </Button>
+                {/* AI spend summary */}
+                <div className="p-5 rounded-2xl border border-white/10 bg-card/50">
+                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-yellow-400" /> Coûts IA
+                  </h3>
+                  <div className="grid grid-cols-3 gap-6">
+                    <div>
+                      <div className="text-2xl font-bold text-white">${stats.spend.totalCost}</div>
+                      <div className="text-xs text-muted-foreground">Total</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-white">${stats.spend.cost7d}</div>
+                      <div className="text-xs text-muted-foreground">Cette semaine</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-white">{stats.spend.calls.toLocaleString()}</div>
+                      <div className="text-xs text-muted-foreground">Appels loggés</div>
+                    </div>
+                  </div>
+                  {stats.spend.calls === 0 && (
+                    <p className="text-xs text-amber-400 mt-3">⚠ Les appels avant le déploiement du token tracking ne sont pas comptés.</p>
+                  )}
                 </div>
-              </div>
-            </div>
+              </>
+            ) : null}
           </div>
         )}
 
-        {/* Creators Tab */}
-        {activeTab === "creators" && (
-          <div className="space-y-6">
-            {/* Search & Filters */}
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher un créateur..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-card/50 border-white/10"
-                />
-              </div>
-              <Select defaultValue="all">
-                <SelectTrigger className="w-40 bg-card/50 border-white/10">
-                  <SelectValue placeholder="Pays" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les pays</SelectItem>
-                  <SelectItem value="France">France</SelectItem>
-                  <SelectItem value="USA">USA</SelectItem>
-                  <SelectItem value="UK">UK</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button className="btn-gradient">
-                <Plus className="w-4 h-4 mr-2" />
-                Ajouter créateur
-              </Button>
-            </div>
-
-            {/* Creators Table */}
-            <div className="rounded-2xl border border-white/10 overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-white/5">
-                  <tr>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      Créateur
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      Pays
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      Secteur
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      Abonnés
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      Score
-                    </th>
-                    <th className="text-right p-4 text-sm font-medium text-muted-foreground">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {creatorsData?.influencers
-                    ?.filter(
-                      (c: any) =>
-                        !searchQuery ||
-                        c.name?.toLowerCase().includes(searchQuery.toLowerCase())
-                    )
-                    .map((creator: any) => (
-                      <tr key={creator.id} className="border-t border-white/5">
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet to-rose flex items-center justify-center text-white font-semibold">
-                              {creator.name?.charAt(0) || "?"}
-                            </div>
-                            <div>
-                              <div className="font-medium text-white">
-                                {creator.name}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                @{creator.linkedinUrl?.split("/").pop() || "unknown"}
-                              </div>
-                            </div>
-                          </div>
+        {/* ── USERS ── */}
+        {activeTab === "users" && (
+          <div className="space-y-4">
+            <Input
+              placeholder="Rechercher par email ou nom..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="max-w-sm bg-card/50 border-white/10"
+            />
+            {usersLoading ? (
+              <p className="text-muted-foreground">Chargement...</p>
+            ) : (
+              <div className="rounded-2xl border border-white/10 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-white/5">
+                    <tr>
+                      {["Email", "Nom", "Plan", "Rôle", "Générations", "LinkedIn", "Inscrit", "Actif"].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map(u => (
+                      <tr key={u.id} className="border-t border-white/5 hover:bg-white/[0.02]">
+                        <td className="px-4 py-3 text-white font-medium">{u.email}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{u.name ?? "—"}</td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-violet-500/20 text-violet-300">{u.plan}</span>
                         </td>
-                        <td className="p-4 text-sm text-muted-foreground">
-                          {creator.country}
+                        <td className="px-4 py-3">
+                          <select
+                            value={u.role}
+                            onChange={e => setRole.mutate({ userId: u.id, role: e.target.value as "user" | "admin" })}
+                            className="bg-transparent text-xs text-muted-foreground border border-white/10 rounded px-2 py-0.5"
+                          >
+                            <option value="user">user</option>
+                            <option value="admin">admin</option>
+                          </select>
                         </td>
-                        <td className="p-4">
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-violet/20 text-violet-light">
-                            {creator.industry}
-                          </span>
+                        <td className="px-4 py-3 text-white">{u.generations}</td>
+                        <td className="px-4 py-3">
+                          {u.linkedinConnected
+                            ? <Linkedin className="w-4 h-4 text-blue-400" />
+                            : <span className="text-muted-foreground/40">—</span>}
                         </td>
-                        <td className="p-4 text-sm text-white">
-                          {(creator.followers / 1000).toFixed(0)}K
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 h-2 rounded-full bg-white/10">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-violet to-rose"
-                                style={{
-                                  width: `${creator.authorityScore || 50}%`,
-                                }}
-                              />
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {creator.authorityScore || 50}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button variant="ghost" size="sm">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-400"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{timeAgo(u.createdAt)}</td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{timeAgo(u.lastSignedIn)}</td>
                       </tr>
                     ))}
-                </tbody>
-              </table>
-            </div>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Posts Tab */}
-        {activeTab === "posts" && (
+        {/* ── AUTO-PUBLISH FAILURES ── */}
+        {activeTab === "autopublish" && (
           <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher un post..."
-                  className="pl-10 bg-card/50 border-white/10"
-                />
-              </div>
-              <Select defaultValue="all">
-                <SelectTrigger className="w-40 bg-card/50 border-white/10">
-                  <SelectValue placeholder="Langue" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Toutes</SelectItem>
-                  <SelectItem value="FR">Français</SelectItem>
-                  <SelectItem value="EN">Anglais</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button className="btn-gradient">
-                <Plus className="w-4 h-4 mr-2" />
-                Ajouter post
-              </Button>
-            </div>
-
-            <div className="grid gap-4">
-              {postsData?.posts?.slice(0, 10).map((post: any) => (
-                <div
-                  key={post.id}
-                  className="p-4 rounded-xl border border-white/10 bg-card/50"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-violet/20 text-violet-light">
-                        {post.theme || "Général"}
-                      </span>
-                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
-                        {post.language}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-red-400">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+            {failures ? (
+              <>
+                <div className="p-5 rounded-2xl border border-white/10 bg-card/50">
+                  <h3 className="text-sm font-semibold text-white mb-4">Répartition par erreur</h3>
+                  <div className="space-y-3">
+                    {failures.byError.map(e => (
+                      <div key={e.error} className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0">
+                          <AlertTriangle className="w-4 h-4 text-red-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white truncate">{e.error ?? "(aucun message)"}</p>
+                        </div>
+                        <span className="text-sm font-medium text-red-400 shrink-0">{e.count}x</span>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-sm text-white/90 line-clamp-2">{post.content}</p>
                 </div>
-              ))}
-            </div>
+
+                <div className="rounded-2xl border border-white/10 overflow-hidden">
+                  <div className="px-5 py-3 bg-white/5 border-b border-white/10">
+                    <h3 className="text-sm font-semibold text-white">20 échecs les plus récents</h3>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead className="bg-white/[0.02]">
+                      <tr>
+                        {["Email", "Erreur", "Retries", "Planifié"].map(h => (
+                          <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {failures.recent.map((r, i) => (
+                        <tr key={i} className="border-t border-white/5">
+                          <td className="px-4 py-3 text-white">{r.email ?? "?"}</td>
+                          <td className="px-4 py-3 text-muted-foreground text-xs max-w-xs truncate">{r.error}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{r.retries}</td>
+                          <td className="px-4 py-3 text-muted-foreground text-xs">{timeAgo(r.scheduledFor)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : <p className="text-muted-foreground">Chargement...</p>}
           </div>
         )}
 
-        {/* Settings Tab */}
-        {activeTab === "settings" && (
-          <div className="max-w-2xl space-y-8">
-            <div className="p-6 rounded-2xl border border-white/10 bg-card/50">
-              <h3 className="text-lg font-semibold text-white mb-4">
-                Paramètres généraux
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    Nom de la plateforme
-                  </label>
-                  <Input
-                    defaultValue="LinkedRank"
-                    className="bg-white/5 border-white/10"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    Description
-                  </label>
-                  <Textarea
-                    defaultValue="La plateforme #1 pour les créateurs LinkedIn"
-                    className="bg-white/5 border-white/10"
-                  />
-                </div>
-              </div>
-            </div>
+        {/* ── SPEND ── */}
+        {activeTab === "spend" && (
+          <div className="space-y-6">
+            {spendData ? (
+              <>
+                {spendData.byModel.length === 0 ? (
+                  <div className="p-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-amber-300 text-sm">
+                    ⚠ Aucun appel loggé pour l'instant. Le tracking démarre à partir du prochain déploiement.
+                  </div>
+                ) : null}
 
-            <div className="p-6 rounded-2xl border border-white/10 bg-card/50">
-              <h3 className="text-lg font-semibold text-white mb-4">
-                Intégrations
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                      <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="font-medium text-white">LinkedIn API</div>
-                      <div className="text-xs text-muted-foreground">
-                        Publication automatique
-                      </div>
+                <div className="grid lg:grid-cols-3 gap-6">
+                  <div className="p-5 rounded-2xl border border-white/10 bg-card/50">
+                    <h3 className="text-sm font-semibold text-white mb-4">Par modèle</h3>
+                    <div className="space-y-3">
+                      {spendData.byModel.length > 0 ? spendData.byModel.map(r => (
+                        <div key={r.model} className="flex justify-between items-center">
+                          <div>
+                            <div className="text-sm text-white font-mono">{r.model}</div>
+                            <div className="text-xs text-muted-foreground">{r.calls} appels · {r.tokens.toLocaleString()} tokens</div>
+                          </div>
+                          <span className="text-sm font-medium text-yellow-400">${r.cost}</span>
+                        </div>
+                      )) : <p className="text-muted-foreground text-sm">Aucune donnée</p>}
                     </div>
                   </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400">
-                    Configuration requise
-                  </span>
-                </div>
 
-                <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-violet/20 flex items-center justify-center">
-                      <Sparkles className="w-5 h-5 text-violet-light" />
-                    </div>
-                    <div>
-                      <div className="font-medium text-white">IA Génération</div>
-                      <div className="text-xs text-muted-foreground">
-                        Génération de contenu
-                      </div>
+                  <div className="p-5 rounded-2xl border border-white/10 bg-card/50">
+                    <h3 className="text-sm font-semibold text-white mb-4">Par fonctionnalité</h3>
+                    <div className="space-y-3">
+                      {spendData.byEndpoint.length > 0 ? spendData.byEndpoint.map(r => (
+                        <div key={r.endpoint} className="flex justify-between items-center">
+                          <div>
+                            <div className="text-sm text-white">{r.endpoint}</div>
+                            <div className="text-xs text-muted-foreground">{r.calls} appels</div>
+                          </div>
+                          <span className="text-sm font-medium text-yellow-400">${r.cost}</span>
+                        </div>
+                      )) : <p className="text-muted-foreground text-sm">Aucune donnée</p>}
                     </div>
                   </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Actif
-                  </span>
+
+                  <div className="p-5 rounded-2xl border border-white/10 bg-card/50">
+                    <h3 className="text-sm font-semibold text-white mb-4">Top utilisateurs</h3>
+                    <div className="space-y-3">
+                      {spendData.topUsers.length > 0 ? spendData.topUsers.map(r => (
+                        <div key={r.email} className="flex justify-between items-center">
+                          <div>
+                            <div className="text-sm text-white truncate max-w-[160px]">{r.email}</div>
+                            <div className="text-xs text-muted-foreground">{r.calls} appels</div>
+                          </div>
+                          <span className="text-sm font-medium text-yellow-400">${r.cost}</span>
+                        </div>
+                      )) : <p className="text-muted-foreground text-sm">Aucune donnée</p>}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </>
+            ) : <p className="text-muted-foreground">Chargement...</p>}
           </div>
         )}
+
       </div>
     </div>
   );

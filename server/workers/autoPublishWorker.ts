@@ -3,7 +3,7 @@ import { autoPublishSettings, autoPublishSchedule, autoPublishQueue, generatedPo
 import { eq, and, lte, inArray } from "drizzle-orm";
 import { postToLinkedIn } from "../services/linkedin";
 import { getLinkedinSettings } from "../db";
-import { notifyPostPublished } from "../services/notificationService";
+import { notifyPostPublished, notifyPostFailed } from "../services/notificationService";
 import { recordPublishedPost } from "../services/agentLearningService";
 import { resolveStorageAssetUrl, normalizeStoredImageFields } from "../_core/publicUrl";
 import {
@@ -73,14 +73,13 @@ async function publishToLinkedIn(
   imageUrl?: string | null,
   pdfUrl?: string | null,
   documentTitle?: string | null
-): Promise<boolean> {
+): Promise<{ success: boolean; error?: string }> {
   try {
-    // Get user's LinkedIn settings (access token)
     const linkedinSettings = await getLinkedinSettings(userId);
-    
+
     if (!linkedinSettings?.accessToken) {
       console.log(`[AutoPublish] User ${userId} has no LinkedIn access token`);
-      return false;
+      return { success: false, error: "Compte LinkedIn non connecté — reconnectez votre compte dans les paramètres." };
     }
 
     const media = pdfUrl
@@ -110,14 +109,16 @@ async function publishToLinkedIn(
         linkedinPostId: result.postId,
         source: "auto_publish",
       });
-      return true;
+      return { success: true };
     } else {
-      console.error(`[AutoPublish] LinkedIn API error for user ${userId}:`, result.error);
-      return false;
+      const msg = result.error ? String(result.error) : "Erreur API LinkedIn inconnue";
+      console.error(`[AutoPublish] LinkedIn API error for user ${userId}:`, msg);
+      return { success: false, error: msg };
     }
   } catch (error) {
-    console.error(`[AutoPublish] Failed to publish for user ${userId}:`, error);
-    return false;
+    const msg = error instanceof Error ? error.message : "Erreur inattendue lors de la publication";
+    console.error(`[AutoPublish] Failed to publish for user ${userId}:`, msg);
+    return { success: false, error: msg };
   }
 }
 
@@ -273,15 +274,17 @@ async function processScheduledQueue(): Promise<void> {
       }
 
       try {
-        success = await publishToLinkedIn(
+        const result = await publishToLinkedIn(
           post.userId,
           post.content,
           resolvedPdfUrl ? null : resolvedImageUrl,
           resolvedPdfUrl,
           documentTitle
         );
+        success = result.success;
         if (!success) {
-          errorMessage = "Publication LinkedIn échouée";
+          errorMessage = result.error ?? "Publication LinkedIn échouée";
+          notifyPostFailed(post.userId, errorMessage).catch(() => {});
         }
       } catch (error) {
         console.error(`[AutoPublish] Post ${post.id} publish error:`, error);
@@ -289,6 +292,7 @@ async function processScheduledQueue(): Promise<void> {
           error instanceof Error
             ? error.message
             : "Publication LinkedIn échouée";
+        notifyPostFailed(post.userId, errorMessage).catch(() => {});
       }
 
       await db
@@ -423,11 +427,15 @@ async function processScheduledPublications(): Promise<void> {
           await emergencyGenerateForSlot(schedule.userId, settings, schedule.id);
 
         const resolvedImageUrl = resolveStorageAssetUrl(imageUrl, imageKey);
-        const success = await publishToLinkedIn(
+        const publishResult = await publishToLinkedIn(
           schedule.userId,
           content,
           resolvedImageUrl
         );
+        const success = publishResult.success;
+        if (!success) {
+          notifyPostFailed(schedule.userId, publishResult.error).catch(() => {});
+        }
 
         const storedImage = normalizeStoredImageFields(imageUrl, imageKey);
 
@@ -446,7 +454,7 @@ async function processScheduledPublications(): Promise<void> {
             topicAngle: plan.topicAngle,
             emergency: true,
           }),
-          errorMessage: success ? null : "Publication LinkedIn échouée",
+          errorMessage: success ? null : (publishResult.error ?? "Publication LinkedIn échouée"),
         });
 
         await syncGeneratedPostStatus(db, generatedPostId, success);

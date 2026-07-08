@@ -941,3 +941,22 @@ export const rateLimitHits = pgTable(
 );
 
 export type RateLimitHit = typeof rateLimitHits.$inferSelect;
+
+/**
+ * Token usage log — one row per LLM call.
+ * Used for accurate AI cost tracking and per-user spend analysis.
+ */
+export const tokenUsage = pgTable("token_usage", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId"),
+  endpoint: varchar("endpoint", { length: 100 }),
+  model: varchar("model", { length: 100 }).notNull(),
+  promptTokens: integer("promptTokens").notNull().default(0),
+  completionTokens: integer("completionTokens").notNull().default(0),
+  totalTokens: integer("totalTokens").notNull().default(0),
+  costUsd: varchar("costUsd", { length: 20 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type TokenUsage = typeof tokenUsage.$inferSelect;
+export type InsertTokenUsage = typeof tokenUsage.$inferInsert;

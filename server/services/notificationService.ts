@@ -307,6 +307,24 @@ export async function notifyPostPublished(
   });
 }
 
+export async function notifyPostFailed(
+  userId: number,
+  reason?: string
+): Promise<Notification | null> {
+  const isNotConnected = reason?.toLowerCase().includes("non connecté");
+  return createNotification({
+    userId,
+    type: "post_published",
+    title: "Échec de publication automatique",
+    message: isNotConnected
+      ? "Votre compte LinkedIn n'est pas connecté. Connectez-le dans les paramètres pour activer la publication automatique."
+      : `La publication automatique a échoué : ${reason ?? "erreur inconnue"}`,
+    actionUrl: isNotConnected ? "/settings" : "/dashboard",
+    actionLabel: isNotConnected ? "Connecter LinkedIn" : "Voir le dashboard",
+    priority: "high",
+  });
+}
+
 /**
  * Contextual notification when an agent completes a task
  */

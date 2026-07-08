@@ -5,7 +5,7 @@ import { signOutSupabase } from "./_core/supabase";
 import { resolvePublicUrl, resolvePublicUrls, resolveStorageAssetUrl } from "./_core/publicUrl";
 import { systemRouter } from "./_core/systemRouter";
 import { checkRateLimit } from "./_core/rateLimit";
-import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
+import { publicProcedure, router, protectedProcedure, adminProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { hashPassword, verifyPassword } from "./services/password";
 import { getAllPosts, getPostById, createPost, updatePost, deletePost, getPostsCount, getAllCategories, getDb, getUserByEmail, upsertUser } from "./db";
@@ -25,7 +25,7 @@ import {
   processTask,
   processAllPendingTasks,
 } from "./services/agentService";
-import { agents, agentTasks, agentLogs, generatedCarousels, carouselTemplates } from "../drizzle/schema";
+import { agents, agentTasks, agentLogs, generatedCarousels, carouselTemplates, users, mediaLibrary, autoPublishQueue, tokenUsage, linkedinSettings } from "../drizzle/schema";
 import { generateCarousel, generateCarouselContent, renderCarouselToImages, type CarouselConfig } from "./services/carouselGenerator";
 import {
   getUserNotifications,
@@ -67,6 +67,7 @@ import {
   suggestMediaForPost,
   reanalyzeMedia,
 } from "./services/mediaLibraryService";
+import { withCache } from "./_core/cache";
 
 export const appRouter = router({
   system: systemRouter,
@@ -218,9 +219,9 @@ export const appRouter = router({
 
   // Categories router
   categories: router({
-    list: publicProcedure.query(async () => {
-      return await getAllCategories();
-    }),
+    list: publicProcedure.query(() =>
+      withCache("categories:list", 5 * 60_000, getAllCategories)
+    ),
   }),
 
   // Content Generator router
@@ -759,25 +760,27 @@ export const appRouter = router({
       }),
 
     // Get available countries and industries for filters
-    filters: publicProcedure.query(async () => {
-      const db = await getDb();
-      if (!db) return { countries: [], industries: [] };
-      
-      const countries = await db
-        .selectDistinct({ country: linkedinInfluencers.country })
-        .from(linkedinInfluencers)
-        .where(sql`${linkedinInfluencers.country} IS NOT NULL`);
+    filters: publicProcedure.query(() =>
+      withCache("influencers:filters", 15 * 60_000, async () => {
+        const db = await getDb();
+        if (!db) return { countries: [], industries: [] };
 
-      const industries = await db
-        .selectDistinct({ industry: linkedinInfluencers.industry })
-        .from(linkedinInfluencers)
-        .where(sql`${linkedinInfluencers.industry} IS NOT NULL`);
+        const countries = await db
+          .selectDistinct({ country: linkedinInfluencers.country })
+          .from(linkedinInfluencers)
+          .where(sql`${linkedinInfluencers.country} IS NOT NULL`);
 
-      return {
-        countries: countries.map((c: { country: string | null }) => c.country).filter(Boolean) as string[],
-        industries: industries.map((i: { industry: string | null }) => i.industry).filter(Boolean) as string[],
-      };
-    }),
+        const industries = await db
+          .selectDistinct({ industry: linkedinInfluencers.industry })
+          .from(linkedinInfluencers)
+          .where(sql`${linkedinInfluencers.industry} IS NOT NULL`);
+
+        return {
+          countries: countries.map((c: { country: string | null }) => c.country).filter(Boolean) as string[],
+          industries: industries.map((i: { industry: string | null }) => i.industry).filter(Boolean) as string[],
+        };
+      })
+    ),
   }),
 
   viralPosts: router({
@@ -1161,20 +1164,22 @@ export const appRouter = router({
       }),
 
     // Get templates
-    templates: publicProcedure.query(async () => {
-      const db = (await getDb())!;
-      
-      const templates = await db
-        .select()
-        .from(carouselTemplates)
-        .where(eq(carouselTemplates.isActive, true))
-        .orderBy(desc(carouselTemplates.usageCount));
+    templates: publicProcedure.query(() =>
+      withCache("carousels:templates", 5 * 60_000, async () => {
+        const db = (await getDb())!;
 
-      return templates.map(t => ({
-        ...t,
-        layout: t.layout ? JSON.parse(t.layout) : {},
-      }));
-    }),
+        const templates = await db
+          .select()
+          .from(carouselTemplates)
+          .where(eq(carouselTemplates.isActive, true))
+          .orderBy(desc(carouselTemplates.usageCount));
+
+        return templates.map(t => ({
+          ...t,
+          layout: t.layout ? JSON.parse(t.layout) : {},
+        }));
+      })
+    ),
   }),
 
   // Notifications router
@@ -1219,6 +1224,197 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await deleteNotification(input.id, ctx.user.id);
         return { success: true };
+      }),
+  }),
+
+  admin: router({
+    stats: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [userStats] = await db.execute(sql`
+        SELECT
+          COUNT(*)::int                                                                        AS total,
+          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int             AS last_24h,
+          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int               AS last_7d,
+          COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '24 hours')::int          AS active_24h,
+          COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '7 days')::int            AS active_7d
+        FROM users
+      `);
+
+      const [genStats] = await db.execute(sql`
+        SELECT
+          COUNT(*)::int                                                                        AS total,
+          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int             AS last_24h,
+          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int               AS last_7d,
+          COUNT(DISTINCT "userId")::int                                                       AS unique_users
+        FROM generated_posts
+      `);
+
+      const [apStats] = await db.execute(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'published')::int  AS published,
+          COUNT(*) FILTER (WHERE status = 'failed')::int     AS failed,
+          COUNT(*) FILTER (WHERE status = 'pending')::int    AS pending
+        FROM auto_publish_queue
+      `);
+
+      const [spendStats] = await db.execute(sql`
+        SELECT
+          COUNT(*)::int                                        AS calls,
+          COALESCE(SUM("totalTokens"), 0)::int                AS total_tokens,
+          COALESCE(SUM("costUsd"::numeric), 0)                AS total_cost,
+          COALESCE(SUM("costUsd"::numeric) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days'), 0) AS cost_7d
+        FROM token_usage
+      `);
+
+      const [mediaStats] = await db.execute(sql`
+        SELECT
+          COUNT(*)::int                            AS total_files,
+          COALESCE(SUM("fileSize"), 0)::bigint     AS total_bytes
+        FROM media_library
+      `);
+
+      const [carouselStats] = await db.execute(sql`
+        SELECT COUNT(*)::int AS total FROM generated_carousels
+      `);
+
+      return {
+        users: {
+          total: Number(userStats.total),
+          last24h: Number(userStats.last_24h),
+          last7d: Number(userStats.last_7d),
+          active24h: Number(userStats.active_24h),
+          active7d: Number(userStats.active_7d),
+        },
+        generations: {
+          total: Number(genStats.total),
+          last24h: Number(genStats.last_24h),
+          last7d: Number(genStats.last_7d),
+          uniqueUsers: Number(genStats.unique_users),
+        },
+        autoPublish: {
+          published: Number(apStats.published),
+          failed: Number(apStats.failed),
+          pending: Number(apStats.pending),
+        },
+        spend: {
+          calls: Number(spendStats.calls),
+          totalTokens: Number(spendStats.total_tokens),
+          totalCost: Number(spendStats.total_cost).toFixed(4),
+          cost7d: Number(spendStats.cost_7d).toFixed(4),
+        },
+        storage: {
+          files: Number(mediaStats.total_files),
+          bytes: Number(mediaStats.total_bytes),
+          mb: Math.round(Number(mediaStats.total_bytes) / 1024 / 1024),
+        },
+        carousels: Number(carouselStats.total),
+      };
+    }),
+
+    users: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const rows = await db.execute(sql`
+        SELECT
+          u.id, u.email, u.name, u.role, u."subscriptionPlan",
+          u."createdAt", u."lastSignedIn",
+          COUNT(gp.id)::int                           AS generations,
+          ls."isConnected"                             AS linkedin_connected
+        FROM users u
+        LEFT JOIN generated_posts gp ON gp."userId" = u.id
+        LEFT JOIN linkedin_settings ls ON ls."userId" = u.id
+        GROUP BY u.id, ls."isConnected"
+        ORDER BY u."createdAt" DESC
+        LIMIT 200
+      `);
+
+      return rows.map(r => ({
+        id: Number(r.id),
+        email: r.email as string,
+        name: r.name as string | null,
+        role: r.role as string,
+        plan: r.subscriptionPlan as string,
+        createdAt: r.createdAt as string,
+        lastSignedIn: r.lastSignedIn as string,
+        generations: Number(r.generations),
+        linkedinConnected: Boolean(r.linkedin_connected),
+      }));
+    }),
+
+    autopublishFailures: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const byError = await db.execute(sql`
+        SELECT "errorMessage", COUNT(*)::int AS count
+        FROM auto_publish_queue WHERE status = 'failed'
+        GROUP BY "errorMessage" ORDER BY count DESC LIMIT 10
+      `);
+
+      const recent = await db.execute(sql`
+        SELECT aq."errorMessage", aq."scheduledFor", aq."retryCount", u.email
+        FROM auto_publish_queue aq
+        LEFT JOIN users u ON u.id = aq."userId"
+        WHERE aq.status = 'failed'
+        ORDER BY aq."updatedAt" DESC LIMIT 20
+      `);
+
+      return {
+        byError: byError.map(r => ({ error: r.errorMessage as string, count: Number(r.count) })),
+        recent: recent.map(r => ({
+          email: r.email as string,
+          error: r.errorMessage as string,
+          retries: Number(r.retryCount),
+          scheduledFor: r.scheduledFor as string,
+        })),
+      };
+    }),
+
+    spend: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const byModel = await db.execute(sql`
+        SELECT model, COUNT(*)::int AS calls,
+               SUM("totalTokens")::int AS tokens,
+               SUM("costUsd"::numeric) AS cost
+        FROM token_usage GROUP BY model ORDER BY cost DESC
+      `);
+
+      const byEndpoint = await db.execute(sql`
+        SELECT COALESCE(endpoint, 'unknown') AS endpoint,
+               COUNT(*)::int AS calls,
+               SUM("costUsd"::numeric) AS cost
+        FROM token_usage GROUP BY endpoint ORDER BY cost DESC LIMIT 10
+      `);
+
+      const topUsers = await db.execute(sql`
+        SELECT u.email, u.name, COUNT(*)::int AS calls,
+               SUM(tu."totalTokens")::int AS tokens,
+               SUM(tu."costUsd"::numeric) AS cost
+        FROM token_usage tu
+        LEFT JOIN users u ON u.id = tu."userId"
+        GROUP BY tu."userId", u.email, u.name
+        ORDER BY cost DESC LIMIT 10
+      `);
+
+      return {
+        byModel: byModel.map(r => ({ model: r.model as string, calls: Number(r.calls), tokens: Number(r.tokens), cost: Number(r.cost).toFixed(4) })),
+        byEndpoint: byEndpoint.map(r => ({ endpoint: r.endpoint as string, calls: Number(r.calls), cost: Number(r.cost).toFixed(4) })),
+        topUsers: topUsers.map(r => ({ email: r.email as string, name: r.name as string | null, calls: Number(r.calls), tokens: Number(r.tokens), cost: Number(r.cost).toFixed(4) })),
+      };
+    }),
+
+    setRole: adminProcedure
+      .input(z.object({ userId: z.number(), role: z.enum(["user", "admin"]) }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        await db.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
+        return { ok: true };
       }),
   }),
 
