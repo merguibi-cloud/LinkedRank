@@ -1,5 +1,6 @@
 import { ENV } from "./env";
 import { withCircuitBreaker } from "./retry";
+import { logTokenUsage } from "./usageLogger";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -68,6 +69,9 @@ export type InvokeParams = {
   output_schema?: OutputSchema;
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
+  // Usage tracking — pass these to get per-user, per-feature cost logging
+  userId?: number;
+  endpoint?: string;
 };
 
 export type ToolCall = {
@@ -316,6 +320,8 @@ async function invokeLLMCore(params: InvokeParams): Promise<InvokeResult> {
     output_schema,
     responseFormat,
     response_format,
+    userId,
+    endpoint,
   } = params;
 
   const payload: Record<string, unknown> = {
@@ -394,7 +400,17 @@ async function invokeLLMCore(params: InvokeParams): Promise<InvokeResult> {
           openaiModel
         );
         if (fallbackRes.ok) {
-          return (await fallbackRes.json()) as InvokeResult;
+          const fallbackResult = (await fallbackRes.json()) as InvokeResult;
+          if (fallbackResult.usage) {
+            logTokenUsage({
+              userId,
+              endpoint,
+              model: fallbackResult.model,
+              promptTokens: fallbackResult.usage.prompt_tokens,
+              completionTokens: fallbackResult.usage.completion_tokens,
+            }).catch(() => {});
+          }
+          return fallbackResult;
         }
         const fallbackErr = await fallbackRes.text();
         throw new Error(formatLlmError(fallbackRes.status, fallbackErr));
@@ -404,7 +420,19 @@ async function invokeLLMCore(params: InvokeParams): Promise<InvokeResult> {
     throw new Error(formatLlmError(response.status, errorText));
   }
 
-  return (await response.json()) as InvokeResult;
+  const result = (await response.json()) as InvokeResult;
+
+  if (result.usage) {
+    logTokenUsage({
+      userId,
+      endpoint,
+      model: result.model,
+      promptTokens: result.usage.prompt_tokens,
+      completionTokens: result.usage.completion_tokens,
+    }).catch(() => {});
+  }
+
+  return result;
 }
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
