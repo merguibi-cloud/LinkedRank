@@ -14,18 +14,17 @@ export default function AdminLogin() {
   const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) {
-      if (user.role === "admin") {
-        setLocation("/admin");
-      } else {
-        setAccessDenied(true);
-        // Sign them out so they can try a different account
-        if (isSupabaseConfigured()) {
-          createClient().auth.signOut();
-        }
+    if (loading) return;
+    if (!user) return;
+    if (user.role === "admin") {
+      setLocation("/admin");
+    } else {
+      setAccessDenied(true);
+      if (isSupabaseConfigured()) {
+        createClient().auth.signOut();
       }
     }
-  }, [user, loading, setLocation]);
+  }, [user?.id, user?.role, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +52,8 @@ export default function AdminLogin() {
           toast.error(data.error || "Connexion échouée");
           return;
         }
-        window.location.reload();
+        // useEffect will handle redirect once useAuth picks up the new session
+        toast.success("Connexion réussie !");
       }
     } catch {
       toast.error("Erreur de connexion au serveur");

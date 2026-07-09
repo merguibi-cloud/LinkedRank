@@ -127,7 +127,7 @@ export function isNavLinkActive(pathname: string, href: string): boolean {
 export const NAVBAR_HEIGHT_REM = 4;
 export const NAVBAR_OFFSET_CLASS = "pt-16";
 
-const NAVBAR_HIDDEN_PATHS = ["/login", "/signup", "/onboarding", "/linkedin/connect"] as const;
+const NAVBAR_HIDDEN_PATHS = ["/login", "/signup", "/onboarding", "/linkedin/connect", "/admin/login"] as const;
 
 /** Afficher la barre de navigation globale (masquée sur auth / onboarding). */
 export function shouldShowNavbar(pathname: string): boolean {
