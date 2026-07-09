@@ -21,6 +21,7 @@ const RankingsWorld = lazy(() => import("./pages/RankingsWorld"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Admin = lazy(() => import("./pages/Admin"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const Resources = lazy(() => import("./pages/Resources"));
 const Schedule = lazy(() => import("./pages/Schedule"));
 const AutoPublish = lazy(() => import("./pages/AutoPublish"));
@@ -114,6 +115,7 @@ function Router() {
         <Route path={"/rankings/world"} component={RankingsWorld} />
         <Route path={"/onboarding"} component={Onboarding} />
         <Route path={"/dashboard"} component={Dashboard} />
+        <Route path={"/admin/login"} component={AdminLogin} />
         <Route path={"/admin"} component={Admin} />
         <Route path={"/resources"} component={Resources} />
         <Route path={"/resources/guide-linkedin-2025"} component={GuideLinkedIn2025} />

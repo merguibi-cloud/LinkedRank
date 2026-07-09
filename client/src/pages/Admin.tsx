@@ -38,7 +38,7 @@ export default function Admin() {
 
   const setRole = trpc.admin.setRole.useMutation({ onSuccess: () => refetchStats() });
 
-  if (!user) return <Redirect to="/login" />;
+  if (!user) return <Redirect to="/admin/login" />;
 
   if (user.role !== "admin") {
     return (
