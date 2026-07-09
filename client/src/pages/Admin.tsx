@@ -31,12 +31,49 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [search, setSearch] = useState("");
 
+<<<<<<< Updated upstream
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = trpc.admin.stats.useQuery();
   const { data: userList, isLoading: usersLoading } = trpc.admin.users.useQuery();
   const { data: failures } = trpc.admin.autopublishFailures.useQuery();
   const { data: spendData } = trpc.admin.spend.useQuery();
+=======
+  const isAdmin = user?.role === "admin";
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = trpc.admin.stats.useQuery(undefined, { enabled: isAdmin });
+  const { data: userList, isLoading: usersLoading, refetch: refetchUsers } = trpc.admin.users.useQuery(undefined, {
+    enabled: isAdmin && activeTab === "users",
+  });
+  const { data: failures, isLoading: failuresLoading, refetch: refetchFailures } = trpc.admin.autopublishFailures.useQuery(undefined, {
+    enabled: isAdmin && activeTab === "autopublish",
+  });
+  const { data: spendData, isLoading: spendLoading, refetch: refetchSpend } = trpc.admin.spend.useQuery(undefined, {
+    enabled: isAdmin && activeTab === "spend",
+  });
+>>>>>>> Stashed changes
 
-  const setRole = trpc.admin.setRole.useMutation({ onSuccess: () => refetchStats() });
+  const setRole = trpc.admin.setRole.useMutation({
+    onSuccess: () => {
+      refetchStats();
+      refetchUsers();
+    },
+  });
+
+  const refreshActiveTab = () => {
+    if (activeTab === "users") {
+      refetchUsers();
+      return;
+    }
+    if (activeTab === "autopublish") {
+      refetchFailures();
+      refetchStats();
+      return;
+    }
+    if (activeTab === "spend") {
+      refetchSpend();
+      refetchStats();
+      return;
+    }
+    refetchStats();
+  };
 
   if (!user) return <Redirect to="/admin/login" />;
 
@@ -57,7 +94,7 @@ export default function Admin() {
 
   const tabs: { id: Tab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: "overview", label: "Vue d'ensemble", icon: BarChart3 },
-    { id: "users", label: `Utilisateurs${userList ? ` (${userList.length})` : ""}`, icon: Users },
+    { id: "users", label: `Utilisateurs${stats ? ` (${stats.users.total})` : ""}`, icon: Users },
     { id: "autopublish", label: `Auto-publish${stats ? ` · ${stats.autoPublish.failed} échecs` : ""}`, icon: AlertTriangle },
     { id: "spend", label: "Coûts IA", icon: Zap },
   ];
@@ -76,7 +113,7 @@ export default function Admin() {
             <h1 className="text-3xl font-bold text-white mb-1">Administration</h1>
             <p className="text-muted-foreground text-sm">LinkedRank — tableau de bord interne</p>
           </div>
-          <Button variant="outline" className="border-white/10 gap-2" onClick={() => refetchStats()}>
+          <Button variant="outline" className="border-white/10 gap-2" onClick={refreshActiveTab}>
             <RefreshCw className="w-4 h-4" />
             Actualiser
           </Button>
@@ -260,7 +297,9 @@ export default function Admin() {
         {/* ── AUTO-PUBLISH FAILURES ── */}
         {activeTab === "autopublish" && (
           <div className="space-y-6">
-            {failures ? (
+            {failuresLoading ? (
+              <p className="text-muted-foreground">Chargement...</p>
+            ) : failures ? (
               <>
                 <div className="p-5 rounded-2xl border border-white/10 bg-card/50">
                   <h3 className="text-sm font-semibold text-white mb-4">Répartition par erreur</h3>
@@ -304,14 +343,16 @@ export default function Admin() {
                   </table>
                 </div>
               </>
-            ) : <p className="text-muted-foreground">Chargement...</p>}
+            ) : null}
           </div>
         )}
 
         {/* ── SPEND ── */}
         {activeTab === "spend" && (
           <div className="space-y-6">
-            {spendData ? (
+            {spendLoading ? (
+              <p className="text-muted-foreground">Chargement...</p>
+            ) : spendData ? (
               <>
                 {spendData.byModel.length === 0 ? (
                   <div className="p-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-amber-300 text-sm">
@@ -366,7 +407,7 @@ export default function Admin() {
                   </div>
                 </div>
               </>
-            ) : <p className="text-muted-foreground">Chargement...</p>}
+            ) : null}
           </div>
         )}
 
