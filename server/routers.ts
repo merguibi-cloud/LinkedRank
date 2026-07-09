@@ -8,7 +8,7 @@ import { checkRateLimit } from "./_core/rateLimit";
 import { publicProcedure, router, protectedProcedure, adminProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { hashPassword, verifyPassword } from "./services/password";
-import { getAllPosts, getPostById, createPost, updatePost, deletePost, getPostsCount, getAllCategories, getDb, getUserByEmail, upsertUser } from "./db";
+import { getAllPosts, getPostById, createPost, updatePost, deletePost, getPostsCount, getAllCategories, getDb, getPgClient, getUserByEmail, upsertUser } from "./db";
 import {
   createAgent,
   getUserAgents,
@@ -1229,55 +1229,46 @@ export const appRouter = router({
 
   admin: router({
     stats: adminProcedure.query(async () => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const pg = await getPgClient();
+      if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      const [userStats] = await db.execute(sql`
+      const [userStats] = await pg`
         SELECT
-          COUNT(*)::int                                                                        AS total,
-          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int             AS last_24h,
-          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int               AS last_7d,
-          COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '24 hours')::int          AS active_24h,
-          COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '7 days')::int            AS active_7d
-        FROM users
-      `);
+          COUNT(*)::int                                                                           AS total,
+          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int                AS last_24h,
+          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int                  AS last_7d,
+          COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '24 hours')::int             AS active_24h,
+          COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '7 days')::int               AS active_7d
+        FROM users`;
 
-      const [genStats] = await db.execute(sql`
+      const [genStats] = await pg`
         SELECT
-          COUNT(*)::int                                                                        AS total,
-          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int             AS last_24h,
-          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int               AS last_7d,
-          COUNT(DISTINCT "userId")::int                                                       AS unique_users
-        FROM generated_posts
-      `);
+          COUNT(*)::int                                                                           AS total,
+          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int                AS last_24h,
+          COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int                  AS last_7d,
+          COUNT(DISTINCT "userId")::int                                                          AS unique_users
+        FROM generated_posts`;
 
-      const [apStats] = await db.execute(sql`
+      const [apStats] = await pg`
         SELECT
           COUNT(*) FILTER (WHERE status = 'published')::int  AS published,
           COUNT(*) FILTER (WHERE status = 'failed')::int     AS failed,
           COUNT(*) FILTER (WHERE status = 'pending')::int    AS pending
-        FROM auto_publish_queue
-      `);
+        FROM auto_publish_queue`;
 
-      const [spendStats] = await db.execute(sql`
+      const [spendStats] = await pg`
         SELECT
-          COUNT(*)::int                                        AS calls,
-          COALESCE(SUM("totalTokens"), 0)::int                AS total_tokens,
-          COALESCE(SUM("costUsd"::numeric), 0)                AS total_cost,
+          COUNT(*)::int                                                                           AS calls,
+          COALESCE(SUM("totalTokens"), 0)::int                                                   AS total_tokens,
+          COALESCE(SUM("costUsd"::numeric), 0)                                                   AS total_cost,
           COALESCE(SUM("costUsd"::numeric) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days'), 0) AS cost_7d
-        FROM token_usage
-      `);
+        FROM token_usage`;
 
-      const [mediaStats] = await db.execute(sql`
-        SELECT
-          COUNT(*)::int                            AS total_files,
-          COALESCE(SUM("fileSize"), 0)::bigint     AS total_bytes
-        FROM media_library
-      `);
+      const [mediaStats] = await pg`
+        SELECT COUNT(*)::int AS total_files, COALESCE(SUM("fileSize"), 0)::bigint AS total_bytes
+        FROM media_library`;
 
-      const [carouselStats] = await db.execute(sql`
-        SELECT COUNT(*)::int AS total FROM generated_carousels
-      `);
+      const [carouselStats] = await pg`SELECT COUNT(*)::int AS total FROM generated_carousels`;
 
       return {
         users: {
@@ -1314,22 +1305,21 @@ export const appRouter = router({
     }),
 
     users: adminProcedure.query(async () => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const pg = await getPgClient();
+      if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      const rows = await db.execute(sql`
+      const rows = await pg`
         SELECT
           u.id, u.email, u.name, u.role, u."subscriptionPlan",
           u."createdAt", u."lastSignedIn",
-          COUNT(gp.id)::int                           AS generations,
-          ls."isConnected"                             AS linkedin_connected
+          COUNT(gp.id)::int       AS generations,
+          ls."isConnected"        AS linkedin_connected
         FROM users u
         LEFT JOIN generated_posts gp ON gp."userId" = u.id
         LEFT JOIN linkedin_settings ls ON ls."userId" = u.id
         GROUP BY u.id, ls."isConnected"
         ORDER BY u."createdAt" DESC
-        LIMIT 200
-      `);
+        LIMIT 200`;
 
       return rows.map(r => ({
         id: Number(r.id),
@@ -1337,30 +1327,28 @@ export const appRouter = router({
         name: r.name as string | null,
         role: r.role as string,
         plan: r.subscriptionPlan as string,
-        createdAt: r.createdAt as string,
-        lastSignedIn: r.lastSignedIn as string,
+        createdAt: String(r.createdAt),
+        lastSignedIn: String(r.lastSignedIn),
         generations: Number(r.generations),
         linkedinConnected: Boolean(r.linkedin_connected),
       }));
     }),
 
     autopublishFailures: adminProcedure.query(async () => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const pg = await getPgClient();
+      if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      const byError = await db.execute(sql`
+      const byError = await pg`
         SELECT "errorMessage", COUNT(*)::int AS count
         FROM auto_publish_queue WHERE status = 'failed'
-        GROUP BY "errorMessage" ORDER BY count DESC LIMIT 10
-      `);
+        GROUP BY "errorMessage" ORDER BY count DESC LIMIT 10`;
 
-      const recent = await db.execute(sql`
+      const recent = await pg`
         SELECT aq."errorMessage", aq."scheduledFor", aq."retryCount", u.email
         FROM auto_publish_queue aq
         LEFT JOIN users u ON u.id = aq."userId"
         WHERE aq.status = 'failed'
-        ORDER BY aq."updatedAt" DESC LIMIT 20
-      `);
+        ORDER BY aq."updatedAt" DESC LIMIT 20`;
 
       return {
         byError: byError.map(r => ({ error: r.errorMessage as string, count: Number(r.count) })),
@@ -1368,38 +1356,29 @@ export const appRouter = router({
           email: r.email as string,
           error: r.errorMessage as string,
           retries: Number(r.retryCount),
-          scheduledFor: r.scheduledFor as string,
+          scheduledFor: String(r.scheduledFor),
         })),
       };
     }),
 
     spend: adminProcedure.query(async () => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const pg = await getPgClient();
+      if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      const byModel = await db.execute(sql`
-        SELECT model, COUNT(*)::int AS calls,
-               SUM("totalTokens")::int AS tokens,
-               SUM("costUsd"::numeric) AS cost
-        FROM token_usage GROUP BY model ORDER BY cost DESC
-      `);
+      const byModel = await pg`
+        SELECT model, COUNT(*)::int AS calls, SUM("totalTokens")::int AS tokens, SUM("costUsd"::numeric) AS cost
+        FROM token_usage GROUP BY model ORDER BY cost DESC`;
 
-      const byEndpoint = await db.execute(sql`
-        SELECT COALESCE(endpoint, 'unknown') AS endpoint,
-               COUNT(*)::int AS calls,
-               SUM("costUsd"::numeric) AS cost
-        FROM token_usage GROUP BY endpoint ORDER BY cost DESC LIMIT 10
-      `);
+      const byEndpoint = await pg`
+        SELECT COALESCE(endpoint, 'unknown') AS endpoint, COUNT(*)::int AS calls, SUM("costUsd"::numeric) AS cost
+        FROM token_usage GROUP BY endpoint ORDER BY cost DESC LIMIT 10`;
 
-      const topUsers = await db.execute(sql`
-        SELECT u.email, u.name, COUNT(*)::int AS calls,
-               SUM(tu."totalTokens")::int AS tokens,
-               SUM(tu."costUsd"::numeric) AS cost
+      const topUsers = await pg`
+        SELECT u.email, u.name, COUNT(*)::int AS calls, SUM(tu."totalTokens")::int AS tokens, SUM(tu."costUsd"::numeric) AS cost
         FROM token_usage tu
         LEFT JOIN users u ON u.id = tu."userId"
         GROUP BY tu."userId", u.email, u.name
-        ORDER BY cost DESC LIMIT 10
-      `);
+        ORDER BY cost DESC LIMIT 10`;
 
       return {
         byModel: byModel.map(r => ({ model: r.model as string, calls: Number(r.calls), tokens: Number(r.tokens), cost: Number(r.cost).toFixed(4) })),

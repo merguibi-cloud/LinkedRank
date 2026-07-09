@@ -37,9 +37,12 @@ export default function AdminLogin() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
           toast.error(error.message || "Connexion échouée");
+          setIsSubmitting(false);
           return;
         }
-        // useAuth will re-run; useEffect above will redirect or show access denied
+        // Session is stored — let Admin page handle role verification
+        window.location.href = "/admin";
+        return;
       } else {
         const res = await fetch("/api/auth/login", {
           method: "POST",
@@ -50,14 +53,14 @@ export default function AdminLogin() {
         const data = await res.json();
         if (!res.ok) {
           toast.error(data.error || "Connexion échouée");
+          setIsSubmitting(false);
           return;
         }
-        // useEffect will handle redirect once useAuth picks up the new session
-        toast.success("Connexion réussie !");
+        window.location.href = "/admin";
+        return;
       }
     } catch {
       toast.error("Erreur de connexion au serveur");
-    } finally {
       setIsSubmitting(false);
     }
   };
