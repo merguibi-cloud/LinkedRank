@@ -21,6 +21,11 @@ export async function getDb() {
   return _db;
 }
 
+export async function getPgClient() {
+  await getDb();
+  return _client;
+}
+
 export async function closeDb(): Promise<void> {
   if (_client) {
     await _client.end({ timeout: 5 });

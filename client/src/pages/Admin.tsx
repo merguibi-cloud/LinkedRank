@@ -27,16 +27,22 @@ function timeAgo(dateStr: string) {
 }
 
 export default function Admin() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [search, setSearch] = useState("");
 
-  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = trpc.admin.stats.useQuery();
-  const { data: userList, isLoading: usersLoading } = trpc.admin.users.useQuery();
-  const { data: failures } = trpc.admin.autopublishFailures.useQuery();
-  const { data: spendData } = trpc.admin.spend.useQuery();
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = trpc.admin.stats.useQuery(undefined, { enabled: user?.role === "admin" });
+  const { data: userList, isLoading: usersLoading } = trpc.admin.users.useQuery(undefined, { enabled: user?.role === "admin" });
+  const { data: failures } = trpc.admin.autopublishFailures.useQuery(undefined, { enabled: user?.role === "admin" });
+  const { data: spendData } = trpc.admin.spend.useQuery(undefined, { enabled: user?.role === "admin" });
 
   const setRole = trpc.admin.setRole.useMutation({ onSuccess: () => refetchStats() });
+
+  if (loading) return (
+    <div className="min-h-screen bg-[#05050D] flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-[#614AFC] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   if (!user) return <Redirect to="/admin/login" />;
 
