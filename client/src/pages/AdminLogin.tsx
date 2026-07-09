@@ -62,14 +62,6 @@ export default function AdminLogin() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#05050D] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-white/40" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#05050D] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
