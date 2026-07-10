@@ -1268,56 +1268,7 @@ export const appRouter = router({
         SELECT COUNT(*)::int AS total_files, COALESCE(SUM("fileSize"), 0)::bigint AS total_bytes
         FROM media_library`;
 
-<<<<<<< stats-blocked
-      const [carouselStats] = await db.execute(sql`
-        SELECT COUNT(*)::int AS total FROM generated_carousels
-      `);
-=======
-      const [
-        [userStats],
-        [genStats],
-        [apStats],
-        [spendStats],
-        [mediaStats],
-        [carouselStats],
-      ] = await Promise.all([
-        pg`
-          SELECT
-            COUNT(*)::int                                                                         AS total,
-            COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int              AS last_24h,
-            COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int                AS last_7d,
-            COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '24 hours')::int           AS active_24h,
-            COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '7 days')::int             AS active_7d
-          FROM users`,
-        pg`
-          SELECT
-            COUNT(*)::int                                                                         AS total,
-            COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int              AS last_24h,
-            COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int                AS last_7d,
-            COUNT(DISTINCT "userId")::int                                                        AS unique_users
-          FROM generated_posts`,
-        pg`
-          SELECT
-            COUNT(*) FILTER (WHERE status = 'published')::int  AS published,
-            COUNT(*) FILTER (WHERE status = 'failed')::int     AS failed,
-            COUNT(*) FILTER (WHERE status = 'pending')::int    AS pending
-          FROM auto_publish_queue`,
-        pg`
-          SELECT
-            COUNT(*)::int                                                                         AS calls,
-            COALESCE(SUM("totalTokens"), 0)::int                                                 AS total_tokens,
-            COALESCE(SUM("costUsd"::numeric), 0)                                                 AS total_cost,
-            COALESCE(SUM("costUsd"::numeric) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days'), 0) AS cost_7d
-          FROM token_usage`,
-        pg`
-          SELECT COUNT(*)::int AS total_files, COALESCE(SUM("fileSize"), 0)::bigint AS total_bytes
-          FROM media_library`,
-        pg`SELECT COUNT(*)::int AS total FROM generated_carousels`,
-      ]);
->>>>>>> Stashed changes
-=======
       const [carouselStats] = await pg`SELECT COUNT(*)::int AS total FROM generated_carousels`;
->>>>>>> master
 
       return {
         users: {

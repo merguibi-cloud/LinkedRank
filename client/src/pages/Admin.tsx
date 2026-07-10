@@ -31,16 +31,14 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [search, setSearch] = useState("");
 
-  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = trpc.admin.stats.useQuery(undefined, { enabled: user?.role === "admin" });
-  const { data: userList, isLoading: usersLoading } = trpc.admin.users.useQuery(undefined, { enabled: user?.role === "admin" });
-  const { data: failures } = trpc.admin.autopublishFailures.useQuery(undefined, { enabled: user?.role === "admin" });
-  const { data: spendData } = trpc.admin.spend.useQuery(undefined, { enabled: user?.role === "admin" });
+  const isAdmin = user?.role === "admin";
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = trpc.admin.stats.useQuery(undefined, { enabled: isAdmin });
+  const { data: userList, isLoading: usersLoading, refetch: refetchUsers } = trpc.admin.users.useQuery(undefined, { enabled: isAdmin && activeTab === "users" });
+  const { data: failures, isLoading: failuresLoading, refetch: refetchFailures } = trpc.admin.autopublishFailures.useQuery(undefined, { enabled: isAdmin && activeTab === "autopublish" });
+  const { data: spendData, isLoading: spendLoading, refetch: refetchSpend } = trpc.admin.spend.useQuery(undefined, { enabled: isAdmin && activeTab === "spend" });
 
   const setRole = trpc.admin.setRole.useMutation({
-    onSuccess: () => {
-      refetchStats();
-      refetchUsers();
-    },
+    onSuccess: () => { refetchStats(); refetchUsers(); },
   });
 
   const refreshActiveTab = () => {
@@ -49,12 +47,6 @@ export default function Admin() {
     if (activeTab === "spend") { refetchSpend(); refetchStats(); return; }
     refetchStats();
   };
-
-  if (loading) return (
-    <div className="min-h-screen bg-[#05050D] flex items-center justify-center">
-      <div className="w-6 h-6 border-2 border-[#614AFC] border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
 
   if (loading) return (
     <div className="min-h-screen bg-[#05050D] flex items-center justify-center">
