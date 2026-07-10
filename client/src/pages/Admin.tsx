@@ -10,6 +10,45 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-lg bg-white/[0.06] ${className}`} />;
+}
+
+function StatCardSkeleton() {
+  return (
+    <div className="p-5 rounded-2xl border border-white/10 bg-card/50 space-y-3">
+      <Skeleton className="w-9 h-9 rounded-xl" />
+      <Skeleton className="h-7 w-16" />
+      <Skeleton className="h-3 w-28" />
+      <Skeleton className="h-3 w-20" />
+    </div>
+  );
+}
+
+function SecondaryStatSkeleton() {
+  return (
+    <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] flex items-center gap-3">
+      <Skeleton className="w-4 h-4 rounded shrink-0" />
+      <div className="space-y-2 flex-1">
+        <Skeleton className="h-6 w-10" />
+        <Skeleton className="h-3 w-24" />
+      </div>
+    </div>
+  );
+}
+
+function TableRowSkeleton({ cols }: { cols: number }) {
+  return (
+    <tr className="border-t border-white/5">
+      {Array.from({ length: cols }).map((_, i) => (
+        <td key={i} className="px-4 py-3">
+          <Skeleton className="h-4 w-full max-w-[120px]" />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
 type Tab = "overview" | "users" | "autopublish" | "spend";
 
 function formatBytes(mb: number) {
@@ -120,7 +159,25 @@ export default function Admin() {
         {activeTab === "overview" && (
           <div className="space-y-8">
             {statsLoading ? (
-              <p className="text-muted-foreground">Chargement...</p>
+              <>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {Array.from({ length: 4 }).map((_, i) => <SecondaryStatSkeleton key={i} />)}
+                </div>
+                <div className="p-5 rounded-2xl border border-white/10 bg-card/50 space-y-4">
+                  <Skeleton className="h-4 w-24" />
+                  <div className="grid grid-cols-3 gap-6">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="space-y-2">
+                        <Skeleton className="h-7 w-20" />
+                        <Skeleton className="h-3 w-14" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
             ) : stats ? (
               <>
                 {/* Stat cards */}
@@ -227,7 +284,20 @@ export default function Admin() {
               className="max-w-sm bg-card/50 border-white/10"
             />
             {usersLoading ? (
-              <p className="text-muted-foreground">Chargement...</p>
+              <div className="rounded-2xl border border-white/10 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-white/5">
+                    <tr>
+                      {["Email", "Nom", "Plan", "Rôle", "Générations", "LinkedIn", "Inscrit", "Actif"].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} cols={8} />)}
+                  </tbody>
+                </table>
+              </div>
             ) : (
               <div className="rounded-2xl border border-white/10 overflow-hidden">
                 <table className="w-full text-sm">
@@ -277,7 +347,24 @@ export default function Admin() {
         {activeTab === "autopublish" && (
           <div className="space-y-6">
             {failuresLoading ? (
-              <p className="text-muted-foreground">Chargement...</p>
+              <div className="space-y-4">
+                <div className="p-5 rounded-2xl border border-white/10 bg-card/50 space-y-3">
+                  <Skeleton className="h-4 w-40" />
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+                      <Skeleton className="h-4 flex-1" />
+                      <Skeleton className="h-4 w-8 shrink-0" />
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-2xl border border-white/10 overflow-hidden">
+                  <div className="px-5 py-3 bg-white/5"><Skeleton className="h-4 w-44" /></div>
+                  <table className="w-full text-sm"><tbody>
+                    {Array.from({ length: 6 }).map((_, i) => <TableRowSkeleton key={i} cols={4} />)}
+                  </tbody></table>
+                </div>
+              </div>
             ) : failures ? (
               <>
                 <div className="p-5 rounded-2xl border border-white/10 bg-card/50">
@@ -330,7 +417,22 @@ export default function Admin() {
         {activeTab === "spend" && (
           <div className="space-y-6">
             {spendLoading ? (
-              <p className="text-muted-foreground">Chargement...</p>
+              <div className="grid lg:grid-cols-3 gap-6">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="p-5 rounded-2xl border border-white/10 bg-card/50 space-y-4">
+                    <Skeleton className="h-4 w-24" />
+                    {Array.from({ length: 4 }).map((__, j) => (
+                      <div key={j} className="flex justify-between items-center">
+                        <div className="space-y-1.5">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-24" />
+                        </div>
+                        <Skeleton className="h-4 w-12" />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             ) : spendData ? (
               <>
                 {spendData.byModel.length === 0 ? (
