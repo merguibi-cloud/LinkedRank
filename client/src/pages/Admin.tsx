@@ -27,16 +27,10 @@ function timeAgo(dateStr: string) {
 }
 
 export default function Admin() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [search, setSearch] = useState("");
 
-<<<<<<< Updated upstream
-  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = trpc.admin.stats.useQuery();
-  const { data: userList, isLoading: usersLoading } = trpc.admin.users.useQuery();
-  const { data: failures } = trpc.admin.autopublishFailures.useQuery();
-  const { data: spendData } = trpc.admin.spend.useQuery();
-=======
   const isAdmin = user?.role === "admin";
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = trpc.admin.stats.useQuery(undefined, { enabled: isAdmin });
   const { data: userList, isLoading: usersLoading, refetch: refetchUsers } = trpc.admin.users.useQuery(undefined, {
@@ -48,7 +42,6 @@ export default function Admin() {
   const { data: spendData, isLoading: spendLoading, refetch: refetchSpend } = trpc.admin.spend.useQuery(undefined, {
     enabled: isAdmin && activeTab === "spend",
   });
->>>>>>> Stashed changes
 
   const setRole = trpc.admin.setRole.useMutation({
     onSuccess: () => {
@@ -58,22 +51,17 @@ export default function Admin() {
   });
 
   const refreshActiveTab = () => {
-    if (activeTab === "users") {
-      refetchUsers();
-      return;
-    }
-    if (activeTab === "autopublish") {
-      refetchFailures();
-      refetchStats();
-      return;
-    }
-    if (activeTab === "spend") {
-      refetchSpend();
-      refetchStats();
-      return;
-    }
+    if (activeTab === "users") { refetchUsers(); return; }
+    if (activeTab === "autopublish") { refetchFailures(); refetchStats(); return; }
+    if (activeTab === "spend") { refetchSpend(); refetchStats(); return; }
     refetchStats();
   };
+
+  if (loading) return (
+    <div className="min-h-screen bg-[#05050D] flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-[#614AFC] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   if (!user) return <Redirect to="/admin/login" />;
 
