@@ -1296,88 +1296,137 @@ export const appRouter = router({
       };
     }),
 
-    users: adminProcedure.query(async () => {
-      const pg = await getPgClient();
-      if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    users: adminProcedure
+      .input(z.object({
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(25),
+        search: z.string().optional(),
+      }))
+      .query(async ({ input }) => {
+        const pg = await getPgClient();
+        if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      const rows = await pg`
-        SELECT
-          u.id, u.email, u.name, u.role, u."subscriptionPlan",
-          u."createdAt", u."lastSignedIn",
-          COUNT(gp.id)::int       AS generations,
-          ls."isConnected"        AS linkedin_connected
-        FROM users u
-        LEFT JOIN generated_posts gp ON gp."userId" = u.id
-        LEFT JOIN linkedin_settings ls ON ls."userId" = u.id
-        GROUP BY u.id, ls."isConnected"
-        ORDER BY u."createdAt" DESC
-        LIMIT 200`;
+        const offset = (input.page - 1) * input.limit;
+        const pattern = input.search ? `%${input.search}%` : null;
 
-      return rows.map(r => ({
-        id: Number(r.id),
-        email: r.email as string,
-        name: r.name as string | null,
-        role: r.role as string,
-        plan: r.subscriptionPlan as string,
-        createdAt: String(r.createdAt),
-        lastSignedIn: String(r.lastSignedIn),
-        generations: Number(r.generations),
-        linkedinConnected: Boolean(r.linkedin_connected),
-      }));
-    }),
+        const [rows, [countRow]] = await Promise.all([
+          pattern
+            ? pg`
+                SELECT u.id, u.email, u.name, u.role, u."subscriptionPlan",
+                       u."createdAt", u."lastSignedIn",
+                       COUNT(gp.id)::int AS generations, ls."isConnected" AS linkedin_connected
+                FROM users u
+                LEFT JOIN generated_posts gp ON gp."userId" = u.id
+                LEFT JOIN linkedin_settings ls ON ls."userId" = u.id
+                WHERE u.email ILIKE ${pattern} OR u.name ILIKE ${pattern}
+                GROUP BY u.id, ls."isConnected"
+                ORDER BY u."createdAt" DESC
+                LIMIT ${input.limit} OFFSET ${offset}`
+            : pg`
+                SELECT u.id, u.email, u.name, u.role, u."subscriptionPlan",
+                       u."createdAt", u."lastSignedIn",
+                       COUNT(gp.id)::int AS generations, ls."isConnected" AS linkedin_connected
+                FROM users u
+                LEFT JOIN generated_posts gp ON gp."userId" = u.id
+                LEFT JOIN linkedin_settings ls ON ls."userId" = u.id
+                GROUP BY u.id, ls."isConnected"
+                ORDER BY u."createdAt" DESC
+                LIMIT ${input.limit} OFFSET ${offset}`,
+          pattern
+            ? pg`SELECT COUNT(*)::int AS total FROM users WHERE email ILIKE ${pattern} OR name ILIKE ${pattern}`
+            : pg`SELECT COUNT(*)::int AS total FROM users`,
+        ]);
 
-    autopublishFailures: adminProcedure.query(async () => {
-      const pg = await getPgClient();
-      if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        return {
+          rows: rows.map(r => ({
+            id: Number(r.id),
+            email: r.email as string,
+            name: r.name as string | null,
+            role: r.role as string,
+            plan: r.subscriptionPlan as string,
+            createdAt: String(r.createdAt),
+            lastSignedIn: String(r.lastSignedIn),
+            generations: Number(r.generations),
+            linkedinConnected: Boolean(r.linkedin_connected),
+          })),
+          total: Number(countRow.total),
+          page: input.page,
+          limit: input.limit,
+        };
+      }),
 
-      const byError = await pg`
-        SELECT "errorMessage", COUNT(*)::int AS count
-        FROM auto_publish_queue WHERE status = 'failed'
-        GROUP BY "errorMessage" ORDER BY count DESC LIMIT 10`;
+    autopublishFailures: adminProcedure
+      .input(z.object({
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(50).default(20),
+      }))
+      .query(async ({ input }) => {
+        const pg = await getPgClient();
+        if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      const recent = await pg`
-        SELECT aq."errorMessage", aq."scheduledFor", aq."retryCount", u.email
-        FROM auto_publish_queue aq
-        LEFT JOIN users u ON u.id = aq."userId"
-        WHERE aq.status = 'failed'
-        ORDER BY aq."updatedAt" DESC LIMIT 20`;
+        const offset = (input.page - 1) * input.limit;
 
-      return {
-        byError: byError.map(r => ({ error: r.errorMessage as string, count: Number(r.count) })),
-        recent: recent.map(r => ({
-          email: r.email as string,
-          error: r.errorMessage as string,
-          retries: Number(r.retryCount),
-          scheduledFor: String(r.scheduledFor),
-        })),
-      };
-    }),
+        const [byError, recent, [countRow]] = await Promise.all([
+          pg`SELECT "errorMessage", COUNT(*)::int AS count
+             FROM auto_publish_queue WHERE status = 'failed'
+             GROUP BY "errorMessage" ORDER BY count DESC LIMIT 10`,
+          pg`SELECT aq."errorMessage", aq."scheduledFor", aq."retryCount", u.email
+             FROM auto_publish_queue aq
+             LEFT JOIN users u ON u.id = aq."userId"
+             WHERE aq.status = 'failed'
+             ORDER BY aq."updatedAt" DESC
+             LIMIT ${input.limit} OFFSET ${offset}`,
+          pg`SELECT COUNT(*)::int AS total FROM auto_publish_queue WHERE status = 'failed'`,
+        ]);
 
-    spend: adminProcedure.query(async () => {
-      const pg = await getPgClient();
-      if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        return {
+          byError: byError.map(r => ({ error: r.errorMessage as string, count: Number(r.count) })),
+          recent: recent.map(r => ({
+            email: r.email as string,
+            error: r.errorMessage as string,
+            retries: Number(r.retryCount),
+            scheduledFor: String(r.scheduledFor),
+          })),
+          total: Number(countRow.total),
+          page: input.page,
+          limit: input.limit,
+        };
+      }),
 
-      const byModel = await pg`
-        SELECT model, COUNT(*)::int AS calls, SUM("totalTokens")::int AS tokens, SUM("costUsd"::numeric) AS cost
-        FROM token_usage GROUP BY model ORDER BY cost DESC`;
+    spend: adminProcedure
+      .input(z.object({
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(50).default(15),
+      }))
+      .query(async ({ input }) => {
+        const pg = await getPgClient();
+        if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      const byEndpoint = await pg`
-        SELECT COALESCE(endpoint, 'unknown') AS endpoint, COUNT(*)::int AS calls, SUM("costUsd"::numeric) AS cost
-        FROM token_usage GROUP BY endpoint ORDER BY cost DESC LIMIT 10`;
+        const offset = (input.page - 1) * input.limit;
 
-      const topUsers = await pg`
-        SELECT u.email, u.name, COUNT(*)::int AS calls, SUM(tu."totalTokens")::int AS tokens, SUM(tu."costUsd"::numeric) AS cost
-        FROM token_usage tu
-        LEFT JOIN users u ON u.id = tu."userId"
-        GROUP BY tu."userId", u.email, u.name
-        ORDER BY cost DESC LIMIT 10`;
+        const [byModel, byEndpoint, topUsers, [countRow]] = await Promise.all([
+          pg`SELECT model, COUNT(*)::int AS calls, SUM("totalTokens")::int AS tokens, SUM("costUsd"::numeric) AS cost
+             FROM token_usage GROUP BY model ORDER BY cost DESC`,
+          pg`SELECT COALESCE(endpoint, 'unknown') AS endpoint, COUNT(*)::int AS calls, SUM("costUsd"::numeric) AS cost
+             FROM token_usage GROUP BY endpoint ORDER BY cost DESC LIMIT 10`,
+          pg`SELECT u.email, u.name, COUNT(*)::int AS calls, SUM(tu."totalTokens")::int AS tokens, SUM(tu."costUsd"::numeric) AS cost
+             FROM token_usage tu
+             LEFT JOIN users u ON u.id = tu."userId"
+             GROUP BY tu."userId", u.email, u.name
+             ORDER BY cost DESC
+             LIMIT ${input.limit} OFFSET ${offset}`,
+          pg`SELECT COUNT(DISTINCT "userId")::int AS total FROM token_usage`,
+        ]);
 
-      return {
-        byModel: byModel.map(r => ({ model: r.model as string, calls: Number(r.calls), tokens: Number(r.tokens), cost: Number(r.cost).toFixed(4) })),
-        byEndpoint: byEndpoint.map(r => ({ endpoint: r.endpoint as string, calls: Number(r.calls), cost: Number(r.cost).toFixed(4) })),
-        topUsers: topUsers.map(r => ({ email: r.email as string, name: r.name as string | null, calls: Number(r.calls), tokens: Number(r.tokens), cost: Number(r.cost).toFixed(4) })),
-      };
-    }),
+        return {
+          byModel: byModel.map(r => ({ model: r.model as string, calls: Number(r.calls), tokens: Number(r.tokens), cost: Number(r.cost).toFixed(4) })),
+          byEndpoint: byEndpoint.map(r => ({ endpoint: r.endpoint as string, calls: Number(r.calls), cost: Number(r.cost).toFixed(4) })),
+          topUsers: topUsers.map(r => ({ email: r.email as string, name: r.name as string | null, calls: Number(r.calls), tokens: Number(r.tokens), cost: Number(r.cost).toFixed(4) })),
+          total: Number(countRow.total),
+          page: input.page,
+          limit: input.limit,
+        };
+      }),
 
     setRole: adminProcedure
       .input(z.object({ userId: z.number(), role: z.enum(["user", "admin"]) }))
