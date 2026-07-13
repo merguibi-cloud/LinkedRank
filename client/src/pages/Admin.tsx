@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link, Redirect } from "wouter";
 import {
   Users, FileText, BarChart3, AlertTriangle, Sparkles,
   XCircle, TrendingUp, RefreshCw, CheckCircle2, Linkedin,
-  HardDrive, Zap, Clock,
+  HardDrive, Zap, ChevronLeft, ChevronRight, Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+// ── Skeleton helpers ──────────────────────────────────────────────────────────
 
 function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded-lg bg-white/[0.06] ${className}`} />;
@@ -49,6 +51,79 @@ function TableRowSkeleton({ cols }: { cols: number }) {
   );
 }
 
+// ── Pagination component ──────────────────────────────────────────────────────
+
+function Pagination({
+  page,
+  total,
+  limit,
+  onPage,
+  isFetching,
+}: {
+  page: number;
+  total: number;
+  limit: number;
+  onPage: (p: number) => void;
+  isFetching?: boolean;
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  if (totalPages <= 1) return null;
+
+  const from = (page - 1) * limit + 1;
+  const to = Math.min(page * limit, total);
+
+  // generate window: always show first, last, current ± 1
+  const pages = new Set([1, totalPages, page, page - 1, page + 1].filter(p => p >= 1 && p <= totalPages));
+  const sorted = Array.from(pages).sort((a, b) => a - b);
+
+  return (
+    <div className="flex items-center justify-between pt-4 border-t border-white/10">
+      <span className="text-xs text-muted-foreground">
+        {from}–{to} sur {total}
+        {isFetching && <span className="ml-2 text-violet-400">…</span>}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          disabled={page === 1}
+          onClick={() => onPage(page - 1)}
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+
+        {sorted.map((p, idx) => {
+          const gap = idx > 0 && p - sorted[idx - 1] > 1;
+          return (
+            <span key={p} className="flex items-center gap-1">
+              {gap && <span className="text-muted-foreground/40 text-xs px-1">…</span>}
+              <button
+                onClick={() => onPage(p)}
+                className={`min-w-[28px] h-7 px-1.5 rounded-lg text-xs transition-colors ${
+                  p === page
+                    ? "bg-violet-500/30 text-violet-300 font-semibold"
+                    : "text-muted-foreground hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {p}
+              </button>
+            </span>
+          );
+        })}
+
+        <button
+          disabled={page === totalPages}
+          onClick={() => onPage(page + 1)}
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 type Tab = "overview" | "users" | "autopublish" | "spend";
 
 function formatBytes(mb: number) {
@@ -65,16 +140,51 @@ function timeAgo(dateStr: string) {
   return "récemment";
 }
 
+const PAGE_SIZE = { users: 25, autopublish: 20, spend: 15 } as const;
+
+// ── Page component ────────────────────────────────────────────────────────────
+
 export default function Admin() {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+
+  // per-tab page state
+  const [usersPage, setUsersPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [apPage, setApPage] = useState(1);
+  const [spendPage, setSpendPage] = useState(1);
 
   const isAdmin = user?.role === "admin";
-  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = trpc.admin.stats.useQuery(undefined, { enabled: isAdmin });
-  const { data: userList, isLoading: usersLoading, refetch: refetchUsers } = trpc.admin.users.useQuery(undefined, { enabled: isAdmin && activeTab === "users" });
-  const { data: failures, isLoading: failuresLoading, refetch: refetchFailures } = trpc.admin.autopublishFailures.useQuery(undefined, { enabled: isAdmin && activeTab === "autopublish" });
-  const { data: spendData, isLoading: spendLoading, refetch: refetchSpend } = trpc.admin.spend.useQuery(undefined, { enabled: isAdmin && activeTab === "spend" });
+
+  // debounce search: reset page and update debounced value
+  const handleSearch = useCallback((val: string) => {
+    setSearch(val);
+    setUsersPage(1);
+    const t = setTimeout(() => setDebouncedSearch(val), 350);
+    return () => clearTimeout(t);
+  }, []);
+
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } =
+    trpc.admin.stats.useQuery(undefined, { enabled: isAdmin });
+
+  const { data: usersData, isLoading: usersLoading, isFetching: usersFetching, refetch: refetchUsers } =
+    trpc.admin.users.useQuery(
+      { page: usersPage, limit: PAGE_SIZE.users, search: debouncedSearch || undefined },
+      { enabled: isAdmin && activeTab === "users", keepPreviousData: true },
+    );
+
+  const { data: failures, isLoading: failuresLoading, isFetching: failuresFetching, refetch: refetchFailures } =
+    trpc.admin.autopublishFailures.useQuery(
+      { page: apPage, limit: PAGE_SIZE.autopublish },
+      { enabled: isAdmin && activeTab === "autopublish", keepPreviousData: true },
+    );
+
+  const { data: spendData, isLoading: spendLoading, isFetching: spendFetching, refetch: refetchSpend } =
+    trpc.admin.spend.useQuery(
+      { page: spendPage, limit: PAGE_SIZE.spend },
+      { enabled: isAdmin && activeTab === "spend", keepPreviousData: true },
+    );
 
   const setRole = trpc.admin.setRole.useMutation({
     onSuccess: () => { refetchStats(); refetchUsers(); },
@@ -86,6 +196,8 @@ export default function Admin() {
     if (activeTab === "spend") { refetchSpend(); refetchStats(); return; }
     refetchStats();
   };
+
+  // ── Auth guards ─────────────────────────────────────────────────────────────
 
   if (loading) return (
     <div className="min-h-screen bg-[#05050D] flex items-center justify-center">
@@ -110,16 +222,16 @@ export default function Admin() {
     );
   }
 
+  // ── Tabs config ─────────────────────────────────────────────────────────────
+
   const tabs: { id: Tab; label: string; icon: React.FC<{ className?: string }> }[] = [
-    { id: "overview", label: "Vue d'ensemble", icon: BarChart3 },
-    { id: "users", label: `Utilisateurs${stats ? ` (${stats.users.total})` : ""}`, icon: Users },
+    { id: "overview",    label: "Vue d'ensemble", icon: BarChart3 },
+    { id: "users",       label: `Utilisateurs${stats ? ` (${stats.users.total})` : ""}`, icon: Users },
     { id: "autopublish", label: `Auto-publish${stats ? ` · ${stats.autoPublish.failed} échecs` : ""}`, icon: AlertTriangle },
-    { id: "spend", label: "Coûts IA", icon: Zap },
+    { id: "spend",       label: "Coûts IA", icon: Zap },
   ];
 
-  const filteredUsers = (userList ?? []).filter(u =>
-    !search || u.email?.toLowerCase().includes(search.toLowerCase()) || u.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-background">
@@ -180,42 +292,17 @@ export default function Admin() {
               </>
             ) : stats ? (
               <>
-                {/* Stat cards */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
-                    {
-                      label: "Utilisateurs total",
-                      value: stats.users.total,
-                      sub: `${stats.users.active7d} actifs (7j)`,
-                      icon: Users,
-                      color: "violet",
-                    },
-                    {
-                      label: "Générations IA",
-                      value: stats.generations.total,
-                      sub: `+${stats.generations.last7d} cette semaine`,
-                      icon: Sparkles,
-                      color: "rose",
-                    },
-                    {
-                      label: "Publications réussies",
-                      value: stats.autoPublish.published,
-                      sub: `${stats.autoPublish.failed} échecs`,
-                      icon: CheckCircle2,
-                      color: "emerald",
-                    },
-                    {
-                      label: "Stockage",
-                      value: formatBytes(stats.storage.mb),
-                      sub: `${stats.storage.files} fichiers`,
-                      icon: HardDrive,
-                      color: "blue",
-                    },
+                    { label: "Utilisateurs total", value: stats.users.total,          sub: `${stats.users.active7d} actifs (7j)`,         icon: Users,        color: "violet" },
+                    { label: "Générations IA",      value: stats.generations.total,   sub: `+${stats.generations.last7d} cette semaine`,   icon: Sparkles,     color: "rose" },
+                    { label: "Publications réussies",value: stats.autoPublish.published, sub: `${stats.autoPublish.failed} échecs`,         icon: CheckCircle2, color: "emerald" },
+                    { label: "Stockage",            value: formatBytes(stats.storage.mb), sub: `${stats.storage.files} fichiers`,           icon: HardDrive,    color: "blue" },
                   ].map(card => (
                     <div key={card.label} className="p-5 rounded-2xl border border-white/10 bg-card/50">
                       <div className={`w-9 h-9 rounded-xl mb-3 flex items-center justify-center ${
-                        card.color === "violet" ? "bg-violet-500/20 text-violet-300" :
-                        card.color === "rose" ? "bg-rose-500/20 text-rose-400" :
+                        card.color === "violet"  ? "bg-violet-500/20 text-violet-300" :
+                        card.color === "rose"    ? "bg-rose-500/20 text-rose-400" :
                         card.color === "emerald" ? "bg-emerald-500/20 text-emerald-400" :
                         "bg-blue-500/20 text-blue-400"
                       }`}>
@@ -228,13 +315,12 @@ export default function Admin() {
                   ))}
                 </div>
 
-                {/* Secondary stats row */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
-                    { label: "Inscrits (24h)", value: stats.users.last24h, icon: TrendingUp },
-                    { label: "Inscrits (7j)", value: stats.users.last7d, icon: TrendingUp },
-                    { label: "Générations (24h)", value: stats.generations.last24h, icon: Sparkles },
-                    { label: "Carousels générés", value: stats.carousels, icon: FileText },
+                    { label: "Inscrits (24h)",      value: stats.users.last24h,          icon: TrendingUp },
+                    { label: "Inscrits (7j)",        value: stats.users.last7d,           icon: TrendingUp },
+                    { label: "Générations (24h)",    value: stats.generations.last24h,    icon: Sparkles },
+                    { label: "Carousels générés",    value: stats.carousels,              icon: FileText },
                   ].map(s => (
                     <div key={s.label} className="p-4 rounded-xl border border-white/10 bg-white/[0.02] flex items-center gap-3">
                       <s.icon className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -246,7 +332,6 @@ export default function Admin() {
                   ))}
                 </div>
 
-                {/* AI spend summary */}
                 <div className="p-5 rounded-2xl border border-white/10 bg-card/50">
                   <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                     <Zap className="w-4 h-4 text-yellow-400" /> Coûts IA
@@ -277,39 +362,38 @@ export default function Admin() {
         {/* ── USERS ── */}
         {activeTab === "users" && (
           <div className="space-y-4">
-            <Input
-              placeholder="Rechercher par email ou nom..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="max-w-sm bg-card/50 border-white/10"
-            />
+            {/* Search */}
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Email ou nom…"
+                value={search}
+                onChange={e => handleSearch(e.target.value)}
+                className="pl-9 bg-card/50 border-white/10"
+              />
+            </div>
+
             {usersLoading ? (
               <div className="rounded-2xl border border-white/10 overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-white/5">
-                    <tr>
-                      {["Email", "Nom", "Plan", "Rôle", "Générations", "LinkedIn", "Inscrit", "Actif"].map(h => (
-                        <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
-                      ))}
-                    </tr>
+                    <tr>{["Email","Nom","Plan","Rôle","Générations","LinkedIn","Inscrit","Actif"].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
+                    ))}</tr>
                   </thead>
-                  <tbody>
-                    {Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} cols={8} />)}
-                  </tbody>
+                  <tbody>{Array.from({ length: PAGE_SIZE.users }).map((_, i) => <TableRowSkeleton key={i} cols={8} />)}</tbody>
                 </table>
               </div>
-            ) : (
+            ) : usersData ? (
               <div className="rounded-2xl border border-white/10 overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-white/5">
-                    <tr>
-                      {["Email", "Nom", "Plan", "Rôle", "Générations", "LinkedIn", "Inscrit", "Actif"].map(h => (
-                        <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
-                      ))}
-                    </tr>
+                    <tr>{["Email","Nom","Plan","Rôle","Générations","LinkedIn","Inscrit","Actif"].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
+                    ))}</tr>
                   </thead>
-                  <tbody>
-                    {filteredUsers.map(u => (
+                  <tbody className={usersFetching ? "opacity-60 transition-opacity" : ""}>
+                    {usersData.rows.map(u => (
                       <tr key={u.id} className="border-t border-white/5 hover:bg-white/[0.02]">
                         <td className="px-4 py-3 text-white font-medium">{u.email}</td>
                         <td className="px-4 py-3 text-muted-foreground">{u.name ?? "—"}</td>
@@ -338,8 +422,11 @@ export default function Admin() {
                     ))}
                   </tbody>
                 </table>
+                <div className="px-4 pb-3">
+                  <Pagination page={usersData.page} total={usersData.total} limit={usersData.limit} onPage={setUsersPage} isFetching={usersFetching} />
+                </div>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
@@ -385,18 +472,17 @@ export default function Admin() {
                 </div>
 
                 <div className="rounded-2xl border border-white/10 overflow-hidden">
-                  <div className="px-5 py-3 bg-white/5 border-b border-white/10">
-                    <h3 className="text-sm font-semibold text-white">20 échecs les plus récents</h3>
+                  <div className="px-5 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-white">Échecs récents</h3>
+                    <span className="text-xs text-muted-foreground">{failures.total} au total</span>
                   </div>
                   <table className="w-full text-sm">
                     <thead className="bg-white/[0.02]">
-                      <tr>
-                        {["Email", "Erreur", "Retries", "Planifié"].map(h => (
-                          <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
-                        ))}
-                      </tr>
+                      <tr>{["Email","Erreur","Retries","Planifié"].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
+                      ))}</tr>
                     </thead>
-                    <tbody>
+                    <tbody className={failuresFetching ? "opacity-60" : ""}>
                       {failures.recent.map((r, i) => (
                         <tr key={i} className="border-t border-white/5">
                           <td className="px-4 py-3 text-white">{r.email ?? "?"}</td>
@@ -407,6 +493,9 @@ export default function Admin() {
                       ))}
                     </tbody>
                   </table>
+                  <div className="px-4 pb-3">
+                    <Pagination page={failures.page} total={failures.total} limit={failures.limit} onPage={setApPage} isFetching={failuresFetching} />
+                  </div>
                 </div>
               </>
             ) : null}
@@ -423,10 +512,7 @@ export default function Admin() {
                     <Skeleton className="h-4 w-24" />
                     {Array.from({ length: 4 }).map((__, j) => (
                       <div key={j} className="flex justify-between items-center">
-                        <div className="space-y-1.5">
-                          <Skeleton className="h-4 w-32" />
-                          <Skeleton className="h-3 w-24" />
-                        </div>
+                        <div className="space-y-1.5"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-24" /></div>
                         <Skeleton className="h-4 w-12" />
                       </div>
                     ))}
@@ -435,13 +521,14 @@ export default function Admin() {
               </div>
             ) : spendData ? (
               <>
-                {spendData.byModel.length === 0 ? (
+                {spendData.byModel.length === 0 && (
                   <div className="p-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-amber-300 text-sm">
                     ⚠ Aucun appel loggé pour l'instant. Le tracking démarre à partir du prochain déploiement.
                   </div>
-                ) : null}
+                )}
 
                 <div className="grid lg:grid-cols-3 gap-6">
+                  {/* By model */}
                   <div className="p-5 rounded-2xl border border-white/10 bg-card/50">
                     <h3 className="text-sm font-semibold text-white mb-4">Par modèle</h3>
                     <div className="space-y-3">
@@ -457,6 +544,7 @@ export default function Admin() {
                     </div>
                   </div>
 
+                  {/* By endpoint */}
                   <div className="p-5 rounded-2xl border border-white/10 bg-card/50">
                     <h3 className="text-sm font-semibold text-white mb-4">Par fonctionnalité</h3>
                     <div className="space-y-3">
@@ -472,19 +560,21 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  <div className="p-5 rounded-2xl border border-white/10 bg-card/50">
+                  {/* Top users — paginated */}
+                  <div className="p-5 rounded-2xl border border-white/10 bg-card/50 flex flex-col">
                     <h3 className="text-sm font-semibold text-white mb-4">Top utilisateurs</h3>
-                    <div className="space-y-3">
+                    <div className={`space-y-3 flex-1 ${spendFetching ? "opacity-60" : ""}`}>
                       {spendData.topUsers.length > 0 ? spendData.topUsers.map(r => (
                         <div key={r.email} className="flex justify-between items-center">
-                          <div>
-                            <div className="text-sm text-white truncate max-w-[160px]">{r.email}</div>
-                            <div className="text-xs text-muted-foreground">{r.calls} appels</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm text-white truncate">{r.email}</div>
+                            <div className="text-xs text-muted-foreground">{r.calls} appels · {r.tokens.toLocaleString()} tokens</div>
                           </div>
-                          <span className="text-sm font-medium text-yellow-400">${r.cost}</span>
+                          <span className="text-sm font-medium text-yellow-400 ml-3 shrink-0">${r.cost}</span>
                         </div>
                       )) : <p className="text-muted-foreground text-sm">Aucune donnée</p>}
                     </div>
+                    <Pagination page={spendData.page} total={spendData.total} limit={spendData.limit} onPage={setSpendPage} isFetching={spendFetching} />
                   </div>
                 </div>
               </>
