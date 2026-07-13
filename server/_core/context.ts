@@ -8,13 +8,18 @@ export type TrpcContext = {
   user: User | null;
 };
 
+const CONTEXT_TIMEOUT_MS = 8_000;
+
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
   let user: User | null = null;
 
   try {
-    user = await resolveAppUser(opts.req, opts.res);
+    user = await Promise.race([
+      resolveAppUser(opts.req, opts.res),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), CONTEXT_TIMEOUT_MS)),
+    ]);
   } catch {
     user = null;
   }
