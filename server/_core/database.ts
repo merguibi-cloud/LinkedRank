@@ -10,8 +10,11 @@ export const POSTGRES_POOL_OPTIONS: Options<Record<string, never>> = {
   prepare: false,
   max: process.env.NODE_ENV === "production" ? 2 : 3,
   idle_timeout: 10,
-  connect_timeout: 15,
-  max_lifetime: 60 * 30,
+  connect_timeout: 10,
+  max_lifetime: 60 * 10,
+  // Kill any query that hangs longer than 20 s — prevents 5-min Vercel timeouts
+  // when PgBouncer pool is saturated on cold start.
+  connection: { statement_timeout: 20000 },
 };
 
 /** Options pour scripts CLI ponctuels (une seule connexion, fermeture explicite). */

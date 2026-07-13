@@ -43,6 +43,27 @@ async function resolveLegacyUser(req: Request): Promise<User | null> {
   }
 }
 
+// Cache user resolution for 60 seconds to avoid hitting DB on every request.
+// Key: supabase user id  →  { user, expiresAt }
+const USER_CACHE_TTL_MS = 60_000;
+const userCache = new Map<string, { user: User; expiresAt: number }>();
+
+function getCachedUser(supabaseId: string): User | null {
+  const entry = userCache.get(supabaseId);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { userCache.delete(supabaseId); return null; }
+  return entry.user;
+}
+
+function setCachedUser(supabaseId: string, user: User) {
+  userCache.set(supabaseId, { user, expiresAt: Date.now() + USER_CACHE_TTL_MS });
+  // Evict oldest entries if cache grows too large
+  if (userCache.size > 500) {
+    const oldest = userCache.keys().next().value;
+    if (oldest) userCache.delete(oldest);
+  }
+}
+
 export async function resolveAppUser(
   req: Request,
   res: Response
@@ -50,17 +71,21 @@ export async function resolveAppUser(
   if (isSupabaseConfigured()) {
     try {
       const supabase = createSupabaseServerClient(req, res);
-      const {
-        data: { user: supabaseUser },
-      } = await supabase.auth.getUser();
+      const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
       if (supabaseUser) {
         const openId = `supabase:${supabaseUser.id}`;
+
+        // Return cached user — skip DB entirely for hot requests
+        const cached = getCachedUser(supabaseUser.id);
+        if (cached) return cached;
+
         const name =
           (supabaseUser.user_metadata?.name as string | undefined) ??
           (supabaseUser.user_metadata?.full_name as string | undefined) ??
           null;
 
+        // upsert + read in parallel-ish: upsert first, then read back
         await upsertUser({
           openId,
           email: supabaseUser.email ?? null,
@@ -69,7 +94,9 @@ export async function resolveAppUser(
           lastSignedIn: new Date(),
         });
 
-        return (await getUserByOpenId(openId)) ?? null;
+        const user = (await getUserByOpenId(openId)) ?? null;
+        if (user) setCachedUser(supabaseUser.id, user);
+        return user;
       }
     } catch (error) {
       console.warn("[Supabase] resolveAppUser failed, falling back to legacy session:", error);
