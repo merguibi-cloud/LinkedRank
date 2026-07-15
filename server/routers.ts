@@ -1309,27 +1309,33 @@ export const appRouter = router({
         const offset = (input.page - 1) * input.limit;
         const pattern = input.search ? `%${input.search}%` : null;
 
+        // Lateral subquery for generation count — avoids GROUP BY over all rows
+        // and lets Postgres use the index on generated_posts."userId" per-user.
         const [rows, [countRow]] = await Promise.all([
           pattern
             ? pg`
                 SELECT u.id, u.email, u.name, u.role, u."subscriptionPlan",
                        u."createdAt", u."lastSignedIn",
-                       COUNT(gp.id)::int AS generations, ls."isConnected" AS linkedin_connected
+                       COALESCE(gp.cnt, 0)::int AS generations,
+                       ls."isConnected" AS linkedin_connected
                 FROM users u
-                LEFT JOIN generated_posts gp ON gp."userId" = u.id
+                LEFT JOIN LATERAL (
+                  SELECT COUNT(*)::int AS cnt FROM generated_posts WHERE "userId" = u.id
+                ) gp ON true
                 LEFT JOIN linkedin_settings ls ON ls."userId" = u.id
                 WHERE u.email ILIKE ${pattern} OR u.name ILIKE ${pattern}
-                GROUP BY u.id, ls."isConnected"
                 ORDER BY u."createdAt" DESC
                 LIMIT ${input.limit} OFFSET ${offset}`
             : pg`
                 SELECT u.id, u.email, u.name, u.role, u."subscriptionPlan",
                        u."createdAt", u."lastSignedIn",
-                       COUNT(gp.id)::int AS generations, ls."isConnected" AS linkedin_connected
+                       COALESCE(gp.cnt, 0)::int AS generations,
+                       ls."isConnected" AS linkedin_connected
                 FROM users u
-                LEFT JOIN generated_posts gp ON gp."userId" = u.id
+                LEFT JOIN LATERAL (
+                  SELECT COUNT(*)::int AS cnt FROM generated_posts WHERE "userId" = u.id
+                ) gp ON true
                 LEFT JOIN linkedin_settings ls ON ls."userId" = u.id
-                GROUP BY u.id, ls."isConnected"
                 ORDER BY u."createdAt" DESC
                 LIMIT ${input.limit} OFFSET ${offset}`,
           pattern

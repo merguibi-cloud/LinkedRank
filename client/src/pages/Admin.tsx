@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link, Redirect } from "wouter";
@@ -157,33 +157,53 @@ export default function Admin() {
 
   const isAdmin = user?.role === "admin";
 
-  // debounce search: reset page and update debounced value
+  // debounce search: properly cancel the previous timer on each keystroke
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSearch = useCallback((val: string) => {
     setSearch(val);
     setUsersPage(1);
-    const t = setTimeout(() => setDebouncedSearch(val), 350);
-    return () => clearTimeout(t);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(val), 350);
   }, []);
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } =
-    trpc.admin.stats.useQuery(undefined, { enabled: isAdmin });
+    trpc.admin.stats.useQuery(undefined, {
+      enabled: isAdmin,
+      staleTime: 5 * 60_000,        // re-use for 5 min; refresh button still works
+      refetchOnWindowFocus: false,   // don't refetch on every alt-tab
+    });
 
   const { data: usersData, isLoading: usersLoading, isFetching: usersFetching, refetch: refetchUsers } =
     trpc.admin.users.useQuery(
       { page: usersPage, limit: PAGE_SIZE.users, search: debouncedSearch || undefined },
-      { enabled: isAdmin && activeTab === "users", keepPreviousData: true },
+      {
+        enabled: isAdmin && activeTab === "users",
+        keepPreviousData: true,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+      },
     );
 
   const { data: failures, isLoading: failuresLoading, isFetching: failuresFetching, refetch: refetchFailures } =
     trpc.admin.autopublishFailures.useQuery(
       { page: apPage, limit: PAGE_SIZE.autopublish },
-      { enabled: isAdmin && activeTab === "autopublish", keepPreviousData: true },
+      {
+        enabled: isAdmin && activeTab === "autopublish",
+        keepPreviousData: true,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+      },
     );
 
   const { data: spendData, isLoading: spendLoading, isFetching: spendFetching, refetch: refetchSpend } =
     trpc.admin.spend.useQuery(
       { page: spendPage, limit: PAGE_SIZE.spend },
-      { enabled: isAdmin && activeTab === "spend", keepPreviousData: true },
+      {
+        enabled: isAdmin && activeTab === "spend",
+        keepPreviousData: true,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+      },
     );
 
   const setRole = trpc.admin.setRole.useMutation({
