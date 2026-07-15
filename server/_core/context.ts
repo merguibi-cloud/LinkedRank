@@ -8,7 +8,7 @@ export type TrpcContext = {
   user: User | null;
 };
 
-const CONTEXT_TIMEOUT_MS = 8_000;
+const CONTEXT_TIMEOUT_MS = 10_000;
 
 export async function createContext(
   opts: CreateExpressContextOptions
@@ -18,9 +18,18 @@ export async function createContext(
   try {
     user = await Promise.race([
       resolveAppUser(opts.req, opts.res),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), CONTEXT_TIMEOUT_MS)),
+      // Throw on timeout so tRPC returns 500 → client retries instead of
+      // treating null as "logged out". Supabase auth errors (invalid token,
+      // etc.) are caught below and mapped to user=null (genuinely signed out).
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(Object.assign(new Error("CONTEXT_TIMEOUT"), { isContextTimeout: true })),
+          CONTEXT_TIMEOUT_MS
+        )
+      ),
     ]);
-  } catch {
+  } catch (err: unknown) {
+    if ((err as { isContextTimeout?: boolean }).isContextTimeout) throw err;
     user = null;
   }
 

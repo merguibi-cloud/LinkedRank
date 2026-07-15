@@ -145,7 +145,7 @@ const PAGE_SIZE = { users: 25, autopublish: 20, spend: 15 } as const;
 // ── Page component ────────────────────────────────────────────────────────────
 
 export default function Admin() {
-  const { user, loading } = useAuth();
+  const { user, loading, error: authError } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
   // per-tab page state
@@ -222,6 +222,21 @@ export default function Admin() {
   if (loading) return (
     <div className="min-h-screen bg-[#05050D] flex items-center justify-center">
       <div className="w-6 h-6 border-2 border-[#614AFC] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  // DB timeout or server error — don't redirect to login, that would log out
+  // a legitimate admin. Show a retry screen instead.
+  if (authError && !user) return (
+    <div className="min-h-screen bg-[#05050D] flex items-center justify-center">
+      <div className="text-center max-w-sm space-y-4">
+        <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/20 flex items-center justify-center">
+          <RefreshCw className="w-6 h-6 text-amber-400" />
+        </div>
+        <p className="text-white font-medium">Connexion au serveur impossible</p>
+        <p className="text-muted-foreground text-sm">Le serveur met du temps à répondre.</p>
+        <Button variant="outline" onClick={() => window.location.reload()}>Réessayer</Button>
+      </div>
     </div>
   );
 
