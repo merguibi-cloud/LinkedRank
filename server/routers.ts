@@ -1369,6 +1369,61 @@ export const appRouter = router({
         };
       }),
 
+    exportUsers: adminProcedure
+      .input(z.object({
+        search: z.string().optional(),
+        role: z.enum(["user", "admin"]).optional(),
+        plan: z.string().min(1).max(32).optional(),
+        linkedin: z.enum(["connected", "disconnected"]).optional(),
+        sort: z.enum(["created_desc", "created_asc", "active_desc", "name_asc", "generations_desc"]).default("created_desc"),
+      }))
+      .mutation(async ({ input }) => {
+        const pg = await getPgClient();
+        if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+        const pattern = input.search ? `%${input.search}%` : null;
+        const role = input.role ?? null;
+        const plan = input.plan ?? null;
+        const linkedinConnected = input.linkedin === "connected" ? true : input.linkedin === "disconnected" ? false : null;
+
+        const rows = await pg`SELECT u.id, u.email, u.name, u.role, u."subscriptionPlan",
+                    u."createdAt", u."lastSignedIn",
+                    COALESCE(gp.cnt, 0)::int AS generations,
+                    COALESCE(ls.linkedin_connected, false) AS linkedin_connected
+             FROM users u
+             LEFT JOIN LATERAL (
+               SELECT COUNT(*)::int AS cnt FROM generated_posts WHERE "userId" = u.id
+             ) gp ON true
+             LEFT JOIN LATERAL (
+               SELECT BOOL_OR("isConnected") AS linkedin_connected
+               FROM linkedin_settings WHERE "userId" = u.id
+             ) ls ON true
+             WHERE (${pattern}::text IS NULL OR u.email ILIKE ${pattern} OR u.name ILIKE ${pattern})
+               AND (${role}::text IS NULL OR u.role = ${role})
+               AND (${plan}::text IS NULL OR u."subscriptionPlan" = ${plan})
+               AND (${linkedinConnected}::boolean IS NULL OR COALESCE(ls.linkedin_connected, false) = ${linkedinConnected})
+             ORDER BY
+               CASE WHEN ${input.sort} = 'created_desc' THEN u."createdAt" END DESC,
+               CASE WHEN ${input.sort} = 'created_asc' THEN u."createdAt" END ASC,
+               CASE WHEN ${input.sort} = 'active_desc' THEN u."lastSignedIn" END DESC,
+               CASE WHEN ${input.sort} = 'name_asc' THEN LOWER(COALESCE(u.name, u.email)) END ASC,
+               CASE WHEN ${input.sort} = 'generations_desc' THEN COALESCE(gp.cnt, 0) END DESC,
+               u.id DESC
+             LIMIT 10000`;
+
+        return rows.map(r => ({
+          id: Number(r.id),
+          email: (r.email as string | null) ?? "",
+          name: (r.name as string | null) ?? "",
+          role: r.role as string,
+          plan: (r.subscriptionPlan as string | null) ?? "",
+          generations: Number(r.generations),
+          linkedinConnected: Boolean(r.linkedin_connected),
+          createdAt: String(r.createdAt),
+          lastSignedIn: String(r.lastSignedIn),
+        }));
+      }),
+
     autopublishFailures: adminProcedure
       .input(z.object({
         page: z.number().int().min(1).default(1),
