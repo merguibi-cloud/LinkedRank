@@ -6,6 +6,7 @@ import {
   Users, FileText, BarChart3, AlertTriangle, Sparkles,
   XCircle, TrendingUp, RefreshCw, CheckCircle2, Linkedin,
   HardDrive, Zap, ChevronLeft, ChevronRight, Search,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -222,6 +223,32 @@ export default function Admin() {
     onSuccess: () => { refetchStats(); refetchUsers(); },
   });
 
+  const exportUsers = trpc.admin.exportUsers.useMutation({
+    onSuccess: rows => {
+      const escapeCsv = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+      const headers = ["ID", "Email", "Nom", "Rôle", "Plan", "Générations IA", "LinkedIn connecté", "Inscription", "Dernière activité"];
+      const csvRows = rows.map(row => [
+        row.id, row.email, row.name, row.role, row.plan, row.generations,
+        row.linkedinConnected ? "Oui" : "Non", row.createdAt, row.lastSignedIn,
+      ]);
+      const csv = `\uFEFF${[headers, ...csvRows].map(row => row.map(escapeCsv).join(",")).join("\n")}`;
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `linkedrank-utilisateurs-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+
+  const handleExportUsers = () => exportUsers.mutate({
+    search: debouncedSearch || undefined,
+    role: roleFilter === "all" ? undefined : roleFilter,
+    plan: planFilter === "all" ? undefined : planFilter,
+    linkedin: linkedinFilter === "all" ? undefined : linkedinFilter,
+    sort: usersSort,
+  });
+
   const refreshActiveTab = () => {
     if (activeTab === "users") { refetchUsers(); return; }
     if (activeTab === "autopublish") { refetchFailures(); refetchStats(); return; }
@@ -424,7 +451,12 @@ export default function Admin() {
               <select value={usersSort} onChange={e => { setUsersSort(e.target.value as typeof usersSort); setUsersPage(1); }} className="h-9 rounded-md border border-white/10 bg-card px-3 text-sm text-white">
                 <option value="created_desc">Plus récents</option><option value="created_asc">Plus anciens</option><option value="active_desc">Activité récente</option><option value="name_asc">Nom A–Z</option><option value="generations_desc">Plus de générations</option>
               </select>
+              <Button variant="outline" className="h-9 border-white/10 gap-2" onClick={handleExportUsers} disabled={exportUsers.isPending}>
+                <Download className="w-4 h-4" />
+                {exportUsers.isPending ? "Export…" : "Exporter CSV"}
+              </Button>
             </div>
+            {exportUsers.error && <p className="text-xs text-red-400">Échec de l'export : {exportUsers.error.message}</p>}
 
             {usersLoading ? (
               <div className="rounded-2xl border border-white/10 overflow-hidden">
