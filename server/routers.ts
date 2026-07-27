@@ -297,6 +297,8 @@ export const appRouter = router({
           additionalInstructions: input.additionalInstructions,
           postType: input.postType,
           learningContext,
+          userId,
+          endpoint: "post_generation",
         };
 
         const generated = await generateLinkedInPost(request);
@@ -382,6 +384,8 @@ export const appRouter = router({
           userContext,
           additionalInstructions: input.additionalInstructions,
           learningContext,
+          userId,
+          endpoint: "post_batch_generation",
         };
 
         const posts = await generateMultiplePosts(request, input.count);
@@ -1232,67 +1236,61 @@ export const appRouter = router({
       const pg = await getPgClient();
       if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      const [[userStats], [genStats], [apStats], [spendStats], [mediaStats], [carouselStats]] =
-        await Promise.all([
-          pg`SELECT
-              COUNT(*)::int                                                                        AS total,
-              COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int             AS last_24h,
-              COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int               AS last_7d,
-              COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '24 hours')::int          AS active_24h,
-              COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '7 days')::int            AS active_7d
-             FROM users`,
-          pg`SELECT
-              COUNT(*)::int                                                                        AS total,
-              COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int             AS last_24h,
-              COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int               AS last_7d,
-              COUNT(DISTINCT "userId")::int                                                       AS unique_users
-             FROM generated_posts`,
-          pg`SELECT
-              COUNT(*) FILTER (WHERE status = 'published')::int AS published,
-              COUNT(*) FILTER (WHERE status = 'failed')::int    AS failed,
-              COUNT(*) FILTER (WHERE status = 'pending')::int   AS pending
-             FROM auto_publish_queue`,
-          pg`SELECT
-              COUNT(*)::int                                                                        AS calls,
-              COALESCE(SUM("totalTokens"), 0)::int                                                AS total_tokens,
-              COALESCE(SUM("costUsd"::numeric), 0)                                                AS total_cost,
-              COALESCE(SUM("costUsd"::numeric) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days'), 0) AS cost_7d
-             FROM token_usage`,
-          pg`SELECT COUNT(*)::int AS total_files, COALESCE(SUM("fileSize"), 0)::bigint AS total_bytes FROM media_library`,
-          pg`SELECT COUNT(*)::int AS total FROM generated_carousels`,
-        ]);
+      // Keep the overview to one database round trip. In production the pool is
+      // intentionally small, so launching six queries concurrently can leave a
+      // serverless request waiting for connections during traffic spikes.
+      const [summary] = await pg`SELECT
+        (SELECT COUNT(*)::int FROM users) AS users_total,
+        (SELECT COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int FROM users) AS users_last_24h,
+        (SELECT COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int FROM users) AS users_last_7d,
+        (SELECT COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '24 hours')::int FROM users) AS users_active_24h,
+        (SELECT COUNT(*) FILTER (WHERE "lastSignedIn" > NOW() - INTERVAL '7 days')::int FROM users) AS users_active_7d,
+        (SELECT COUNT(*)::int FROM generated_posts) AS generations_total,
+        (SELECT COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '24 hours')::int FROM generated_posts) AS generations_last_24h,
+        (SELECT COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int FROM generated_posts) AS generations_last_7d,
+        (SELECT COUNT(DISTINCT "userId")::int FROM generated_posts) AS generations_unique_users,
+        (SELECT COUNT(*) FILTER (WHERE status = 'published')::int FROM auto_publish_queue) AS autopublish_published,
+        (SELECT COUNT(*) FILTER (WHERE status = 'failed')::int FROM auto_publish_queue) AS autopublish_failed,
+        (SELECT COUNT(*) FILTER (WHERE status = 'pending')::int FROM auto_publish_queue) AS autopublish_pending,
+        (SELECT COUNT(*)::int FROM token_usage) AS spend_calls,
+        (SELECT COALESCE(SUM("totalTokens"), 0)::int FROM token_usage) AS spend_total_tokens,
+        (SELECT COALESCE(SUM("costUsd"::numeric), 0) FROM token_usage) AS spend_total_cost,
+        (SELECT COALESCE(SUM("costUsd"::numeric) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days'), 0) FROM token_usage) AS spend_cost_7d,
+        (SELECT COUNT(*)::int FROM media_library) AS storage_total_files,
+        (SELECT COALESCE(SUM("fileSize"), 0)::bigint FROM media_library) AS storage_total_bytes,
+        (SELECT COUNT(*)::int FROM generated_carousels) AS carousels_total`;
 
       return {
         users: {
-          total: Number(userStats.total),
-          last24h: Number(userStats.last_24h),
-          last7d: Number(userStats.last_7d),
-          active24h: Number(userStats.active_24h),
-          active7d: Number(userStats.active_7d),
+          total: Number(summary.users_total),
+          last24h: Number(summary.users_last_24h),
+          last7d: Number(summary.users_last_7d),
+          active24h: Number(summary.users_active_24h),
+          active7d: Number(summary.users_active_7d),
         },
         generations: {
-          total: Number(genStats.total),
-          last24h: Number(genStats.last_24h),
-          last7d: Number(genStats.last_7d),
-          uniqueUsers: Number(genStats.unique_users),
+          total: Number(summary.generations_total),
+          last24h: Number(summary.generations_last_24h),
+          last7d: Number(summary.generations_last_7d),
+          uniqueUsers: Number(summary.generations_unique_users),
         },
         autoPublish: {
-          published: Number(apStats.published),
-          failed: Number(apStats.failed),
-          pending: Number(apStats.pending),
+          published: Number(summary.autopublish_published),
+          failed: Number(summary.autopublish_failed),
+          pending: Number(summary.autopublish_pending),
         },
         spend: {
-          calls: Number(spendStats.calls),
-          totalTokens: Number(spendStats.total_tokens),
-          totalCost: Number(spendStats.total_cost).toFixed(4),
-          cost7d: Number(spendStats.cost_7d).toFixed(4),
+          calls: Number(summary.spend_calls),
+          totalTokens: Number(summary.spend_total_tokens),
+          totalCost: Number(summary.spend_total_cost).toFixed(4),
+          cost7d: Number(summary.spend_cost_7d).toFixed(4),
         },
         storage: {
-          files: Number(mediaStats.total_files),
-          bytes: Number(mediaStats.total_bytes),
-          mb: Math.round(Number(mediaStats.total_bytes) / 1024 / 1024),
+          files: Number(summary.storage_total_files),
+          bytes: Number(summary.storage_total_bytes),
+          mb: Math.round(Number(summary.storage_total_bytes) / 1024 / 1024),
         },
-        carousels: Number(carouselStats.total),
+        carousels: Number(summary.carousels_total),
       };
     }),
 
@@ -1301,6 +1299,10 @@ export const appRouter = router({
         page: z.number().int().min(1).default(1),
         limit: z.number().int().min(1).max(100).default(25),
         search: z.string().optional(),
+        role: z.enum(["user", "admin"]).optional(),
+        plan: z.string().min(1).max(32).optional(),
+        linkedin: z.enum(["connected", "disconnected"]).optional(),
+        sort: z.enum(["created_desc", "created_asc", "active_desc", "name_asc", "generations_desc"]).default("created_desc"),
       }))
       .query(async ({ input }) => {
         const pg = await getPgClient();
@@ -1308,39 +1310,45 @@ export const appRouter = router({
 
         const offset = (input.page - 1) * input.limit;
         const pattern = input.search ? `%${input.search}%` : null;
+        const role = input.role ?? null;
+        const plan = input.plan ?? null;
+        const linkedinConnected = input.linkedin === "connected" ? true : input.linkedin === "disconnected" ? false : null;
 
-        // Lateral subquery for generation count — avoids GROUP BY over all rows
-        // and lets Postgres use the index on generated_posts."userId" per-user.
         const [rows, [countRow]] = await Promise.all([
-          pattern
-            ? pg`
-                SELECT u.id, u.email, u.name, u.role, u."subscriptionPlan",
-                       u."createdAt", u."lastSignedIn",
-                       COALESCE(gp.cnt, 0)::int AS generations,
-                       ls."isConnected" AS linkedin_connected
-                FROM users u
-                LEFT JOIN LATERAL (
-                  SELECT COUNT(*)::int AS cnt FROM generated_posts WHERE "userId" = u.id
-                ) gp ON true
-                LEFT JOIN linkedin_settings ls ON ls."userId" = u.id
-                WHERE u.email ILIKE ${pattern} OR u.name ILIKE ${pattern}
-                ORDER BY u."createdAt" DESC
-                LIMIT ${input.limit} OFFSET ${offset}`
-            : pg`
-                SELECT u.id, u.email, u.name, u.role, u."subscriptionPlan",
-                       u."createdAt", u."lastSignedIn",
-                       COALESCE(gp.cnt, 0)::int AS generations,
-                       ls."isConnected" AS linkedin_connected
-                FROM users u
-                LEFT JOIN LATERAL (
-                  SELECT COUNT(*)::int AS cnt FROM generated_posts WHERE "userId" = u.id
-                ) gp ON true
-                LEFT JOIN linkedin_settings ls ON ls."userId" = u.id
-                ORDER BY u."createdAt" DESC
-                LIMIT ${input.limit} OFFSET ${offset}`,
-          pattern
-            ? pg`SELECT COUNT(*)::int AS total FROM users WHERE email ILIKE ${pattern} OR name ILIKE ${pattern}`
-            : pg`SELECT COUNT(*)::int AS total FROM users`,
+          pg`SELECT u.id, u.email, u.name, u.role, u."subscriptionPlan",
+                    u."createdAt", u."lastSignedIn",
+                    COALESCE(gp.cnt, 0)::int AS generations,
+                    COALESCE(ls.linkedin_connected, false) AS linkedin_connected
+             FROM users u
+             LEFT JOIN LATERAL (
+               SELECT COUNT(*)::int AS cnt FROM generated_posts WHERE "userId" = u.id
+             ) gp ON true
+             LEFT JOIN LATERAL (
+               SELECT BOOL_OR("isConnected") AS linkedin_connected
+               FROM linkedin_settings WHERE "userId" = u.id
+             ) ls ON true
+             WHERE (${pattern}::text IS NULL OR u.email ILIKE ${pattern} OR u.name ILIKE ${pattern})
+               AND (${role}::text IS NULL OR u.role = ${role})
+               AND (${plan}::text IS NULL OR u."subscriptionPlan" = ${plan})
+               AND (${linkedinConnected}::boolean IS NULL OR COALESCE(ls.linkedin_connected, false) = ${linkedinConnected})
+             ORDER BY
+               CASE WHEN ${input.sort} = 'created_desc' THEN u."createdAt" END DESC,
+               CASE WHEN ${input.sort} = 'created_asc' THEN u."createdAt" END ASC,
+               CASE WHEN ${input.sort} = 'active_desc' THEN u."lastSignedIn" END DESC,
+               CASE WHEN ${input.sort} = 'name_asc' THEN LOWER(COALESCE(u.name, u.email)) END ASC,
+               CASE WHEN ${input.sort} = 'generations_desc' THEN COALESCE(gp.cnt, 0) END DESC,
+               u.id DESC
+             LIMIT ${input.limit} OFFSET ${offset}`,
+          pg`SELECT COUNT(*)::int AS total
+             FROM users u
+             LEFT JOIN LATERAL (
+               SELECT BOOL_OR("isConnected") AS linkedin_connected
+               FROM linkedin_settings WHERE "userId" = u.id
+             ) ls ON true
+             WHERE (${pattern}::text IS NULL OR u.email ILIKE ${pattern} OR u.name ILIKE ${pattern})
+               AND (${role}::text IS NULL OR u.role = ${role})
+               AND (${plan}::text IS NULL OR u."subscriptionPlan" = ${plan})
+               AND (${linkedinConnected}::boolean IS NULL OR COALESCE(ls.linkedin_connected, false) = ${linkedinConnected})`,
         ]);
 
         return {
@@ -1410,24 +1418,26 @@ export const appRouter = router({
 
         const offset = (input.page - 1) * input.limit;
 
-        const [byModel, byEndpoint, topUsers, [countRow]] = await Promise.all([
-          pg`SELECT model, COUNT(*)::int AS calls, SUM("totalTokens")::int AS tokens, SUM("costUsd"::numeric) AS cost
-             FROM token_usage GROUP BY model ORDER BY cost DESC`,
-          pg`SELECT COALESCE(endpoint, 'unknown') AS endpoint, COUNT(*)::int AS calls, SUM("costUsd"::numeric) AS cost
-             FROM token_usage GROUP BY endpoint ORDER BY cost DESC LIMIT 10`,
-          pg`SELECT u.email, u.name, COUNT(*)::int AS calls, SUM(tu."totalTokens")::int AS tokens, SUM(tu."costUsd"::numeric) AS cost
-             FROM token_usage tu
-             LEFT JOIN users u ON u.id = tu."userId"
-             GROUP BY tu."userId", u.email, u.name
-             ORDER BY cost DESC
-             LIMIT ${input.limit} OFFSET ${offset}`,
-          pg`SELECT COUNT(DISTINCT "userId")::int AS total FROM token_usage`,
-        ]);
+        // Run these sequentially: the production pool has only two connections,
+        // and four concurrent queries can stall a serverless invocation.
+        const byModel = await pg`SELECT model, COUNT(*)::int AS calls, SUM("totalTokens")::int AS tokens, SUM("costUsd"::numeric) AS cost
+          FROM token_usage GROUP BY model ORDER BY cost DESC`;
+        const byEndpoint = await pg`SELECT COALESCE(endpoint, 'unknown') AS endpoint, COUNT(*)::int AS calls, SUM("costUsd"::numeric) AS cost
+          FROM token_usage GROUP BY endpoint ORDER BY cost DESC LIMIT 10`;
+        const topUsers = await pg`SELECT u.email, u.name, COUNT(*)::int AS calls, SUM(tu."totalTokens")::int AS tokens, SUM(tu."costUsd"::numeric) AS cost
+          FROM token_usage tu
+          LEFT JOIN users u ON u.id = tu."userId"
+          GROUP BY tu."userId", u.email, u.name
+          ORDER BY cost DESC
+          LIMIT ${input.limit} OFFSET ${offset}`;
+        const [countRow] = await pg`SELECT COUNT(*)::int AS total FROM (
+          SELECT "userId" FROM token_usage GROUP BY "userId"
+        ) tracked_users`;
 
         return {
           byModel: byModel.map(r => ({ model: r.model as string, calls: Number(r.calls), tokens: Number(r.tokens), cost: Number(r.cost).toFixed(4) })),
           byEndpoint: byEndpoint.map(r => ({ endpoint: r.endpoint as string, calls: Number(r.calls), cost: Number(r.cost).toFixed(4) })),
-          topUsers: topUsers.map(r => ({ email: r.email as string, name: r.name as string | null, calls: Number(r.calls), tokens: Number(r.tokens), cost: Number(r.cost).toFixed(4) })),
+          topUsers: topUsers.map(r => ({ email: (r.email as string | null) ?? "Anonyme", name: r.name as string | null, calls: Number(r.calls), tokens: Number(r.tokens), cost: Number(r.cost).toFixed(4) })),
           total: Number(countRow.total),
           page: input.page,
           limit: input.limit,

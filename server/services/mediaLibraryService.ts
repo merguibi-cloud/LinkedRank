@@ -99,7 +99,8 @@ async function getUserContext(userId: number): Promise<UserContext> {
 export async function analyzeMediaWithAI(
   fileUrl: string,
   mediaType: "image" | "video" | "document",
-  title?: string
+  title?: string,
+  userId?: number
 ): Promise<{ description: string; suggestedTheme: string; tags: string[] }> {
   if (mediaType === "document") {
     return {
@@ -141,6 +142,8 @@ export async function analyzeMediaWithAI(
       maxTokens: 1024,
       temperature: 0.4,
       responseFormat: { type: "json_object" },
+      userId,
+      endpoint: "media_analysis",
     });
 
     const raw = response.choices[0]?.message?.content;
@@ -188,7 +191,7 @@ export async function uploadMedia(
     input.mimeType
   );
 
-  const aiAnalysis = await analyzeMediaWithAI(fileUrl, mediaType, input.title);
+  const aiAnalysis = await analyzeMediaWithAI(fileUrl, mediaType, input.title, userId);
 
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -356,6 +359,8 @@ export async function generatePostForMedia(
     userContext,
     postType: options.postType ?? "insight",
     additionalInstructions: options.additionalInstructions,
+    userId,
+    endpoint: "media_post_generation",
     media: {
       id: media.id,
       title: media.title ?? undefined,
@@ -490,6 +495,8 @@ ${JSON.stringify(mediaSummaries)}`,
       maxTokens: 1024,
       temperature: 0.3,
       responseFormat: { type: "json_object" },
+      userId,
+      endpoint: "media_suggestion",
     });
 
     const raw = response.choices[0]?.message?.content;
@@ -531,7 +538,7 @@ export async function reanalyzeMedia(userId: number, id: number): Promise<MediaI
   const media = await getMediaById(userId, id);
   if (!media) return null;
 
-  const analysis = await analyzeMediaWithAI(media.fileUrl, media.mediaType, media.title ?? undefined);
+  const analysis = await analyzeMediaWithAI(media.fileUrl, media.mediaType, media.title ?? undefined, userId);
 
   const db = await getDb();
   if (!db) throw new Error("Database not available");

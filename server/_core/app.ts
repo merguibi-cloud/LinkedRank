@@ -11,7 +11,6 @@ let workersStarted = false;
 
 export function startBackgroundWorkers() {
   if (workersStarted) return;
-  workersStarted = true;
 
   if (process.env.VERCEL) {
     console.log(
@@ -19,6 +18,16 @@ export function startBackgroundWorkers() {
     );
     return;
   }
+
+  const workersExplicitlyEnabled = process.env.RUN_BACKGROUND_WORKERS === "true";
+  if (process.env.NODE_ENV === "development" && !workersExplicitlyEnabled) {
+    console.log(
+      "[Workers] Désactivés en développement — définissez RUN_BACKGROUND_WORKERS=true pour les lancer"
+    );
+    return;
+  }
+
+  workersStarted = true;
 
   startAutoPublishWorker();
   startAgentScheduler();
