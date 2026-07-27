@@ -152,6 +152,10 @@ export default function Admin() {
   const [usersPage, setUsersPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | "user" | "admin">("all");
+  const [planFilter, setPlanFilter] = useState("all");
+  const [linkedinFilter, setLinkedinFilter] = useState<"all" | "connected" | "disconnected">("all");
+  const [usersSort, setUsersSort] = useState<"created_desc" | "created_asc" | "active_desc" | "name_asc" | "generations_desc">("created_desc");
   const [apPage, setApPage] = useState(1);
   const [spendPage, setSpendPage] = useState(1);
 
@@ -166,7 +170,7 @@ export default function Admin() {
     debounceRef.current = setTimeout(() => setDebouncedSearch(val), 350);
   }, []);
 
-  const { data: stats, isLoading: statsLoading, refetch: refetchStats } =
+  const { data: stats, isLoading: statsLoading, error: statsError, isFetching: statsFetching, refetch: refetchStats } =
     trpc.admin.stats.useQuery(undefined, {
       enabled: isAdmin,
       staleTime: 5 * 60_000,        // re-use for 5 min; refresh button still works
@@ -175,10 +179,18 @@ export default function Admin() {
 
   const { data: usersData, isLoading: usersLoading, isFetching: usersFetching, refetch: refetchUsers } =
     trpc.admin.users.useQuery(
-      { page: usersPage, limit: PAGE_SIZE.users, search: debouncedSearch || undefined },
+      {
+        page: usersPage,
+        limit: PAGE_SIZE.users,
+        search: debouncedSearch || undefined,
+        role: roleFilter === "all" ? undefined : roleFilter,
+        plan: planFilter === "all" ? undefined : planFilter,
+        linkedin: linkedinFilter === "all" ? undefined : linkedinFilter,
+        sort: usersSort,
+      },
       {
         enabled: isAdmin && activeTab === "users",
-        keepPreviousData: true,
+        placeholderData: previousData => previousData,
         staleTime: 60_000,
         refetchOnWindowFocus: false,
       },
@@ -189,18 +201,18 @@ export default function Admin() {
       { page: apPage, limit: PAGE_SIZE.autopublish },
       {
         enabled: isAdmin && activeTab === "autopublish",
-        keepPreviousData: true,
+        placeholderData: previousData => previousData,
         staleTime: 60_000,
         refetchOnWindowFocus: false,
       },
     );
 
-  const { data: spendData, isLoading: spendLoading, isFetching: spendFetching, refetch: refetchSpend } =
+  const { data: spendData, isLoading: spendLoading, error: spendError, isFetching: spendFetching, refetch: refetchSpend } =
     trpc.admin.spend.useQuery(
       { page: spendPage, limit: PAGE_SIZE.spend },
       {
         enabled: isAdmin && activeTab === "spend",
-        keepPreviousData: true,
+        placeholderData: previousData => previousData,
         staleTime: 60_000,
         refetchOnWindowFocus: false,
       },
@@ -310,6 +322,18 @@ export default function Admin() {
                   </div>
                 </div>
               </>
+            ) : statsError ? (
+              <div className="p-8 rounded-2xl border border-red-500/20 bg-red-500/5 text-center">
+                <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-3" />
+                <h2 className="text-white font-semibold mb-1">Impossible de charger les statistiques</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {statsError.message || "La base de données ne répond pas."}
+                </p>
+                <Button variant="outline" disabled={statsFetching} onClick={() => refetchStats()}>
+                  <RefreshCw className={`w-4 h-4 mr-2 ${statsFetching ? "animate-spin" : ""}`} />
+                  Réessayer
+                </Button>
+              </div>
             ) : stats ? (
               <>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -383,14 +407,23 @@ export default function Admin() {
         {activeTab === "users" && (
           <div className="space-y-4">
             {/* Search */}
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Email ou nom…"
-                value={search}
-                onChange={e => handleSearch(e.target.value)}
-                className="pl-9 bg-card/50 border-white/10"
-              />
+            <div className="flex flex-wrap gap-2 items-center">
+              <div className="relative min-w-[240px] flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input placeholder="Email ou nom…" value={search} onChange={e => handleSearch(e.target.value)} className="pl-9 bg-card/50 border-white/10" />
+              </div>
+              <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value as typeof roleFilter); setUsersPage(1); }} className="h-9 rounded-md border border-white/10 bg-card px-3 text-sm text-white">
+                <option value="all">Tous les rôles</option><option value="user">Utilisateurs</option><option value="admin">Admins</option>
+              </select>
+              <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); setUsersPage(1); }} className="h-9 rounded-md border border-white/10 bg-card px-3 text-sm text-white">
+                <option value="all">Tous les plans</option><option value="starter">Starter</option><option value="pro">Pro</option><option value="business">Business</option>
+              </select>
+              <select value={linkedinFilter} onChange={e => { setLinkedinFilter(e.target.value as typeof linkedinFilter); setUsersPage(1); }} className="h-9 rounded-md border border-white/10 bg-card px-3 text-sm text-white">
+                <option value="all">Tous LinkedIn</option><option value="connected">Connectés</option><option value="disconnected">Non connectés</option>
+              </select>
+              <select value={usersSort} onChange={e => { setUsersSort(e.target.value as typeof usersSort); setUsersPage(1); }} className="h-9 rounded-md border border-white/10 bg-card px-3 text-sm text-white">
+                <option value="created_desc">Plus récents</option><option value="created_asc">Plus anciens</option><option value="active_desc">Activité récente</option><option value="name_asc">Nom A–Z</option><option value="generations_desc">Plus de générations</option>
+              </select>
             </div>
 
             {usersLoading ? (
@@ -539,6 +572,18 @@ export default function Admin() {
                   </div>
                 ))}
               </div>
+            ) : spendError ? (
+              <div className="p-8 rounded-2xl border border-red-500/20 bg-red-500/5 text-center">
+                <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-3" />
+                <h2 className="text-white font-semibold mb-1">Impossible de charger les coûts IA</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {spendError.message || "La base de données ne répond pas."}
+                </p>
+                <Button variant="outline" disabled={spendFetching} onClick={() => refetchSpend()}>
+                  <RefreshCw className={`w-4 h-4 mr-2 ${spendFetching ? "animate-spin" : ""}`} />
+                  Réessayer
+                </Button>
+              </div>
             ) : spendData ? (
               <>
                 {spendData.byModel.length === 0 && (
@@ -597,6 +642,11 @@ export default function Admin() {
                     <Pagination page={spendData.page} total={spendData.total} limit={spendData.limit} onPage={setSpendPage} isFetching={spendFetching} />
                   </div>
                 </div>
+                {spendData.byEndpoint.length === 1 && spendData.byEndpoint[0]?.endpoint === "unknown" && (
+                  <p className="text-xs text-amber-400/90">
+                    Les données historiques ne contiennent ni utilisateur ni fonctionnalité : le même total apparaît donc dans les trois regroupements. Les nouveaux appels seront attribués correctement.
+                  </p>
+                )}
               </>
             ) : null}
           </div>

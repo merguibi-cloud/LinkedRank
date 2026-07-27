@@ -45,6 +45,8 @@ export interface GenerationRequest {
   additionalInstructions?: string;
   postType?: "story" | "tips" | "question" | "announcement" | "motivation" | "insight";
   learningContext?: LearningContext;
+  userId?: number;
+  endpoint?: string;
 }
 
 export interface MediaContext {
@@ -240,6 +242,8 @@ ${additionalInstructions ? `\nInstructions supplémentaires: ${additionalInstruc
       maxTokens: 8192,
       temperature: 0.8,
       responseFormat: { type: "json_object" },
+      userId: request.userId,
+      endpoint: request.endpoint ?? "post_generation",
     });
 
     const finishReason = response.choices[0]?.finish_reason;
@@ -337,6 +341,8 @@ ${additionalInstructions ? `\nInstructions: ${additionalInstructions}` : ""}`;
     maxTokens: 8192,
     temperature: 0.8,
     responseFormat: { type: "json_object" },
+    userId: request.userId,
+    endpoint: request.endpoint ?? "media_post_generation",
   });
 
   const content = extractMessageText(response.choices[0]?.message?.content);

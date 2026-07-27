@@ -26,6 +26,7 @@ export async function buildImagePromptFromPost(options: {
   title: string;
   suggestedMedia?: string;
   visualStyle?: string;
+  userId?: number;
 }): Promise<string> {
   const styleHint =
     VISUAL_STYLE_HINTS[options.visualStyle ?? "professional"] ??
@@ -57,6 +58,8 @@ ${options.suggestedMedia ? `\nDirection visuelle suggérée: ${options.suggested
     ],
     maxTokens: 300,
     temperature: 0.7,
+    userId: options.userId,
+    endpoint: "image_prompt_generation",
   });
 
   const prompt = extractText(response.choices[0]?.message?.content);
@@ -82,7 +85,7 @@ export async function generatePostImage(
   mediaLibraryId: number;
   prompt: string;
 }> {
-  const prompt = await buildImagePromptFromPost(options);
+  const prompt = await buildImagePromptFromPost({ ...options, userId });
   const buffer = await generateImageBuffer({
     prompt,
     size: normalizeImageSize(options.imageSize),
