@@ -10,6 +10,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // ── Skeleton helpers ──────────────────────────────────────────────────────────
 
@@ -165,6 +174,7 @@ export default function Admin() {
   const [inviteLastName, setInviteLastName] = useState("");
   const [invitePhoneNumber, setInvitePhoneNumber] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; email: string } | null>(null);
 
   const isAdmin = user?.role === "admin";
 
@@ -231,6 +241,7 @@ export default function Admin() {
 
   const deleteUser = trpc.admin.deleteUser.useMutation({
     onSuccess: () => {
+      setDeleteTarget(null);
       if (usersData?.rows.length === 1 && usersPage > 1) {
         setUsersPage(page => page - 1);
       } else {
@@ -242,11 +253,8 @@ export default function Admin() {
 
   const handleDeleteUser = (target: { id: number; email: string }) => {
     if (target.id === user?.id) return;
-    const confirmed = window.confirm(
-      `Supprimer définitivement le compte ${target.email} ?\n\n` +
-      "Son accès et toutes ses données LinkedRank seront supprimés. Cette action est irréversible.",
-    );
-    if (confirmed) deleteUser.mutate({ userId: target.id });
+    deleteUser.reset();
+    setDeleteTarget(target);
   };
 
   const exportUsers = trpc.admin.exportUsers.useMutation({
@@ -341,6 +349,62 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background">
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={open => {
+          if (!open && !deleteUser.isPending) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="border-white/10 bg-[#0B0B16] shadow-2xl shadow-black/50 sm:max-w-md">
+          <AlertDialogHeader className="items-center text-center sm:text-center">
+            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-red-500/20 bg-red-500/10">
+              <Trash2 className="h-5 w-5 text-red-400" />
+            </div>
+            <AlertDialogTitle className="text-xl text-white">
+              Supprimer cet utilisateur ?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-center leading-relaxed">
+              <span className="block">
+                Le compte <strong className="font-medium text-white">{deleteTarget?.email}</strong> sera supprimé définitivement.
+              </span>
+              <span className="block">
+                Son accès et toutes ses données LinkedRank seront supprimés. Cette action est irréversible.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {deleteUser.error && (
+            <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-center text-xs text-red-300">
+              {deleteUser.error.message}
+            </p>
+          )}
+
+          <AlertDialogFooter className="mt-2 sm:justify-center">
+            <AlertDialogCancel
+              disabled={deleteUser.isPending}
+              className="border-white/10 bg-transparent text-white hover:bg-white/5"
+            >
+              Annuler
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              disabled={deleteUser.isPending || !deleteTarget}
+              onClick={() => {
+                if (deleteTarget) deleteUser.mutate({ userId: deleteTarget.id });
+              }}
+              className="gap-2 bg-red-600 text-white hover:bg-red-500"
+            >
+              {deleteUser.isPending ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              {deleteUser.isPending ? "Suppression…" : "Supprimer définitivement"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="container py-8 max-w-7xl">
 
         {/* Header */}
