@@ -1492,10 +1492,33 @@ export const appRouter = router({
             );
             if (existing) {
               if (existing.email_confirmed_at) {
-                throw new TRPCError({
-                  code: "CONFLICT",
-                  message: "Un compte actif existe déjà avec cet email",
+                if (applicationUser) {
+                  throw new TRPCError({
+                    code: "CONFLICT",
+                    message: "Un compte actif existe déjà avec cet email",
+                  });
+                }
+
+                // The invite was verified by Supabase, but the user never
+                // completed activation and therefore has no application row.
+                // Preserve the Auth identity and send a fresh password link.
+                const { error: recoveryError } = await supabase.auth.resetPasswordForEmail(email, {
+                  redirectTo: `${redirectBase}/reset-password?invite=1`,
                 });
+                if (recoveryError) {
+                  throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: `Impossible de renvoyer le lien d'activation : ${recoveryError.message}`,
+                  });
+                }
+
+                return {
+                  success: true,
+                  email,
+                  invitationId: existing.id,
+                  reinvited: true,
+                  recovery: true,
+                };
               }
               pendingUserId = existing.id;
               break;
@@ -1530,7 +1553,13 @@ export const appRouter = router({
           });
         }
 
-        return { success: true, email, invitationId: data.user?.id ?? null, reinvited };
+        return {
+          success: true,
+          email,
+          invitationId: data.user?.id ?? null,
+          reinvited,
+          recovery: false,
+        };
       }),
 
     autopublishFailures: adminProcedure
