@@ -25,7 +25,13 @@ export default function ResetPassword() {
     }
 
     const params = new URLSearchParams(window.location.search);
-    if (params.get("error") || params.get("error_code")) {
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    if (
+      params.get("error") ||
+      params.get("error_code") ||
+      hashParams.get("error") ||
+      hashParams.get("error_code")
+    ) {
       setVerifyState("invalid");
       return;
     }
@@ -51,6 +57,28 @@ export default function ResetPassword() {
           return;
         }
         window.history.replaceState({}, document.title, window.location.pathname);
+        markReady();
+        return;
+      }
+
+      // Supabase invitation links use an implicit session in the URL fragment.
+      // The shared browser client deliberately disables automatic URL detection,
+      // so accept and persist that invite session explicitly here.
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (error) {
+          if (!settled) {
+            settled = true;
+            setVerifyState("invalid");
+          }
+          return;
+        }
+        window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
         markReady();
         return;
       }

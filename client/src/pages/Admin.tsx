@@ -285,7 +285,11 @@ export default function Admin() {
 
   const inviteUser = trpc.admin.inviteUser.useMutation({
     onSuccess: result => {
-      setInviteSuccess(`Invitation envoyée à ${result.email}`);
+      setInviteSuccess(
+        result.reinvited
+          ? `Nouvelle invitation envoyée à ${result.email}`
+          : `Invitation envoyée à ${result.email}`,
+      );
       setInviteEmail("");
       setInviteFirstName("");
       setInviteLastName("");
