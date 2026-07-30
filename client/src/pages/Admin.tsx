@@ -567,6 +567,8 @@ export default function Admin() {
                   </p>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-3">
+                  <Input required placeholder="Prénom" value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} className="bg-card/50 border-white/10" />
+                  <Input required placeholder="Nom" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} className="bg-card/50 border-white/10" />
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
@@ -578,8 +580,6 @@ export default function Admin() {
                       className="pl-9 bg-card/50 border-white/10"
                     />
                   </div>
-                  <Input required placeholder="Prénom" value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} className="bg-card/50 border-white/10" />
-                  <Input required placeholder="Nom" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} className="bg-card/50 border-white/10" />
                   <Input required type="tel" placeholder="+212 6 00 00 00 00" value={invitePhoneNumber} onChange={e => setInvitePhoneNumber(e.target.value)} className="bg-card/50 border-white/10" />
                 </div>
                 <div className="flex items-center gap-3">
