@@ -23,6 +23,9 @@ export const users = pgTable("users", {
   /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
+  firstName: varchar("firstName", { length: 120 }),
+  lastName: varchar("lastName", { length: 120 }),
+  phoneNumber: varchar("phoneNumber", { length: 32 }),
   email: varchar("email", { length: 320 }),
   passwordHash: text("passwordHash"),
   loginMethod: varchar("loginMethod", { length: 64 }),

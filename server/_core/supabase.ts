@@ -35,6 +35,30 @@ export function createSupabaseServerClient(req: Request, res: Response) {
   });
 }
 
+export function isInvalidRefreshTokenError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const value = error as { code?: string; message?: string };
+  return (
+    value.code === "refresh_token_not_found" ||
+    /invalid refresh token|refresh token not found/i.test(value.message ?? "")
+  );
+}
+
+export function clearSupabaseAuthCookies(req: Request, res: Response) {
+  const parsed = parseCookieHeader(req.headers.cookie ?? "");
+  for (const name of Object.keys(parsed)) {
+    if (!name.startsWith("sb-") || !name.includes("-auth-token")) continue;
+    res.clearCookie(name, {
+      path: "/",
+      sameSite: "lax",
+      secure:
+        req.secure ||
+        req.headers["x-forwarded-proto"] === "https" ||
+        process.env.NODE_ENV === "production",
+    });
+  }
+}
+
 async function resolveLegacyUser(req: Request): Promise<User | null> {
   try {
     return await sdk.authenticateRequest(req);
@@ -84,12 +108,23 @@ export async function resolveAppUser(
           (supabaseUser.user_metadata?.name as string | undefined) ??
           (supabaseUser.user_metadata?.full_name as string | undefined) ??
           null;
+        const firstName =
+          (supabaseUser.user_metadata?.first_name as string | undefined) ?? null;
+        const lastName =
+          (supabaseUser.user_metadata?.last_name as string | undefined) ?? null;
+        const phoneNumber =
+          (supabaseUser.user_metadata?.phone_number as string | undefined) ??
+          supabaseUser.phone ??
+          null;
 
         // upsert + read in parallel-ish: upsert first, then read back
         await upsertUser({
           openId,
           email: supabaseUser.email ?? null,
           name,
+          firstName,
+          lastName,
+          phoneNumber,
           loginMethod: "supabase",
           lastSignedIn: new Date(),
         });
@@ -99,7 +134,11 @@ export async function resolveAppUser(
         return user;
       }
     } catch (error) {
-      console.warn("[Supabase] resolveAppUser failed, falling back to legacy session:", error);
+      if (isInvalidRefreshTokenError(error)) {
+        clearSupabaseAuthCookies(req, res);
+      } else {
+        console.warn("[Supabase] resolveAppUser failed, falling back to legacy session:", error);
+      }
     }
   }
 

@@ -6,7 +6,7 @@ import {
   Users, FileText, BarChart3, AlertTriangle, Sparkles,
   XCircle, TrendingUp, RefreshCw, CheckCircle2, Linkedin,
   HardDrive, Zap, ChevronLeft, ChevronRight, Search,
-  Download,
+  Download, UserPlus, Mail, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,6 +159,12 @@ export default function Admin() {
   const [usersSort, setUsersSort] = useState<"created_desc" | "created_asc" | "active_desc" | "name_asc" | "generations_desc">("created_desc");
   const [apPage, setApPage] = useState(1);
   const [spendPage, setSpendPage] = useState(1);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteFirstName, setInviteFirstName] = useState("");
+  const [inviteLastName, setInviteLastName] = useState("");
+  const [invitePhoneNumber, setInvitePhoneNumber] = useState("");
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
   const isAdmin = user?.role === "admin";
 
@@ -223,12 +229,32 @@ export default function Admin() {
     onSuccess: () => { refetchStats(); refetchUsers(); },
   });
 
+  const deleteUser = trpc.admin.deleteUser.useMutation({
+    onSuccess: () => {
+      if (usersData?.rows.length === 1 && usersPage > 1) {
+        setUsersPage(page => page - 1);
+      } else {
+        refetchUsers();
+      }
+      refetchStats();
+    },
+  });
+
+  const handleDeleteUser = (target: { id: number; email: string }) => {
+    if (target.id === user?.id) return;
+    const confirmed = window.confirm(
+      `Supprimer définitivement le compte ${target.email} ?\n\n` +
+      "Son accès et toutes ses données LinkedRank seront supprimés. Cette action est irréversible.",
+    );
+    if (confirmed) deleteUser.mutate({ userId: target.id });
+  };
+
   const exportUsers = trpc.admin.exportUsers.useMutation({
     onSuccess: rows => {
       const escapeCsv = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-      const headers = ["ID", "Email", "Nom", "Rôle", "Plan", "Générations IA", "LinkedIn connecté", "Inscription", "Dernière activité"];
+      const headers = ["ID", "Email", "Prénom", "Nom", "Téléphone", "Rôle", "Plan", "Générations IA", "LinkedIn connecté", "Inscription", "Dernière activité"];
       const csvRows = rows.map(row => [
-        row.id, row.email, row.name, row.role, row.plan, row.generations,
+        row.id, row.email, row.firstName, row.lastName, row.phoneNumber, row.role, row.plan, row.generations,
         row.linkedinConnected ? "Oui" : "Non", row.createdAt, row.lastSignedIn,
       ]);
       const csv = `\uFEFF${[headers, ...csvRows].map(row => row.map(escapeCsv).join(",")).join("\n")}`;
@@ -248,6 +274,27 @@ export default function Admin() {
     linkedin: linkedinFilter === "all" ? undefined : linkedinFilter,
     sort: usersSort,
   });
+
+  const inviteUser = trpc.admin.inviteUser.useMutation({
+    onSuccess: result => {
+      setInviteSuccess(`Invitation envoyée à ${result.email}`);
+      setInviteEmail("");
+      setInviteFirstName("");
+      setInviteLastName("");
+      setInvitePhoneNumber("");
+    },
+  });
+
+  const handleInviteUser = (event: React.FormEvent) => {
+    event.preventDefault();
+    setInviteSuccess(null);
+    inviteUser.mutate({
+      email: inviteEmail,
+      firstName: inviteFirstName,
+      lastName: inviteLastName,
+      phoneNumber: invitePhoneNumber,
+    });
+  };
 
   const refreshActiveTab = () => {
     if (activeTab === "users") { refetchUsers(); return; }
@@ -433,6 +480,57 @@ export default function Admin() {
         {/* ── USERS ── */}
         {activeTab === "users" && (
           <div className="space-y-4">
+            <div className="flex justify-end">
+              <Button
+                className="gap-2"
+                onClick={() => {
+                  setInviteOpen(open => !open);
+                  setInviteSuccess(null);
+                  inviteUser.reset();
+                }}
+              >
+                <UserPlus className="w-4 h-4" />
+                Inviter un utilisateur
+              </Button>
+            </div>
+
+            {inviteOpen && (
+              <form onSubmit={handleInviteUser} className="p-5 rounded-2xl border border-violet-500/20 bg-violet-500/[0.05] space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Nouvelle invitation</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Un email sécurisé permettra à l'utilisateur de définir son mot de passe.
+                  </p>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="email"
+                      required
+                      placeholder="utilisateur@entreprise.com"
+                      value={inviteEmail}
+                      onChange={e => setInviteEmail(e.target.value)}
+                      className="pl-9 bg-card/50 border-white/10"
+                    />
+                  </div>
+                  <Input required placeholder="Prénom" value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} className="bg-card/50 border-white/10" />
+                  <Input required placeholder="Nom" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} className="bg-card/50 border-white/10" />
+                  <Input required type="tel" placeholder="+212 6 00 00 00 00" value={invitePhoneNumber} onChange={e => setInvitePhoneNumber(e.target.value)} className="bg-card/50 border-white/10" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button type="submit" disabled={inviteUser.isPending || !inviteEmail.trim()}>
+                    {inviteUser.isPending ? "Envoi…" : "Envoyer l'invitation"}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setInviteOpen(false)}>
+                    Annuler
+                  </Button>
+                </div>
+                {inviteSuccess && <p className="text-sm text-emerald-400">{inviteSuccess}</p>}
+                {inviteUser.error && <p className="text-sm text-red-400">{inviteUser.error.message}</p>}
+              </form>
+            )}
+
             {/* Search */}
             <div className="flex flex-wrap gap-2 items-center">
               <div className="relative min-w-[240px] flex-1 max-w-sm">
@@ -457,23 +555,24 @@ export default function Admin() {
               </Button>
             </div>
             {exportUsers.error && <p className="text-xs text-red-400">Échec de l'export : {exportUsers.error.message}</p>}
+            {deleteUser.error && <p className="text-xs text-red-400">Échec de la suppression : {deleteUser.error.message}</p>}
 
             {usersLoading ? (
               <div className="rounded-2xl border border-white/10 overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-white/5">
-                    <tr>{["Email","Nom","Plan","Rôle","Générations","LinkedIn","Inscrit","Actif"].map(h => (
+                    <tr>{["Email","Prénom","Nom","Téléphone","Plan","Rôle","Générations","LinkedIn","Inscrit","Actif","Actions"].map(h => (
                       <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
                     ))}</tr>
                   </thead>
-                  <tbody>{Array.from({ length: PAGE_SIZE.users }).map((_, i) => <TableRowSkeleton key={i} cols={8} />)}</tbody>
+                  <tbody>{Array.from({ length: PAGE_SIZE.users }).map((_, i) => <TableRowSkeleton key={i} cols={11} />)}</tbody>
                 </table>
               </div>
             ) : usersData ? (
               <div className="rounded-2xl border border-white/10 overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-white/5">
-                    <tr>{["Email","Nom","Plan","Rôle","Générations","LinkedIn","Inscrit","Actif"].map(h => (
+                    <tr>{["Email","Prénom","Nom","Téléphone","Plan","Rôle","Générations","LinkedIn","Inscrit","Actif","Actions"].map(h => (
                       <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
                     ))}</tr>
                   </thead>
@@ -481,7 +580,9 @@ export default function Admin() {
                     {usersData.rows.map(u => (
                       <tr key={u.id} className="border-t border-white/5 hover:bg-white/[0.02]">
                         <td className="px-4 py-3 text-white font-medium">{u.email}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{u.name ?? "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{u.firstName ?? "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{u.lastName ?? "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{u.phoneNumber ?? "—"}</td>
                         <td className="px-4 py-3">
                           <span className="px-2 py-0.5 rounded-full text-xs bg-violet-500/20 text-violet-300">{u.plan}</span>
                         </td>
@@ -503,6 +604,20 @@ export default function Admin() {
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{timeAgo(u.createdAt)}</td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{timeAgo(u.lastSignedIn)}</td>
+                        <td className="px-4 py-3">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            title={u.id === user.id ? "Vous ne pouvez pas supprimer votre propre compte" : `Supprimer ${u.email}`}
+                            aria-label={`Supprimer le compte ${u.email}`}
+                            disabled={u.id === user.id || (deleteUser.isPending && deleteUser.variables?.userId === u.id)}
+                            onClick={() => handleDeleteUser(u)}
+                            className="h-8 w-8 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 disabled:opacity-30"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
