@@ -1450,7 +1450,8 @@ export const appRouter = router({
         }
 
         const email = input.email.toLowerCase();
-        if (await getUserByEmail(email)) {
+        const applicationUser = await getUserByEmail(email);
+        if (applicationUser && !applicationUser.openId.startsWith("supabase:")) {
           throw new TRPCError({ code: "CONFLICT", message: "Un utilisateur existe déjà avec cet email" });
         }
 
@@ -1459,7 +1460,7 @@ export const appRouter = router({
           realtime: { transport: WebSocket as never },
         });
         const redirectBase = (ENV.appUrl || "https://linkedrank.fr").replace(/\/$/, "");
-        const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+        const invitationOptions = {
           redirectTo: `${redirectBase}/reset-password?invite=1`,
           data: {
             name: `${input.firstName} ${input.lastName}`,
@@ -1467,17 +1468,69 @@ export const appRouter = router({
             last_name: input.lastName,
             phone_number: input.phoneNumber,
           },
-        });
+        };
+        let { data, error } = await supabase.auth.admin.inviteUserByEmail(email, invitationOptions);
+
+        let reinvited = false;
+        if (error && /already|registered|exists/i.test(error.message)) {
+          let pendingUserId: string | null = null;
+
+          for (let page = 1; page <= 100 && !pendingUserId; page += 1) {
+            const { data: usersPage, error: listError } = await supabase.auth.admin.listUsers({
+              page,
+              perPage: 1000,
+            });
+            if (listError) {
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: `Impossible de vérifier l'invitation existante : ${listError.message}`,
+              });
+            }
+
+            const existing = usersPage.users.find(
+              user => user.email?.toLowerCase() === email,
+            );
+            if (existing) {
+              if (existing.email_confirmed_at) {
+                throw new TRPCError({
+                  code: "CONFLICT",
+                  message: "Un compte actif existe déjà avec cet email",
+                });
+              }
+              pendingUserId = existing.id;
+              break;
+            }
+
+            if (usersPage.users.length < 1000) break;
+          }
+
+          if (!pendingUserId) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "Cet email est déjà enregistré et ne peut pas être réinvité",
+            });
+          }
+
+          const { error: deleteError } = await supabase.auth.admin.deleteUser(pendingUserId);
+          if (deleteError) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Impossible de remplacer l'invitation expirée : ${deleteError.message}`,
+            });
+          }
+
+          ({ data, error } = await supabase.auth.admin.inviteUserByEmail(email, invitationOptions));
+          reinvited = true;
+        }
 
         if (error) {
-          const duplicate = /already|registered|exists/i.test(error.message);
           throw new TRPCError({
-            code: duplicate ? "CONFLICT" : "INTERNAL_SERVER_ERROR",
-            message: duplicate ? "Cet email a déjà été invité ou enregistré" : `Invitation impossible : ${error.message}`,
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Invitation impossible : ${error.message}`,
           });
         }
 
-        return { success: true, email, invitationId: data.user?.id ?? null };
+        return { success: true, email, invitationId: data.user?.id ?? null, reinvited };
       }),
 
     autopublishFailures: adminProcedure
