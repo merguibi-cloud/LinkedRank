@@ -67,7 +67,11 @@ import {
   suggestMediaForPost,
   reanalyzeMedia,
 } from "./services/mediaLibraryService";
+import { deleteMediaFile } from "./services/mediaLibraryStorage";
 import { withCache } from "./_core/cache";
+import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
+import { ENV } from "./_core/env";
+import WebSocket from "ws";
 
 export const appRouter = router({
   system: systemRouter,
@@ -1315,7 +1319,7 @@ export const appRouter = router({
         const linkedinConnected = input.linkedin === "connected" ? true : input.linkedin === "disconnected" ? false : null;
 
         const [rows, [countRow]] = await Promise.all([
-          pg`SELECT u.id, u.email, u.name, u.role, u."subscriptionPlan",
+          pg`SELECT u.id, u.email, u.name, u."firstName", u."lastName", u."phoneNumber", u.role, u."subscriptionPlan",
                     u."createdAt", u."lastSignedIn",
                     COALESCE(gp.cnt, 0)::int AS generations,
                     COALESCE(ls.linkedin_connected, false) AS linkedin_connected
@@ -1356,6 +1360,9 @@ export const appRouter = router({
             id: Number(r.id),
             email: r.email as string,
             name: r.name as string | null,
+            firstName: r.firstName as string | null,
+            lastName: r.lastName as string | null,
+            phoneNumber: r.phoneNumber as string | null,
             role: r.role as string,
             plan: r.subscriptionPlan as string,
             createdAt: String(r.createdAt),
@@ -1386,7 +1393,7 @@ export const appRouter = router({
         const plan = input.plan ?? null;
         const linkedinConnected = input.linkedin === "connected" ? true : input.linkedin === "disconnected" ? false : null;
 
-        const rows = await pg`SELECT u.id, u.email, u.name, u.role, u."subscriptionPlan",
+        const rows = await pg`SELECT u.id, u.email, u.name, u."firstName", u."lastName", u."phoneNumber", u.role, u."subscriptionPlan",
                     u."createdAt", u."lastSignedIn",
                     COALESCE(gp.cnt, 0)::int AS generations,
                     COALESCE(ls.linkedin_connected, false) AS linkedin_connected
@@ -1415,6 +1422,9 @@ export const appRouter = router({
           id: Number(r.id),
           email: (r.email as string | null) ?? "",
           name: (r.name as string | null) ?? "",
+          firstName: (r.firstName as string | null) ?? "",
+          lastName: (r.lastName as string | null) ?? "",
+          phoneNumber: (r.phoneNumber as string | null) ?? "",
           role: r.role as string,
           plan: (r.subscriptionPlan as string | null) ?? "",
           generations: Number(r.generations),
@@ -1422,6 +1432,52 @@ export const appRouter = router({
           createdAt: String(r.createdAt),
           lastSignedIn: String(r.lastSignedIn),
         }));
+      }),
+
+    inviteUser: adminProcedure
+      .input(z.object({
+        email: z.string().trim().email().max(320),
+        firstName: z.string().trim().min(1).max(120),
+        lastName: z.string().trim().min(1).max(120),
+        phoneNumber: z.string().trim().min(5).max(32),
+      }))
+      .mutation(async ({ input }) => {
+        if (!ENV.supabaseUrl || !ENV.supabaseServiceRoleKey) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Service d'invitation Supabase non configuré",
+          });
+        }
+
+        const email = input.email.toLowerCase();
+        if (await getUserByEmail(email)) {
+          throw new TRPCError({ code: "CONFLICT", message: "Un utilisateur existe déjà avec cet email" });
+        }
+
+        const supabase = createSupabaseAdminClient(ENV.supabaseUrl, ENV.supabaseServiceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false },
+          realtime: { transport: WebSocket as never },
+        });
+        const redirectBase = (ENV.appUrl || "https://linkedrank.fr").replace(/\/$/, "");
+        const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+          redirectTo: `${redirectBase}/reset-password?invite=1`,
+          data: {
+            name: `${input.firstName} ${input.lastName}`,
+            first_name: input.firstName,
+            last_name: input.lastName,
+            phone_number: input.phoneNumber,
+          },
+        });
+
+        if (error) {
+          const duplicate = /already|registered|exists/i.test(error.message);
+          throw new TRPCError({
+            code: duplicate ? "CONFLICT" : "INTERNAL_SERVER_ERROR",
+            message: duplicate ? "Cet email a déjà été invité ou enregistré" : `Invitation impossible : ${error.message}`,
+          });
+        }
+
+        return { success: true, email, invitationId: data.user?.id ?? null };
       }),
 
     autopublishFailures: adminProcedure
@@ -1506,6 +1562,116 @@ export const appRouter = router({
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
         await db.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
         return { ok: true };
+      }),
+
+    deleteUser: adminProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        if (input.userId === ctx.user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Vous ne pouvez pas supprimer votre propre compte administrateur",
+          });
+        }
+
+        const pg = await getPgClient();
+        if (!pg) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+        const [target] = await pg`
+          SELECT id, email, "openId"
+          FROM users
+          WHERE id = ${input.userId}
+          LIMIT 1
+        `;
+        if (!target) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur introuvable" });
+        }
+
+        const storedFiles = await pg`
+          SELECT "fileKey" AS key FROM media_library
+          WHERE "userId" = ${input.userId} AND "fileKey" IS NOT NULL
+          UNION
+          SELECT "imageKey" AS key FROM generated_posts
+          WHERE "userId" = ${input.userId} AND "imageKey" IS NOT NULL
+          UNION
+          SELECT "imageKey" AS key FROM auto_publish_queue
+          WHERE "userId" = ${input.userId} AND "imageKey" IS NOT NULL
+          UNION
+          SELECT "imageKey" AS key FROM auto_publish_history
+          WHERE "userId" = ${input.userId} AND "imageKey" IS NOT NULL
+          UNION
+          SELECT "pdfKey" AS key FROM generated_carousels
+          WHERE "userId" = ${input.userId} AND "pdfKey" IS NOT NULL
+        `;
+
+        const openId = String(target.openId);
+        if (openId.startsWith("supabase:")) {
+          if (!ENV.supabaseUrl || !ENV.supabaseServiceRoleKey) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "Suppression impossible : le service administrateur Supabase n'est pas configuré",
+            });
+          }
+
+          const supabase = createSupabaseAdminClient(ENV.supabaseUrl, ENV.supabaseServiceRoleKey, {
+            auth: { autoRefreshToken: false, persistSession: false },
+            realtime: { transport: WebSocket as never },
+          });
+          const authUserId = openId.slice("supabase:".length);
+          const { error } = await supabase.auth.admin.deleteUser(authUserId);
+          if (error && !/not found|does not exist/i.test(error.message)) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Impossible de supprimer l'accès de connexion : ${error.message}`,
+            });
+          }
+        }
+
+        try {
+          await pg.begin(async transaction => {
+            await transaction`DELETE FROM agent_logs WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM agent_memory WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM agent_tasks WHERE "userId" = ${input.userId} OR "approvedBy" = ${input.userId}`;
+            await transaction`DELETE FROM agents WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM auto_publish_history WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM auto_publish_queue WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM auto_publish_schedule WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM auto_publish_settings WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM generated_carousels WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM generated_posts WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM trend_alerts WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM notifications WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM media_library WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM linkedin_settings WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM user_profiles WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM user_subscriptions WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM rate_limit_hits WHERE "userId" = ${input.userId}`;
+            await transaction`DELETE FROM token_usage WHERE "userId" = ${input.userId}`;
+            await transaction`
+              DELETE FROM team_members
+              WHERE "userId" = ${input.userId}
+                 OR "teamId" IN (SELECT id FROM teams WHERE "ownerId" = ${input.userId})
+            `;
+            await transaction`DELETE FROM teams WHERE "ownerId" = ${input.userId}`;
+            await transaction`DELETE FROM users WHERE id = ${input.userId}`;
+          });
+        } catch (error) {
+          console.error("[Admin] User data deletion failed:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "L'accès a été révoqué, mais la suppression des données a échoué. Réessayez.",
+          });
+        }
+
+        const fileCleanup = await Promise.allSettled(
+          storedFiles.map(file => deleteMediaFile(String(file.key))),
+        );
+        const failedFileCount = fileCleanup.filter(result => result.status === "rejected").length;
+        if (failedFileCount > 0) {
+          console.warn(`[Admin] ${failedFileCount} stored file(s) could not be deleted for user ${input.userId}`);
+        }
+
+        return { success: true, email: (target.email as string | null) ?? null };
       }),
   }),
 

@@ -19,7 +19,12 @@ export function createClient() {
   // competing token-refresh timers and redundant auth-state-change events
   // (Supabase warns about this directly) — keep a single shared client.
   if (!client) {
-    client = createBrowserClient(supabaseUrl, supabaseKey);
+    client = createBrowserClient(supabaseUrl, supabaseKey, {
+      auth: {
+        flowType: "pkce",
+        detectSessionInUrl: false,
+      },
+    });
   }
 
   return client;

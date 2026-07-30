@@ -17,7 +17,7 @@ function emailOpenId(email: string) {
 
 router.post("/register", async (req, res) => {
   try {
-    const { email, password, name } = req.body ?? {};
+    const { email, password, firstName, lastName, phoneNumber } = req.body ?? {};
 
     if (!email || !password) {
       return res.status(400).json({ error: "Email et mot de passe requis" });
@@ -41,7 +41,10 @@ router.post("/register", async (req, res) => {
     await upsertUser({
       openId,
       email: normalizedEmail,
-      name: name?.trim() || null,
+      name: [firstName, lastName].map(value => value?.trim()).filter(Boolean).join(" ") || null,
+      firstName: firstName?.trim() || null,
+      lastName: lastName?.trim() || null,
+      phoneNumber: phoneNumber?.trim() || null,
       loginMethod: "email",
       passwordHash,
       lastSignedIn: new Date(),

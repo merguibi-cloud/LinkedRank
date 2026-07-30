@@ -24,6 +24,7 @@ import {
   Mail,
   Sparkles,
   User,
+  Phone,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -37,12 +38,15 @@ export default function Signup() {
   const utils = trpc.useUtils();
   const [, setLocation] = useLocation();
   const [step, setStep] = useState<SignupStep>(1);
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [pendingEmailVerification, setPendingEmailVerification] = useState(false);
+  const [pendingEmailVerification, setPendingEmailVerification] =
+    useState(false);
 
   const redirect = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -78,6 +82,14 @@ export default function Signup() {
 
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!firstName.trim() || !lastName.trim()) {
+      toast.error("Veuillez entrer votre prénom et votre nom");
+      return;
+    }
+    if (!phoneNumber.trim()) {
+      toast.error("Veuillez entrer votre numéro de téléphone");
+      return;
+    }
     if (!email.trim()) {
       toast.error("Veuillez entrer votre email");
       return;
@@ -101,7 +113,12 @@ export default function Signup() {
           email,
           password,
           options: {
-            data: { name: name.trim() || undefined },
+            data: {
+              name: `${firstName.trim()} ${lastName.trim()}`,
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              phone_number: phoneNumber.trim(),
+            },
             // EmailConfirmationHandler only watches the bare Site URL ("/")
             // for the confirmation "code" param — don't send it elsewhere.
             emailRedirectTo: window.location.origin,
@@ -127,7 +144,13 @@ export default function Signup() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ name, email, password }),
+          body: JSON.stringify({
+            firstName,
+            lastName,
+            phoneNumber,
+            email,
+            password,
+          }),
         });
 
         const data = await response.json();
@@ -168,13 +191,14 @@ export default function Signup() {
             </h1>
             <p className="text-muted-foreground mt-3 leading-relaxed">
               Un lien de confirmation a été envoyé à{" "}
-              <span className="text-white font-medium">{email}</span>.
-              Cliquez dessus pour configurer votre profil.
+              <span className="text-white font-medium">{email}</span>. Cliquez
+              dessus pour configurer votre profil.
             </p>
           </div>
           <div className="rounded-xl border border-violet/20 bg-violet/5 p-4 text-left">
             <p className="text-sm text-muted-foreground">
-              Après confirmation : profil → LinkedIn → premier post ou automatisation.
+              Après confirmation : profil → LinkedIn → premier post ou
+              automatisation.
             </p>
           </div>
           <Link href={getLoginUrl(redirect)}>
@@ -210,17 +234,51 @@ export default function Signup() {
             </div>
 
             <form onSubmit={handleStep1} className="space-y-5">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">Prénom</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="firstName"
+                      value={firstName}
+                      onChange={e => setFirstName(e.target.value)}
+                      placeholder="Mohamed"
+                      required
+                      autoComplete="given-name"
+                      className="bg-white/5 border-white/10 pl-10 h-12 focus:border-violet/50"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Nom</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="lastName"
+                      value={lastName}
+                      onChange={e => setLastName(e.target.value)}
+                      placeholder="Erguibi"
+                      required
+                      autoComplete="family-name"
+                      className="bg-white/5 border-white/10 pl-10 h-12 focus:border-violet/50"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="name">Nom</Label>
+                <Label htmlFor="phoneNumber">Numéro de téléphone</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    id="name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Votre nom ou pseudo"
-                    autoComplete="name"
+                    id="phoneNumber"
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={e => setPhoneNumber(e.target.value)}
+                    placeholder="+212 6 00 00 00 00"
+                    required
+                    autoComplete="tel"
                     className="bg-white/5 border-white/10 pl-10 h-12 focus:border-violet/50"
                   />
                 </div>
@@ -234,7 +292,7 @@ export default function Signup() {
                     id="email"
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={e => setEmail(e.target.value)}
                     placeholder="vous@entreprise.com"
                     required
                     autoComplete="email"
@@ -243,7 +301,10 @@ export default function Signup() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full btn-gradient h-12 text-base">
+              <Button
+                type="submit"
+                className="w-full btn-gradient h-12 text-base"
+              >
                 Continuer
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -284,7 +345,7 @@ export default function Signup() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={e => setPassword(e.target.value)}
                     placeholder="8 caractères minimum"
                     minLength={8}
                     required
@@ -295,15 +356,27 @@ export default function Signup() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
-                    aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                    aria-label={
+                      showPassword
+                        ? "Masquer le mot de passe"
+                        : "Afficher le mot de passe"
+                    }
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
                 <PasswordStrength password={password} />
               </div>
 
-              <Button type="submit" className="w-full btn-gradient h-12 text-base" disabled={isSubmitting}>
+              <Button
+                type="submit"
+                className="w-full btn-gradient h-12 text-base"
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -324,7 +397,10 @@ export default function Signup() {
       <div className="mt-8 pt-6 border-t border-white/10">
         <p className="text-center text-sm text-muted-foreground">
           Déjà un compte ?{" "}
-          <Link href={getLoginUrl(redirect)} className="text-violet-light hover:underline font-medium">
+          <Link
+            href={getLoginUrl(redirect)}
+            className="text-violet-light hover:underline font-medium"
+          >
             Se connecter
           </Link>
         </p>
@@ -335,4 +411,3 @@ export default function Signup() {
     </AuthLayout>
   );
 }
-

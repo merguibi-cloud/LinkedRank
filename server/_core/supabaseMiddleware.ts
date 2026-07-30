@@ -1,5 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
-import { createSupabaseServerClient, isSupabaseConfigured } from "./supabase";
+import {
+  clearSupabaseAuthCookies,
+  createSupabaseServerClient,
+  isInvalidRefreshTokenError,
+  isSupabaseConfigured,
+} from "./supabase";
 
 /**
  * Rafraîchit la session Supabase sur chaque requête (équivalent du middleware Next.js).
@@ -17,7 +22,11 @@ export async function supabaseSessionMiddleware(
     const supabase = createSupabaseServerClient(req, res);
     await supabase.auth.getUser();
   } catch (error) {
-    console.warn("[Supabase] Session refresh failed:", error);
+    if (isInvalidRefreshTokenError(error)) {
+      clearSupabaseAuthCookies(req, res);
+    } else {
+      console.warn("[Supabase] Session refresh failed:", error);
+    }
   }
 
   next();

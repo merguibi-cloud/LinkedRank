@@ -30,11 +30,6 @@ export default function ResetPassword() {
       return;
     }
 
-    // The Supabase browser client auto-detects and exchanges the "code" in
-    // the URL on creation (detectSessionInUrl), then strips it from the URL.
-    // So we don't exchange it ourselves here — that would race against the
-    // SDK's own exchange and fail since the code is already consumed. We
-    // just wait for the resulting session to show up.
     const supabase = createClient();
     let settled = false;
 
@@ -44,9 +39,25 @@ export default function ResetPassword() {
       setVerifyState("ready");
     };
 
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+    const code = params.get("code");
+    void (async () => {
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          if (!settled) {
+            settled = true;
+            setVerifyState("invalid");
+          }
+          return;
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+        markReady();
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) markReady();
-    });
+    })();
 
     const {
       data: { subscription },
